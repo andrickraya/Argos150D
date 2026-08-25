@@ -19,11 +19,11 @@ nav_order: 1
   <div class="hero__actions">
     <a href="#vision" class="btn-cta btn-primary">Ver cómo funciona</a>
     <!-- TODO: cambia "#" por la URL real de tu repositorio en GitHub -->
-    <a href="#" class="btn-cta btn-secondary">Ver repositorio</a>
+    <a href="andrickraya.github.io" class="btn-cta btn-secondary">Ver repositorio</a>
   </div>
 
   <video class="hero-video" controls preload="metadata">
-    <source src="{{ '/assets/video/Practica1.mp4' | relative_url }}" type="video/mp4">
+    <source src="{{ '/assets/videos/Practica1.mp4' | relative_url }}" type="video/mp4">
     Tu navegador no soporta la reproducción de video.
   </video>
 </div>
@@ -78,7 +78,7 @@ nav_order: 1
   </p>
   <div class="hero__actions">
     <!-- TODO: cambia "#" por tu correo, LinkedIn o el link que prefieras -->
-    <a href="#" class="btn-cta btn-primary">Contactar</a>
-    <a href="#" class="btn-cta btn-secondary">Ver repositorio</a>
+    <a href="andrickraya.github.io" class="btn-cta btn-primary">Contactar</a>
+    <a href="andrickraya.github.io" class="btn-cta btn-secondary">Ver repositorio</a>
   </div>
 </div>
