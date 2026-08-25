@@ -1,6 +1,8 @@
 title: C4-XR COP
 description: Sistema táctico de navegación e intercepción inmersiva.
-theme: just-the-docs
+remote_theme: just-the-docs/just-the-docs
 color_scheme: light
 url: "https://github.com/andrickraya/Argos150D"
 baseurl: "/Argos150D"
+plugins:
+  - jekyll-remote-theme
