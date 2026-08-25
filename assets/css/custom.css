@@ -1,0 +1,368 @@
+/* =========================================================================
+   custom.css — Identidad visual "Apple minimalista"
+   Portafolio de Andrick — Ciencia de Datos + XR (Tecnologías Emergentes, IBERO)
+
+   Nota de arquitectura: Just the Docs se carga vía remote_theme, así que la
+   única forma soportada por el curso de sobreescribir sus estilos es este
+   archivo con selectores + !important (no podemos hookear _sass/ local).
+   Es un poco más "bruto" que la alternativa (un color_scheme de Sass), pero
+   es exactamente el patrón que enseña la guía del curso, así que nos
+   quedamos en él a propósito.
+   ========================================================================= */
+
+/* ---------- 1) Tokens de diseño ---------- */
+:root {
+  --bg:            #fbfbfd;
+  --bg-elevated:   #ffffff;
+  --sidebar-bg:    #f5f5f7;
+  --text-primary:  #1d1d1f;
+  --text-secondary:#6e6e73;
+  --text-tertiary: #86868b;
+  --border:        #d2d2d7;
+  --border-light:  #e8e8ed;
+  --accent:        #0066cc;
+  --accent-hover:  #004fa3;
+  --accent-tint:   rgba(0, 102, 204, 0.08);
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 22px;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.05);
+  --shadow-md: 0 12px 32px rgba(0,0,0,.08);
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
+               "Inter", "Helvetica Neue", Arial, sans-serif;
+}
+
+/* ---------- 2) Base ---------- */
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: var(--font-sans) !important;
+  background-color: var(--bg) !important;
+  color: var(--text-primary) !important;
+  -webkit-font-smoothing: antialiased;
+}
+
+.page-content, .main-content {
+  background-color: var(--bg) !important;
+  color: var(--text-primary) !important;
+}
+
+/* ---------- 3) Sidebar ---------- */
+.side-bar {
+  background-color: var(--sidebar-bg) !important;
+  border-right: 1px solid var(--border) !important;
+}
+.side-bar .site-header,
+.side-bar .site-nav,
+.side-bar .nav-list,
+.side-bar .site-footer { background-color: transparent !important; }
+
+.site-title {
+  color: var(--text-primary) !important;
+  font-weight: 600 !important;
+  font-size: 1.15rem !important;
+  letter-spacing: -0.01em;
+}
+.site-title:hover { color: var(--accent) !important; }
+
+.site-logo, .site-title img {
+  height: 26px;
+  width: auto;
+  vertical-align: middle;
+  margin-right: .55rem;
+}
+
+/* Botón de menú (móvil) */
+#menu-button,
+#menu-button .icon {
+  color: var(--text-primary) !important;
+  fill: var(--text-primary) !important;
+  stroke: var(--text-primary) !important;
+}
+#menu-button:hover { color: var(--accent) !important; }
+
+/* ---------- 4) Navegación (links reales del tema) ---------- */
+.nav-list .nav-list-link,
+.nav-list .nav-list-link:visited {
+  color: var(--text-secondary) !important;
+  font-weight: 400;
+  font-size: 0.95rem;
+  border-radius: var(--radius-sm);
+  transition: background-color .15s ease, color .15s ease;
+}
+.nav-list .nav-list-link:hover {
+  color: var(--text-primary) !important;
+  background-color: rgba(0,0,0,0.035) !important;
+}
+.nav-list .nav-list-link.active {
+  color: var(--accent) !important;
+  font-weight: 600;
+  background-color: var(--accent-tint) !important;
+}
+
+/* Hijos (subpáginas) — un poco más pequeños, indentados */
+.nav-list .nav-list-item .nav-list .nav-list-link {
+  font-weight: 400;
+  font-size: 0.88rem;
+  background: transparent !important;
+}
+
+.nav-list-expander,
+.nav-list-expander svg {
+  color: var(--text-tertiary) !important;
+  stroke: var(--text-tertiary) !important;
+  fill: none !important;
+}
+.nav-list-expander:hover,
+.nav-list-expander:hover svg { color: var(--accent) !important; stroke: var(--accent) !important; }
+
+.nav-list .nav-list-link:focus,
+#menu-button:focus {
+  outline: 2px solid var(--accent) !important;
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* ---------- 5) Barra superior + buscador ---------- */
+.main-header {
+  background-color: rgba(251, 251, 253, 0.8) !important;
+  backdrop-filter: saturate(180%) blur(14px);
+  -webkit-backdrop-filter: saturate(180%) blur(14px);
+  border-bottom: 1px solid var(--border-light) !important;
+  position: sticky;
+  top: 0;
+  z-index: 30;
+}
+
+.search-input-wrap {
+  background-color: var(--sidebar-bg) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 980px !important; /* pill, como Spotlight/App Store */
+}
+.search-input {
+  color: var(--text-primary) !important;
+  background: transparent !important;
+}
+.search-input::placeholder { color: var(--text-tertiary) !important; }
+.search-icon { fill: var(--text-tertiary) !important; }
+.search-results {
+  background-color: var(--bg-elevated) !important;
+  border: 1px solid var(--border-light) !important;
+  border-radius: var(--radius-md) !important;
+  box-shadow: var(--shadow-md) !important;
+}
+
+/* ---------- 6) Migas de pan ---------- */
+.breadcrumb-nav-list-item a,
+.breadcrumb-nav-list-item a:visited { color: var(--text-tertiary) !important; }
+.breadcrumb-nav-list-item a:hover { color: var(--accent) !important; }
+
+/* ---------- 7) Enlaces dentro del contenido ---------- */
+:root { --link-color: var(--accent); }
+.main-content a, .main-content a:visited {
+  color: var(--accent) !important;
+  text-decoration-color: rgba(0,102,204,0.35);
+}
+.main-content a:hover {
+  color: var(--accent-hover) !important;
+  text-decoration-color: rgba(0,79,163,0.6);
+}
+
+/* ---------- 8) Tipografía de contenido ---------- */
+.main-content { max-width: 760px; }
+
+.main-content h1, .main-content h2, .main-content h3 {
+  font-weight: 600 !important;
+  letter-spacing: -0.02em !important;
+  color: var(--text-primary) !important;
+}
+.main-content h1 { font-size: 2.6rem !important; line-height: 1.08; margin-bottom: .4em !important; }
+.main-content h2 { font-size: 1.7rem !important; margin-top: 2.6em !important; }
+.main-content h3 { font-size: 1.25rem !important; }
+.main-content p, .main-content li {
+  font-size: 1.06rem;
+  line-height: 1.6;
+  color: var(--text-primary);
+}
+.main-content > p:first-of-type {
+  font-size: 1.25rem;
+  color: var(--text-secondary);
+  font-weight: 400;
+}
+
+/* ---------- 9) Hero (full-bleed, escapa el ancho normal del contenido) ---------- */
+.hero {
+  max-width: none;
+  margin: -2rem calc(50% - 50vw) 3rem;
+  padding: 4.5rem 1.5rem 3rem;
+  text-align: center;
+  background: radial-gradient(120% 140% at 50% -10%, #ffffff 0%, var(--bg) 60%);
+}
+.hero__eyebrow {
+  display: inline-block;
+  font-size: .82rem;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 1rem;
+}
+.hero h1 {
+  font-size: clamp(2.4rem, 5vw, 3.6rem) !important;
+  max-width: 820px;
+  margin: 0 auto .5em !important;
+}
+.hero__subtitle {
+  max-width: 620px;
+  margin: 0 auto 2rem;
+  font-size: 1.2rem;
+  color: var(--text-secondary);
+}
+.hero__actions {
+  display: flex;
+  gap: .9rem;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 2.75rem;
+}
+
+/* Banda full-bleed para CTAs secundarias (NO hereda el margen negativo del hero) */
+.cta-band {
+  max-width: none;
+  margin: 3rem calc(50% - 50vw) -2rem;
+  padding: 3rem 1.5rem 3.5rem;
+  text-align: center;
+  background-color: var(--sidebar-bg);
+  border-top: 1px solid var(--border-light);
+}
+.cta-band h2 { margin-top: 0 !important; }
+
+.hero-video {
+  width: 100%;
+  max-width: 900px;
+  margin: 0 auto;
+  display: block;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--border-light);
+  background-color: #000;
+}
+
+/* ---------- 10) Botones ---------- */
+.btn-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  padding: .72rem 1.5rem;
+  border-radius: 980px;
+  font-size: .98rem;
+  font-weight: 500;
+  text-decoration: none !important;
+  transition: transform .15s ease, background-color .15s ease, box-shadow .15s ease;
+}
+.btn-cta:hover { transform: translateY(-1px); }
+
+.btn-primary {
+  background-color: var(--accent) !important;
+  color: #ffffff !important;
+}
+.btn-primary:hover { background-color: var(--accent-hover) !important; box-shadow: 0 6px 18px rgba(0,102,204,.35); }
+
+.btn-secondary {
+  background-color: var(--bg-elevated) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--border);
+}
+.btn-secondary:hover { border-color: var(--text-tertiary); }
+
+/* ---------- 11) Tarjetas de contenido (reemplaza el glassmorphism) ---------- */
+.card-minimal {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  padding: 2rem;
+  margin: 1.75rem 0;
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow .2s ease, transform .2s ease;
+}
+.card-minimal:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
+.card-minimal h2, .card-minimal h3 { margin-top: 0 !important; }
+
+/* Grid de módulos ("catálogo" del sistema) */
+.module-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.25rem;
+  margin: 1.75rem 0 2.5rem;
+}
+.module-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  padding: 1.5rem;
+  transition: box-shadow .2s ease, transform .2s ease, border-color .2s ease;
+}
+.module-card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+  border-color: var(--border);
+}
+.module-card__label {
+  font-size: .75rem;
+  font-weight: 600;
+  letter-spacing: .03em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.module-card h3 { margin: .3rem 0 .5rem !important; font-size: 1.05rem !important; }
+.module-card p { font-size: .92rem; color: var(--text-secondary); margin: 0; }
+
+/* ---------- 12) Reveal al hacer scroll (sutil, sin librerías) ---------- */
+.reveal {
+  opacity: 0;
+  transform: translateY(14px);
+  transition: opacity .6s ease, transform .6s ease;
+}
+.reveal.is-visible { opacity: 1; transform: translateY(0); }
+@media (prefers-reduced-motion: reduce) {
+  .reveal { opacity: 1; transform: none; transition: none; }
+  html { scroll-behavior: auto; }
+}
+
+/* ---------- 13) Footer propio ---------- */
+footer.site-footer { display: none !important; }
+
+.custom-footer {
+  margin-top: 4rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border-light);
+  color: var(--text-tertiary);
+  font-size: .88rem;
+  background: transparent;
+}
+.custom-footer a, .custom-footer a:visited {
+  color: var(--text-secondary);
+  text-decoration-color: var(--border);
+}
+.custom-footer a:hover { color: var(--accent); }
+.custom-footer__modified strong { color: var(--text-secondary); }
+
+/* ---------- 14) Video / embebidos genéricos ---------- */
+video { max-width: 100%; height: auto; border-radius: var(--radius-md); }
+.responsive-embed {
+  position: relative; width: 100%; padding-top: 56.25%;
+  overflow: hidden; border-radius: var(--radius-md);
+}
+.responsive-embed iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+
+/* ---------- 15) Responsive ---------- */
+@media (max-width: 66rem) {
+  .custom-footer { background: var(--bg-elevated); }
+}
+@media (max-width: 640px) {
+  .hero { padding: 3rem 1.25rem 2rem; }
+  .hero__actions { flex-direction: column; align-items: stretch; }
+  .btn-cta { justify-content: center; }
+  .main-content h1 { font-size: 2rem !important; }
+  .card-minimal { padding: 1.5rem; }
+}

@@ -4,29 +4,122 @@ title: Inicio
 nav_order: 1
 ---
 
-# C4-XR: Consciencia Situacional Inmersiva
+<div class="hero">
+  <span class="hero__eyebrow">C4-XR · Proyecto integrador — Ciencia de Datos + XR</span>
 
-Un proyecto integrador de **Ciencia de Datos** y **Realidad Mixta (Unity 3D / XR)** para transformar la respuesta táctica de la Guardia Nacional.
+# De la sala de control al parabrisas, en tiempo real
 
-<!-- Contenedor del Video -->
-<video width="100%" controls style="border-radius: 18px; box-shadow: 0 4px 24px rgba(0,0,0,0.05); border: 1px solid rgba(0,0,0,0.05); margin: 20px 0 40px 0; background-color: #000;">
-  <source src="assets/video/Practica1.mp4" type="video/mp4">
-  Tu navegador no soporta la reproducción de video.
-</video>
+  <p class="hero__subtitle">
+    Ciencia de Datos y Realidad Mixta para llevar las alertas del C4 Carretero
+    directo al campo de visión de un patrullero en movimiento, en el corredor
+    federal México&nbsp;–&nbsp;Puebla (150D).
+  </p>
 
-<div class="card-minimal">
-  <h2 class="text-blue-apple">Visión del Proyecto</h2>
-  <p>Al ocurrir un incidente crítico en la autopista <b>México - Puebla</b>, el sistema analiza en tiempo real datos provenientes de la infraestructura del C4 Carretero (cámaras de monitoreo, sensores de flujo y arcos lectores de placas)[cite: 1].</p>
-  <p>A través de un visor XR, el patrullero recibe instrucciones dinámicas directamente en su campo de visión: rutas óptimas de llegada, alertas de tráfico en tiempo real y guiado direccional mediante flechas holográficas proyectadas en el asfalto.</p>
+  <div class="hero__actions">
+    <a href="#vision" class="btn-cta btn-primary">Ver cómo funciona</a>
+    <!-- TODO: cambia "#" por la URL real de tu repositorio en GitHub -->
+    <a href="#" class="btn-cta btn-secondary">Ver repositorio</a>
+  </div>
+
+  <video class="hero-video" controls preload="metadata">
+    <source src="{{ '/assets/video/Practica1.mp4' | relative_url }}" type="video/mp4">
+    Tu navegador no soporta la reproducción de video.
+  </video>
 </div>
 
-<div class="card-minimal">
-  <h2 class="text-blue-apple">Arquitectura Tecnológica</h2>
-  <ul>
-    <li><strong>Backend (Ciencia de Datos):</strong> Procesamiento de alertas en tiempo real y modelos predictivos de tráfico utilizando algoritmos de optimización de rutas (como Dijkstra ponderado) integrados vía FastAPI[cite: 1, 2].</li>
-    <li><strong>Frontend (Unity 3D XR):</strong> Interfaz táctica (HUD) que proyecta recuadros de detección sobre vehículos de interés, alertas de distancia ("Giro en 100 m") y velocímetros dinámicos para una intercepción segura[cite: 1, 2].</li>
-  </ul>
+<div class="card-minimal reveal" id="vision">
+
+## Visión del proyecto
+
+Cuando ocurre un incidente crítico en la autopista México–Puebla —bloqueo, robo,
+persecución—, el sistema analiza en tiempo real datos simulados de la
+infraestructura del C4 Carretero: cámaras de monitoreo, sensores de flujo y
+arcos lectores de placas.
+
+A través de un visor XR, el patrullero recibe instrucciones dinámicas
+directamente en su campo de visión: rutas óptimas de llegada, alertas de
+tráfico en tiempo real y guiado direccional mediante flechas holográficas
+ancladas al mundo real.
+
 </div>
 
----
-*Materia: Tecnologías Emergentes | Análisis de Datos + Motores 3D*
+<div class="card-minimal reveal">
+
+## Por qué es distinto
+
+No es un escenario inventado: el corredor 150D y una infraestructura de
+videovigilancia y arcos ANPR muy similar ya están en operación. Lo que no
+existe todavía es la capa que conecta ese monitoreo centralizado con quien
+va manejando hacia el incidente — ese es exactamente el hueco que este
+proyecto llena con XR.
+
+Es, además, un sistema explícitamente de **apoyo a la navegación y a la
+decisión**: calcula rutas, detecta anomalías y estima tiempos, pero no
+automatiza el uso de la fuerza ni decide nada por el usuario.
+
+</div>
+
+<div class="reveal" id="arquitectura">
+
+## Módulos del sistema
+
+<div class="module-grid">
+
+<div class="module-card">
+<span class="module-card__label">Backend · Ruteo</span>
+### Motor de ruteo dinámico
+Dijkstra como línea base y A* con heurística Haversine sobre un grafo cuyos
+pesos se recalculan con cada lectura nueva de tráfico o incidente.
+</div>
+
+<div class="module-card">
+<span class="module-card__label">Backend · ML</span>
+### Detección de anomalías
+Umbral estadístico (z-score / EWMA) como primer nivel, e Isolation Forest
+sobre variables tabulares para detectar patrones atípicos de tráfico.
+</div>
+
+<div class="module-card">
+<span class="module-card__label">Backend · ML</span>
+### Predicción de ETA
+Gradient Boosting sobre features de tramo, hora, clima simulado y nivel de
+congestión para estimar el tiempo de llegada a la intercepción.
+</div>
+
+<div class="module-card">
+<span class="module-card__label">Frontend · Unity XR</span>
+### HUD holográfico
+XR Origin + Canvas en World Space: flecha 3D de dirección, ETA en
+TextMeshPro y alertas ancladas al campo de visión del patrullero.
+</div>
+
+</div>
+</div>
+
+<div class="card-minimal reveal">
+
+## Estado del proyecto
+
+Actualmente en la fase de estructuración teórica y primera entrega:
+arquitectura de datos definida, dataset sintético en diseño sobre la
+topología real del corredor (vía OSMnx), y el entorno base de Unity en
+construcción — escenario de carretera, configuración de XR Origin y
+placeholders de datos.
+
+</div>
+
+<div class="cta-band reveal">
+
+## ¿Quieres saber más?
+
+  <p class="hero__subtitle" style="margin-bottom: 1.5rem;">
+    El detalle técnico completo —arquitectura, dataset y roadmap— está en las
+    siguientes secciones.
+  </p>
+
+  <div class="hero__actions">
+    <!-- TODO: cambia "#" por tu correo, LinkedIn o el link que prefieras -->
+    <a href="#" class="btn-cta btn-primary">Contactar</a>
+    <a href="#" class="btn-cta btn-secondary">Ver repositorio</a>
+  </div>
+</div>
