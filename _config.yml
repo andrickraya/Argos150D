@@ -3,4 +3,4 @@ description: Sistema táctico de navegación e intercepción inmersiva.
 theme: just-the-docs
 color_scheme: light
 url: "https://github.com/andrickraya/Argos150D"
-baseurl: Argos150D" 
+baseurl: "/Argos150D"
