@@ -1,4 +1,4 @@
- ---
+---
 layout: default
 title: Inicio
 nav_order: 1
@@ -80,32 +80,5 @@ nav_order: 1
     <!-- TODO: cambia "#" por tu correo, LinkedIn o el link que prefieras -->
     <a href="andrickraya.github.io" class="btn-cta btn-primary">Contactar</a>
     <a href="andrickraya.github.io" class="btn-cta btn-secondary">Ver repositorio</a>
-  </div>
-</div>
-<div class="card-minimal reveal" id="practicas">
-  <h2>Prácticas de laboratorio: primeros pasos en Unity</h2>
-  <p>Antes de construir el escenario completo del corredor 150D, se completaron dos prácticas guiadas del curso para dominar animación y programación en Unity.</p>
-
-  <div class="module-grid">
-    <div class="module-card">
-      <span class="module-card__label">Práctica · Sin programación</span>
-      <h3>Rueda de la fortuna animada</h3>
-      <p>Rotación continua lograda únicamente con las herramientas de animación de Unity (Animation Window / Animator): keyframes y curvas controlando el giro, sin una sola línea de código.</p>
-      <!-- TODO: sube tu video a assets/videos/ con este nombre exacto (o cambia la ruta de abajo) -->
-      <video class="hero-video" controls preload="metadata">
-        <source src="{{ '/assets/videos/practica-rueda.mp4' | relative_url }}" type="video/mp4">
-        Tu navegador no soporta la reproducción de video.
-      </video>
-    </div>
-    <div class="module-card">
-      <span class="module-card__label">Prácticas 3 y 4 · Con programación</span>
-      <h3>Cañón autónomo + interfaz de control</h3>
-      <p>Cañón construido a partir de un cilindro, con un script en C# (ControlCañon) que instancia balas físicas con Rigidbody y las autodestruye a los 3 segundos. Un Canvas con contador de munición en TextMeshPro y un botón "¡FUEGO!" permiten dispararlo y ver la cuenta de balas actualizarse desde la interfaz.</p>
-      <!-- TODO: sube tu video a assets/videos/ con este nombre exacto (o cambia la ruta de abajo) -->
-      <video class="hero-video" controls preload="metadata">
-        <source src="{{ '/assets/videos/practica-canon.mp4' | relative_url }}" type="video/mp4">
-        Tu navegador no soporta la reproducción de video.
-      </video>
-    </div>
   </div>
 </div>
