@@ -71,7 +71,7 @@ nav_order: 2
   <span class="practice-block__label">Práctica · Sin programación</span>
   <h2>Rueda de la fortuna animada</h2>
   <video class="hero-video" controls preload="metadata">
-    <source src="{{ '/assets/videos/practica-rueda.mp4' | relative_url }}" type="video/mp4">
+    <source src="{{ '/assets/videos/practica-rueda.webm' | relative_url }}" type="video/webm">
     Tu navegador no soporta la reproducción de video.
   </video>
   <div class="practice-columns">
@@ -90,7 +90,7 @@ nav_order: 2
   <span class="practice-block__label">Prácticas 3 y 4 · Con programación</span>
   <h2>Cañón autónomo + interfaz de control</h2>
   <video class="hero-video" controls preload="metadata">
-    <source src="{{ '/assets/videos/practica-canon.mp4' | relative_url }}" type="video/mp4">
+    <source src="{{ '/assets/videos/practica-canon.webm' | relative_url }}" type="video/webm">
     Tu navegador no soporta la reproducción de video.
   </video>
   <div class="practice-columns">
