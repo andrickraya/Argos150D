@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Argos — Navegación en Realidad Mixta para Interiores</title>
+    <meta name="description" content="Argos: Navegación en Realidad Mixta para Interiores — Revolucionando la forma de explorar la Universidad Iberoamericana a través de tecnología inmersiva e inteligencia de datos." />
+    <link rel="icon" href="data:;base64,iVBORw0KGgo=">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      // Tailwind config: custom colors
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              primary: {
+                DEFAULT: '#0f172a',
+                light: '#0b1220',
+                accent: '#06b6d4'
+              },
+              accent: '#06b6d4',
+              glass: 'rgba(255,255,255,0.06)'
+            },
+            fontFamily: {
+              sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial']
+            }
+          }
+        }
+      }
+    </script>
+    <style>
+      /* Minimal fallback for Inter via Google Fonts */
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+  </head>
+
+  <body class="antialiased bg-gradient-to-b from-white to-slate-50 text-slate-800">
+    <header class="sticky top-0 z-40 backdrop-blur bg-white/70 border-b border-slate-200">
+      <nav class="max-w-7xl mx-auto px-6 lg:px-8">
+        <div class="flex items-center justify-between h-16">
+          <a href="#inicio" class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-sky-500 to-indigo-600 flex items-center justify-center text-white font-bold shadow">
+              A
+            </div>
+            <span class="font-semibold text-lg">Argos</span>
+          </a>
+          <div class="hidden md:flex items-center gap-8">
+            <a href="#acerca" class="text-sm hover:text-slate-900">Acerca</a>
+            <a href="#features" class="text-sm hover:text-slate-900">Características</a>
+            <a href="#tecnologia" class="text-sm hover:text-slate-900">Tecnología</a>
+            <a href="#contacto" class="text-sm text-slate-600">Contacto</a>
+          </div>
+          <div class="md:hidden">
+            <button id="menuBtn" aria-label="Abrir menú" class="p-2 rounded-md hover:bg-slate-100">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16"/></svg>
+            </button>
+          </div>
+        </div>
+      </nav>
+      <!-- Mobile menu -->
+      <div id="menu" class="md:hidden hidden border-t border-slate-200 bg-white/80">
+        <div class="px-6 py-4 flex flex-col gap-3">
+          <a href="#acerca" class="py-2">Acerca</a>
+          <a href="#features" class="py-2">Características</a>
+          <a href="#tecnologia" class="py-2">Tecnología</a>
+          <a href="#contacto" class="py-2">Contacto</a>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <!-- Hero -->
+      <section id="inicio" class="relative overflow-hidden">
+        <div class="max-w-7xl mx-auto px-6 lg:px-8">
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center py-20 lg:py-28">
+            <div class="space-y-6">
+              <p class="inline-flex items-center gap-2 text-sm font-medium text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full w-max">Nuevo proyecto</p>
+              <h1 class="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight">
+                Argos: Navegación en Realidad Mixta para Interiores.
+              </h1>
+              <p class="text-lg text-slate-700 max-w-xl">
+                Revolucionando la forma de explorar la Universidad Iberoamericana a través de tecnología inmersiva e inteligencia de datos.
+              </p>
+              <div class="flex items-center gap-4">
+                <a href="#acerca" class="inline-flex items-center justify-center rounded-md bg-indigo-600 text-white px-5 py-3 text-sm font-medium hover:bg-indigo-700 shadow">
+                  Descubre el Proyecto.
+                </a>
+                <a href="#tecnologia" class="text-sm text-slate-600 hover:text-slate-900">Ver stack tecnológico &rarr;</a>
+              </div>
+
+              <div class="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                <div class="p-3 bg-white/60 rounded-lg border border-slate-100 shadow-sm">
+                  <p class="text-xs text-slate-500">Plataforma</p>
+                  <p class="text-sm font-semibold">Meta Quest 3S</p>
+                </div>
+                <div class="p-3 bg-white/60 rounded-lg border border-slate-100 shadow-sm">
+                  <p class="text-xs text-slate-500">Ámbito</p>
+                  <p class="text-sm font-semibold">Universidad Iberoamericana</p>
+                </div>
+                <div class="p-3 bg-white/60 rounded-lg border border-slate-100 shadow-sm">
+                  <p class="text-xs text-slate-500">Tecnología</p>
+                  <p class="text-sm font-semibold">Realidad Mixta & NavMesh</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="relative">
+              <!-- Illustration / Mockup -->
+              <div class="mx-auto w-full max-w-lg">
+                <div class="aspect-[16/10] rounded-2xl bg-gradient-to-br from-slate-800 to-indigo-700 text-white overflow-hidden shadow-lg">
+                  <div class="p-6 h-full flex flex-col justify-between">
+                    <div>
+                      <div class="inline-flex items-center gap-3">
+                        <div class="w-9 h-9 rounded-md bg-white/10 flex items-center justify-center text-white font-bold">A</div>
+                        <div>
+                          <div class="text-xs text-white/80">Argos</div>
+                          <div class="text-sm font-semibold">Mapa 3D del campus</div>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="text-sm text-white/80">
+                      <!-- faux map lines -->
+                      <svg viewBox="0 0 320 160" xmlns="http://www.w3.org/2000/svg" class="w-full h-40" preserveAspectRatio="none">
+                        <defs>
+                          <linearGradient id="g" x1="0" x2="1"><stop offset="0" stop-color="#06b6d4"/><stop offset="1" stop-color="#7c3aed"/></linearGradient>
+                        </defs>
+                        <rect width="320" height="160" fill="rgba(255,255,255,0.02)"/>
+                        <path d="M10 140 C60 120, 100 60, 150 70 C200 80, 230 40, 300 30" stroke="url(#g)" stroke-width="3" fill="none" stroke-linecap="round"/>
+                        <circle cx="150" cy="70" r="6" fill="#06b6d4"/>
+                        <circle cx="300" cy="30" r="4" fill="#fff"/>
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="mt-4 text-xs text-slate-500">Mockup ilustrativo — integra tus capturas AR o render del campus aquí.</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- About -->
+      <section id="acerca" class="py-16 bg-white">
+        <div class="max-w-6xl mx-auto px-6 lg:px-8">
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
+            <div>
+              <h2 class="text-2xl font-semibold mb-4">Acerca del Proyecto</h2>
+              <p class="text-slate-700 leading-relaxed">
+                Argos es un sistema avanzado de navegación espacial desarrollado específicamente para la Universidad Iberoamericana. Utilizando el poder de la Realidad Mixta a través de los visores Meta Quest 3S, Argos permite a los usuarios encontrar la ruta más óptima hacia cualquier punto de interés dentro del campus, superando las limitaciones de precisión del GPS tradicional en interiores.
+              </p>
+            </div>
+            <div>
+              <div class="rounded-xl bg-slate-50 p-6 border border-slate-100 shadow-sm">
+                <h3 class="text-sm text-slate-600 mb-3">Beneficios clave</h3>
+                <ul class="space-y-3 text-slate-700">
+                  <li class="flex items-start gap-3">
+                    <svg class="w-5 h-5 text-indigo-600 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg>
+                    <span>Orientación precisa en interiores</span>
+                  </li>
+                  <li class="flex items-start gap-3">
+                    <svg class="w-5 h-5 text-indigo-600 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg>
+                    <span>Interacción inmersiva sin perder el entorno físico</span>
+                  </li>
+                  <li class="flex items-start gap-3">
+                    <svg class="w-5 h-5 text-indigo-600 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg>
+                    <span>Modelos 3D del campus basados en datos abiertos</span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Features -->
+      <section id="features" class="py-16">
+        <div class="max-w-7xl mx-auto px-6 lg:px-8">
+          <div class="text-center mb-12">
+            <h2 class="text-2xl font-semibold">Características Principales</h2>
+            <p class="text-slate-600 mt-2">Diseñadas para precisión, rendimiento y una experiencia de usuario natural.</p>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <article class="p-6 bg-white rounded-2xl border border-slate-100 shadow-sm">
+              <div class="flex items-center gap-4 mb-4">
+                <div class="p-3 rounded-lg bg-indigo-50 text-indigo-600">
+                  <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A2 2 0 013 15.382V6a2 2 0 011.447-1.894L9 2l6 2 5.553 1.106A2 2 0 0122 6v9.382a2 2 0 01-1.553 1.894L15 20l-6-2z"/></svg>
+                </div>
+                <h3 class="text-lg font-semibold">Mapeo de Precisión Estructural</h3>
+              </div>
+              <p class="text-slate-600">
+                Integración de datos espaciales extraídos de OpenStreetMap para generar modelos 3D exactos del campus, abarcando puntos clave como la Biblioteca, La Karpa y los accesos principales.
+              </p>
+            </article>
+
+            <article class="p-6 bg-white rounded-2xl border border-slate-100 shadow-sm">
+              <div class="flex items-center gap-4 mb-4">
+                <div class="p-3 rounded-lg bg-indigo-50 text-indigo-600">
+                  <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7h18M3 12h18M3 17h18"/></svg>
+                </div>
+                <h3 class="text-lg font-semibold">Cálculo de Rutas Inteligente</h3>
+              </div>
+              <p class="text-slate-600">
+                Implementación de algoritmos de búsqueda de rutas y NavMesh para trazar el camino más corto, esquivando obstáculos de manera dinámica en tiempo real.
+              </p>
+            </article>
+
+            <article class="p-6 bg-white rounded-2xl border border-slate-100 shadow-sm">
+              <div class="flex items-center gap-4 mb-4">
+                <div class="p-3 rounded-lg bg-indigo-50 text-indigo-600">
+                  <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 2l2 7h7l-5.5 4L19 20l-7-4-7 4 2.5-7L2 9h7z"/></svg>
+                </div>
+                <h3 class="text-lg font-semibold">Interacción Inmersiva e Intuitiva</h3>
+              </div>
+              <p class="text-slate-600">
+                Interfaz holográfica anclada al espacio real (World Space) que se controla de forma natural mediante el rastreo de manos (Hand Tracking), permitiendo al usuario no perder de vista su entorno físico gracias a la tecnología Passthrough.
+              </p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <!-- Technology -->
+      <section id="tecnologia" class="py-16 bg-slate-50">
+        <div class="max-w-5xl mx-auto px-6 lg:px-8">
+          <div class="text-center mb-8">
+            <h2 class="text-2xl font-semibold">Tecnología</h2>
+          </div>
+
+          <div class="bg-white rounded-2xl p-8 border border-slate-100 shadow-sm">
+            <p class="text-slate-700">
+              Construido con herramientas líderes en la industria para el desarrollo espacial: Unity 3D, programación orientada a objetos en C#, procesamiento de datos JSON/XML y el Meta XR SDK.
+            </p>
+
+            <div class="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-4">
+              <div class="p-3 rounded-lg bg-slate-50 border border-slate-100 text-center">
+                <div class="text-sm font-medium">Unity 3D</div>
+              </div>
+              <div class="p-3 rounded-lg bg-slate-50 border border-slate-100 text-center">
+                <div class="text-sm font-medium">C#</div>
+              </div>
+              <div class="p-3 rounded-lg bg-slate-50 border border-slate-100 text-center">
+                <div class="text-sm font-medium">JSON / XML</div>
+              </div>
+              <div class="p-3 rounded-lg bg-slate-50 border border-slate-100 text-center">
+                <div class="text-sm font-medium">Meta XR SDK</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Contact / CTA -->
+      <section id="contacto" class="py-12">
+        <div class="max-w-3xl mx-auto px-6 lg:px-8 text-center">
+          <h3 class="text-xl font-semibold">¿Quieres ver una demo o colaborar?</h3>
+          <p class="text-slate-600 mt-2">Ponte en contacto para programar una demostración o para integrar Argos en tu entorno.</p>
+          <div class="mt-6">
+            <a href="mailto:contacto@argos.example" class="inline-block bg-indigo-600 text-white px-6 py-3 rounded-md shadow hover:bg-indigo-700">Contactar</a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="border-t border-slate-200 mt-12">
+      <div class="max-w-7xl mx-auto px-6 lg:px-8 py-8 flex flex-col md:flex-row items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-sky-500 to-indigo-600 flex items-center justify-center text-white font-bold">A</div>
+          <div>
+            <div class="font-semibold">Argos</div>
+            <div class="text-xs text-slate-500">Navegación en Realidad Mixta</div>
+          </div>
+        </div>
+        <p class="text-xs text-slate-500 mt-4 md:mt-0">© <span id="year"></span> Argos. Todos los derechos reservados.</p>
+      </div>
+    </footer>
+
+    <script>
+      // Small interactions
+      document.getElementById('menuBtn')?.addEventListener('click', () => {
+        const menu = document.getElementById('menu');
+        if (menu) menu.classList.toggle('hidden');
+      });
+
+      // Set year
+      document.getElementById('year').textContent = new Date().getFullYear();
+
+      // Smooth scroll for internal links
+      document.querySelectorAll('a[href^="#"]').forEach(a => {
+        a.addEventListener('click', (e) => {
+          const target = document.querySelector(a.getAttribute('href'));
+          if (target) {
+            e.preventDefault();
+            target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            history.replaceState(null, '', a.getAttribute('href'));
+          }
+        });
+      });
+    </script>
+  </body>
+</html>
