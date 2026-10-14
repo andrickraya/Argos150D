@@ -8,20 +8,12 @@
     <link rel="icon" href="data:;base64,iVBORw0KGgo=">
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
-      // Tailwind config: premium palette + fonts
       tailwind.config = {
         theme: {
           extend: {
             colors: {
-              brand: {
-                50: '#f5fbfd',
-                100: '#e6f7fb',
-                300: '#86f0ff',
-                500: '#06b6d4',
-                700: '#0ea5b7'
-              },
-              ink: '#0b1220',
-              slate2: '#0f1724'
+              brand: { 50: '#f5fbfd', 100: '#e6f7fb', 300: '#86f0ff', 500: '#06b6d4', 700: '#0ea5b7' },
+              ink: '#0b1220'
             },
             fontFamily: {
               sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial'],
@@ -33,11 +25,11 @@
     </script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&family=Poppins:wght@500;700&display=swap" rel="stylesheet">
     <style>
-      :root{color-scheme: light}
+      :root { color-scheme: light; }
       .glass { background: linear-gradient(135deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02)); backdrop-filter: blur(6px); }
       .soft-card { box-shadow: 0 6px 20px rgba(12,18,29,0.08); }
-      /* Carousel controls */
       .carousel-btn { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.06); }
+      .video-poster { background: radial-gradient(circle at top, rgba(0,255,214,0.18), transparent 40%), linear-gradient(135deg, #020617, #0f172a); }
     </style>
   </head>
 
@@ -73,17 +65,15 @@
     </header>
 
     <main>
-      <!-- Hero -->
       <section id="inicio" class="relative overflow-hidden">
         <div class="absolute inset-0">
-          <!-- Subtle abstract gradient shapes -->
-          <svg class="w-full h-full" preserveAspectRatio="none" viewBox="0 0 1440 600" xmlns="http://www.w3.org/2000/svg">
+          <svg class="w-full h-full" preserveAspectRatio="none" viewBox="0 0 1440 700" xmlns="http://www.w3.org/2000/svg">
             <defs>
               <linearGradient id="gradA" x1="0" x2="1"><stop offset="0" stop-color="#0ea5b7" stop-opacity="0.12"/><stop offset="1" stop-color="#7c3aed" stop-opacity="0.08"/></linearGradient>
             </defs>
-            <rect width="1440" height="600" fill="transparent"/>
+            <rect width="1440" height="700" fill="transparent"/>
             <ellipse cx="300" cy="300" rx="420" ry="220" fill="url(#gradA)" />
-            <ellipse cx="1100" cy="180" rx="360" ry="140" fill="#06b6d4" fill-opacity="0.04" />
+            <ellipse cx="1130" cy="180" rx="360" ry="140" fill="#06b6d4" fill-opacity="0.04" />
           </svg>
         </div>
 
@@ -115,32 +105,29 @@
             </div>
 
             <div class="relative z-10">
-              <!-- Replace mockup with carousel that shows real images and video -->
               <div class="mx-auto w-full max-w-2xl">
                 <div class="rounded-2xl overflow-hidden soft-card border border-slate-100 bg-slate-900">
                   <div id="carousel" class="relative bg-black">
-                    <img id="mainMedia" src="/assets/images/map.png" alt="Mapa del campus - Argos" class="w-full h-[420px] object-cover" loading="lazy" />
+                    <img id="mainMedia" src="/assets/images/map.svg" alt="Mapa del campus - Argos" class="w-full h-[420px] object-cover" loading="lazy" />
 
-                    <!-- controls -->
                     <button id="prevBtn" class="absolute left-4 top-1/2 -translate-y-1/2 p-2 rounded-full carousel-btn text-white/90 shadow">◀</button>
                     <button id="nextBtn" class="absolute right-4 top-1/2 -translate-y-1/2 p-2 rounded-full carousel-btn text-white/90 shadow">▶</button>
 
                     <div class="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2">
-                      <button class="thumb w-16 h-10 rounded-md overflow-hidden ring-2 ring-transparent" data-src="/assets/images/map.png" aria-label="Mapa campus"><img src="/assets/images/map.png" class="w-full h-full object-cover" alt="mini map"></button>
-                      <button class="thumb w-16 h-10 rounded-md overflow-hidden ring-2 ring-transparent" data-src="/assets/images/unity_scene1.png" aria-label="Escena Unity"><img src="/assets/images/unity_scene1.png" class="w-full h-full object-cover" alt="mini unity"></button>
-                      <button class="thumb w-16 h-10 rounded-md overflow-hidden ring-2 ring-transparent" data-src="/assets/images/unity_inspector.png" aria-label="Inspector Unity"><img src="/assets/images/unity_inspector.png" class="w-full h-full object-cover" alt="mini inspector"></button>
+                      <button class="thumb w-16 h-10 rounded-md overflow-hidden ring-2 ring-transparent" data-src="/assets/images/map.svg" aria-label="Mapa campus"><img src="/assets/images/map.svg" class="w-full h-full object-cover" alt="mini map"></button>
+                      <button class="thumb w-16 h-10 rounded-md overflow-hidden ring-2 ring-transparent" data-src="/assets/images/unity_scene1.svg" aria-label="Escena Unity"><img src="/assets/images/unity_scene1.svg" class="w-full h-full object-cover" alt="mini unity"></button>
+                      <button class="thumb w-16 h-10 rounded-md overflow-hidden ring-2 ring-transparent" data-src="/assets/images/unity_inspector.svg" aria-label="Inspector Unity"><img src="/assets/images/unity_inspector.svg" class="w-full h-full object-cover" alt="mini inspector"></button>
                       <button id="playVideoBtn" class="w-16 h-10 rounded-md bg-white/6 text-white flex items-center justify-center">▶</button>
                     </div>
                   </div>
                 </div>
-                <div class="mt-3 text-xs text-slate-400">Mockup reemplazado por tus capturas reales; si los archivos no se han subido aún, verás un placeholder — puedo añadir los archivos si me autorizas.</div>
+                <div class="mt-3 text-xs text-slate-400">Capturas y vista previa del proyecto en formato optimizado para sitio web.</div>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      <!-- About -->
       <section id="acerca" class="py-16 bg-white">
         <div class="max-w-6xl mx-auto px-6 lg:px-8">
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
@@ -152,18 +139,9 @@
               <div class="rounded-xl bg-slate-50 p-6 border border-slate-100 shadow-sm">
                 <h3 class="text-sm text-slate-600 mb-3">Beneficios clave</h3>
                 <ul class="space-y-3 text-slate-700">
-                  <li class="flex items-start gap-3">
-                    <svg class="w-5 h-5 text-indigo-600 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg>
-                    <span>Orientación precisa en interiores</span>
-                  </li>
-                  <li class="flex items-start gap-3">
-                    <svg class="w-5 h-5 text-indigo-600 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg>
-                    <span>Interacción inmersiva sin perder el entorno físico</span>
-                  </li>
-                  <li class="flex items-start gap-3">
-                    <svg class="w-5 h-5 text-indigo-600 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg>
-                    <span>Modelos 3D del campus basados en datos abiertos</span>
-                  </li>
+                  <li class="flex items-start gap-3"><svg class="w-5 h-5 text-indigo-600 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg><span>Orientación precisa en interiores</span></li>
+                  <li class="flex items-start gap-3"><svg class="w-5 h-5 text-indigo-600 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg><span>Interacción inmersiva sin perder el entorno físico</span></li>
+                  <li class="flex items-start gap-3"><svg class="w-5 h-5 text-indigo-600 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg><span>Modelos 3D del campus basados en datos abiertos</span></li>
                 </ul>
               </div>
             </div>
@@ -171,7 +149,6 @@
         </div>
       </section>
 
-      <!-- Features -->
       <section id="features" class="py-16">
         <div class="max-w-7xl mx-auto px-6 lg:px-8">
           <div class="text-center mb-12">
@@ -182,9 +159,7 @@
           <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
             <article class="p-6 bg-white rounded-2xl border border-slate-100 shadow-sm">
               <div class="flex items-center gap-4 mb-4">
-                <div class="p-3 rounded-lg bg-indigo-50 text-indigo-600">
-                  <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A2 2 0 013 15.382V6a2 2 0 011.447-1.894L9 2l6 2 5.553 1.106A2 2 0 0122 6v9.382a2 2 0 01-1.553 1.894L15 20l-6-2z"/></svg>
-                </div>
+                <div class="p-3 rounded-lg bg-indigo-50 text-indigo-600"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A2 2 0 013 15.382V6a2 2 0 011.447-1.894L9 2l6 2 5.553 1.106A2 2 0 0122 6v9.382a2 2 0 01-1.553 1.894L15 20l-6-2z"/></svg></div>
                 <h3 class="text-lg font-semibold">Mapeo de Precisión Estructural</h3>
               </div>
               <p class="text-slate-600">Integración de datos espaciales extraídos de OpenStreetMap para generar modelos 3D exactos del campus, abarcando puntos clave como la Biblioteca, La Karpa y los accesos principales.</p>
@@ -192,9 +167,7 @@
 
             <article class="p-6 bg-white rounded-2xl border border-slate-100 shadow-sm">
               <div class="flex items-center gap-4 mb-4">
-                <div class="p-3 rounded-lg bg-indigo-50 text-indigo-600">
-                  <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7h18M3 12h18M3 17h18"/></svg>
-                </div>
+                <div class="p-3 rounded-lg bg-indigo-50 text-indigo-600"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7h18M3 12h18M3 17h18"/></svg></div>
                 <h3 class="text-lg font-semibold">Cálculo de Rutas Inteligente</h3>
               </div>
               <p class="text-slate-600">Implementación de algoritmos de búsqueda de rutas y NavMesh para trazar el camino más corto, esquivando obstáculos de manera dinámica en tiempo real.</p>
@@ -202,9 +175,7 @@
 
             <article class="p-6 bg-white rounded-2xl border border-slate-100 shadow-sm">
               <div class="flex items-center gap-4 mb-4">
-                <div class="p-3 rounded-lg bg-indigo-50 text-indigo-600">
-                  <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 2l2 7h7l-5.5 4L19 20l-7-4-7 4 2.5-7L2 9h7z"/></svg>
-                </div>
+                <div class="p-3 rounded-lg bg-indigo-50 text-indigo-600"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 2l2 7h7l-5.5 4L19 20l-7-4-7 4 2.5-7L2 9h7z"/></svg></div>
                 <h3 class="text-lg font-semibold">Interacción Inmersiva e Intuitiva</h3>
               </div>
               <p class="text-slate-600">Interfaz holográfica anclada al espacio real (World Space) que se controla de forma natural mediante el rastreo de manos (Hand Tracking), permitiendo al usuario no perder de vista su entorno físico gracias a la tecnología Passthrough.</p>
@@ -213,16 +184,13 @@
         </div>
       </section>
 
-      <!-- Technology -->
       <section id="tecnologia" class="py-16 bg-slate-50">
         <div class="max-w-5xl mx-auto px-6 lg:px-8">
           <div class="text-center mb-8">
             <h2 class="text-2xl font-semibold">Tecnología</h2>
           </div>
-
           <div class="bg-white rounded-2xl p-8 border border-slate-100 shadow-sm">
             <p class="text-slate-700">Construido con herramientas líderes en la industria para el desarrollo espacial: Unity 3D, programación orientada a objetos en C#, procesamiento de datos JSON/XML y el Meta XR SDK.</p>
-
             <div class="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-4">
               <div class="p-3 rounded-lg bg-slate-50 border border-slate-100 text-center">Unity 3D</div>
               <div class="p-3 rounded-lg bg-slate-50 border border-slate-100 text-center">C#</div>
@@ -233,7 +201,6 @@
         </div>
       </section>
 
-      <!-- Contact / CTA -->
       <section id="contacto" class="py-12">
         <div class="max-w-3xl mx-auto px-6 lg:px-8 text-center">
           <h3 class="text-xl font-semibold">¿Quieres ver una demo o colaborar?</h3>
@@ -258,28 +225,24 @@
       </div>
     </footer>
 
-    <!-- Video modal (hidden) -->
     <div id="videoModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/60">
-      <div class="max-w-3xl w-full bg-black rounded-lg overflow-hidden">
+      <div class="max-w-3xl w-full bg-slate-950 rounded-lg overflow-hidden border border-slate-800 shadow-2xl">
         <div class="flex justify-end p-2 bg-slate-900/50">
           <button id="closeVideo" class="text-white/80 p-1">✕</button>
         </div>
-        <video id="demoVideo" controls class="w-full h-96 bg-black">
-          <source src="/assets/video/collisions.mp4" type="video/mp4">
-          Tu navegador no soporta video HTML5.
-        </video>
+        <div class="video-poster">
+          <img src="/assets/video/collisions.svg" alt="Miniatura del video de colisiones" class="w-full h-[420px] object-cover" />
+        </div>
       </div>
     </div>
 
     <script>
-      // Interactions: menu
       document.getElementById('menuBtn')?.addEventListener('click', () => {
         const menu = document.getElementById('menu');
         if (menu) menu.classList.toggle('hidden');
       });
 
-      // Carousel logic
-      const mediaOrder = ['/assets/images/map.png','/assets/images/unity_scene1.png','/assets/images/unity_inspector.png'];
+      const mediaOrder = ['/assets/images/map.svg', '/assets/images/unity_scene1.svg', '/assets/images/unity_inspector.svg'];
       let idx = 0;
       const mainMedia = document.getElementById('mainMedia');
       const prevBtn = document.getElementById('prevBtn');
@@ -289,30 +252,31 @@
       function showIndex(i){
         idx = (i + mediaOrder.length) % mediaOrder.length;
         mainMedia.src = mediaOrder[idx];
-        thumbs.forEach(t=> t.classList.remove('ring-2','ring-indigo-500'));
-        if(thumbs[idx]) thumbs[idx].classList.add('ring-2','ring-indigo-500');
+        thumbs.forEach(t => t.classList.remove('ring-2','ring-indigo-500'));
+        if (thumbs[idx]) thumbs[idx].classList.add('ring-2','ring-indigo-500');
       }
-      prevBtn?.addEventListener('click', ()=> showIndex(idx-1));
-      nextBtn?.addEventListener('click', ()=> showIndex(idx+1));
-      thumbs.forEach((t,i)=> t.addEventListener('click', ()=> showIndex(i)));
+      prevBtn?.addEventListener('click', () => showIndex(idx - 1));
+      nextBtn?.addEventListener('click', () => showIndex(idx + 1));
+      thumbs.forEach((t, i) => t.addEventListener('click', () => showIndex(i)));
 
-      // Play video modal
       const playVideoBtn = document.getElementById('playVideoBtn');
       const videoModal = document.getElementById('videoModal');
       const closeVideo = document.getElementById('closeVideo');
-      const demoVideo = document.getElementById('demoVideo');
 
-      playVideoBtn?.addEventListener('click', ()=>{
+      playVideoBtn?.addEventListener('click', () => {
         videoModal.classList.remove('hidden');
-        demoVideo.play().catch(()=>{});
       });
-      closeVideo?.addEventListener('click', ()=>{ videoModal.classList.add('hidden'); demoVideo.pause(); demoVideo.currentTime = 0; });
-      videoModal?.addEventListener('click', (e)=>{ if(e.target === videoModal){ videoModal.classList.add('hidden'); demoVideo.pause(); demoVideo.currentTime=0; } });
+      closeVideo?.addEventListener('click', () => {
+        videoModal.classList.add('hidden');
+      });
+      videoModal?.addEventListener('click', (e) => {
+        if (e.target === videoModal) {
+          videoModal.classList.add('hidden');
+        }
+      });
 
-      // Set year
       document.getElementById('year').textContent = new Date().getFullYear();
 
-      // Smooth scroll for internal links
       document.querySelectorAll('a[href^="#"]').forEach(a => {
         a.addEventListener('click', (e) => {
           const target = document.querySelector(a.getAttribute('href'));
@@ -323,7 +287,6 @@
           }
         });
       });
-
     </script>
   </body>
 </html>
