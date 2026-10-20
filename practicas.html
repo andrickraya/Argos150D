@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Argos — Prácticas</title>
+    <meta
+      name="description"
+      content="Prácticas del proyecto Argos: navegación en realidad mixta, Unity, colisiones, interfaces y conectividad IoT."
+    />
+    <link rel="icon" href="data:;base64,iVBORw0KGgo=" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              primary: {
+                DEFAULT: '#0f172a',
+                light: '#0b1220',
+                accent: '#06b6d4'
+              },
+              accent: '#06b6d4',
+              glass: 'rgba(255,255,255,0.06)'
+            },
+            fontFamily: {
+              sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial']
+            }
+          }
+        }
+      }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+      html { scroll-behavior: smooth; }
+      body {
+        background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+        color: #0f172a;
+      }
+      .feature-card {
+        border: 1px solid rgba(148, 163, 184, 0.2);
+        border-radius: 1.5rem;
+        background: white;
+        box-shadow: 0 10px 30px rgba(15, 23, 42, 0.04);
+      }
+      .card-hover {
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+      }
+      .card-hover:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 16px 38px rgba(15, 23, 42, 0.08);
+      }
+    </style>
+  </head>
+
+  <body class="antialiased">
+    <header class="sticky top-0 z-40 border-b border-slate-200 bg-white/80 backdrop-blur">
+      <nav class="mx-auto max-w-7xl px-6 lg:px-8">
+        <div class="flex h-16 items-center justify-between">
+          <a href="index.html" class="flex items-center gap-3">
+            <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-sky-500 to-indigo-600 text-lg font-bold text-white shadow">
+              A
+            </div>
+            <span class="text-lg font-semibold text-slate-900">Argos</span>
+          </a>
+
+          <div class="hidden items-center gap-8 md:flex">
+            <a href="index.html#acerca" class="text-sm text-slate-600 hover:text-slate-900">Acerca</a>
+            <a href="index.html#features" class="text-sm text-slate-600 hover:text-slate-900">Características</a>
+            <a href="index.html#tecnologia" class="text-sm text-slate-600 hover:text-slate-900">Tecnología</a>
+            <a href="practicas.html" class="text-sm font-medium text-slate-900">Prácticas</a>
+          </div>
+
+          <a href="index.html#contacto" class="hidden rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:text-slate-900 md:inline-flex">
+            Contacto
+          </a>
+
+          <button id="menuBtn" class="rounded-md border border-slate-200 p-2 md:hidden" aria-label="Abrir menú">
+            <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16" />
+            </svg>
+          </button>
+        </div>
+      </nav>
+
+      <div id="menu" class="hidden border-t border-slate-200 bg-white/90 md:hidden">
+        <div class="mx-auto flex max-w-7xl flex-col gap-2 px-6 py-4">
+          <a href="index.html#acerca" class="py-2 text-slate-700">Acerca</a>
+          <a href="index.html#features" class="py-2 text-slate-700">Características</a>
+          <a href="index.html#tecnologia" class="py-2 text-slate-700">Tecnología</a>
+          <a href="practicas.html" class="py-2 text-slate-700">Prácticas</a>
+          <a href="index.html#contacto" class="py-2 text-slate-700">Contacto</a>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section class="py-16 md:py-20">
+        <div class="mx-auto max-w-7xl px-6 lg:px-8">
+          <div class="mx-auto max-w-3xl text-center">
+            <p class="text-sm font-semibold uppercase tracking-[0.2em] text-indigo-600">Argos</p>
+            <h1 class="mt-4 text-4xl font-black tracking-tight text-slate-900 sm:text-5xl lg:text-6xl">
+              Prácticas de desarrollo interactivo
+            </h1>
+            <p class="mt-6 text-lg leading-8 text-slate-600">
+              Experiencias de programación, simulación física, interfaces y conectividad IoT desarrolladas en Unity para el proyecto Argos.
+            </p>
+            <div class="mt-8 flex items-center justify-center gap-4">
+              <a href="index.html" class="inline-flex items-center justify-center rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-200 hover:bg-slate-800">
+                Volver al inicio
+              </a>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="practicas" class="pb-16 md:pb-24">
+        <div class="mx-auto max-w-7xl px-6 lg:px-8">
+          <div class="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+            <article class="feature-card card-hover overflow-hidden">
+              <img src="unity_scene1.png" alt="Práctica 1" class="h-52 w-full object-cover" />
+              <div class="p-6">
+                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Práctica 1</p>
+                <h3 class="mt-4 text-2xl font-bold text-slate-900">Físicas Básicas y Gravedad</h3>
+                <p class="mt-4 text-slate-600 leading-7">
+                  Exploramos cómo los objetos participan en la simulación física de Unity configurando un plano base y soltando objetos para analizar la masa, la gravedad y la resistencia en la caída.
+                </p>
+              </div>
+            </article>
+
+            <article class="feature-card card-hover overflow-hidden">
+              <img src="unity_inspector.png" alt="Práctica 2" class="h-52 w-full object-cover" />
+              <div class="p-6">
+                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Práctica 2</p>
+                <h3 class="mt-4 text-2xl font-bold text-slate-900">Colisiones Avanzadas</h3>
+                <p class="mt-4 text-slate-600 leading-7">
+                  Programamos la detección de colisiones mediante el evento OnCollisionEnter y evaluamos el comportamiento físico comparando los métodos de detección Discrete y Continuous.
+                </p>
+              </div>
+            </article>
+
+            <article class="feature-card card-hover overflow-hidden">
+              <img src="unity_scene1.png" alt="Práctica 3" class="h-52 w-full object-cover" />
+              <div class="p-6">
+                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Práctica 3</p>
+                <h3 class="mt-4 text-2xl font-bold text-slate-900">Objetos y Scripts</h3>
+                <p class="mt-4 text-slate-600 leading-7">
+                  Introducción a la programación orientada a objetos en C#. Desarrollamos un cañón virtual creando instancias de balas físicas con Rigidbody, las cuales se autodestruyen mediante código tras unos segundos para optimizar la memoria.
+                </p>
+              </div>
+            </article>
+
+            <article class="feature-card card-hover overflow-hidden">
+              <img src="unity_inspector.png" alt="Práctica 4" class="h-52 w-full object-cover" />
+              <div class="p-6">
+                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Práctica 4</p>
+                <h3 class="mt-4 text-2xl font-bold text-slate-900">Interfaz de Usuario</h3>
+                <p class="mt-4 text-slate-600 leading-7">
+                  Creamos una interfaz gráfica sobre la pantalla mediante un Canvas, utilizando elementos TextMeshPro para crear un contador de munición y botones interactivos que accionan el disparo.
+                </p>
+              </div>
+            </article>
+
+            <article class="feature-card card-hover overflow-hidden">
+              <img src="unity_scene1.png" alt="Práctica 5" class="h-52 w-full object-cover" />
+              <div class="p-6">
+                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Práctica 5</p>
+                <h3 class="mt-4 text-2xl font-bold text-slate-900">Conexión y Navegación de Escenas</h3>
+                <p class="mt-4 text-slate-600 leading-7">
+                  Estructuramos el flujo del proyecto conectando diferentes niveles. Utilizamos el SceneManager y asignamos funciones de cambio de escena a los eventos OnClick de los botones en la interfaz.
+                </p>
+              </div>
+            </article>
+
+            <article class="feature-card card-hover overflow-hidden">
+              <img src="unity_inspector.png" alt="Práctica 6" class="h-52 w-full object-cover" />
+              <div class="p-6">
+                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Práctica 6</p>
+                <h3 class="mt-4 text-2xl font-bold text-slate-900">Conectividad IoT (MQTT)</h3>
+                <p class="mt-4 text-slate-600 leading-7">
+                  Integramos comunicación en tiempo real usando el protocolo MQTT en Unity. Desarrollamos interacciones de Realidad Mixta para cambiar el color de figuras y enviamos/recibimos comandos desde una placa ESP32 para controlar un carro omnidireccional.
+                </p>
+              </div>
+            </article>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="border-t border-slate-200 bg-white">
+      <div class="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 px-6 py-8 md:flex-row lg:px-8">
+        <div class="flex items-center gap-3">
+          <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-sky-500 to-indigo-600 text-white font-bold">A</div>
+          <div>
+            <div class="font-semibold text-slate-900">Argos</div>
+            <div class="text-xs text-slate-500">Navegación en Realidad Mixta</div>
+          </div>
+        </div>
+        <p class="text-xs text-slate-500">© <span id="year"></span> Argos. Todos los derechos reservados.</p>
+      </div>
+    </footer>
+
+    <script>
+      document.getElementById('year').textContent = new Date().getFullYear();
+
+      const menuBtn = document.getElementById('menuBtn');
+      const menu = document.getElementById('menu');
+      menuBtn?.addEventListener('click', () => menu?.classList.toggle('hidden'));
+    </script>
+  </body>
+</html>
