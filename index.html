@@ -12,288 +12,298 @@
         theme: {
           extend: {
             colors: {
-              brand: { 50: '#f5fbfd', 100: '#e6f7fb', 300: '#86f0ff', 500: '#06b6d4', 700: '#0ea5b7' },
-              ink: '#0b1220'
+              gallery: '#ffffff',
+              mist: '#f5f5f7',
+              frost: '#fafafc',
+              hair: '#d6d6d6',
+              control: '#e6e6e8',
+              ink: '#1d1d1f',
+              slate: '#707070',
+              steel: '#86868b',
+              apple: '#0066cc',
+              pricing: '#0071e3',
+              launch: '#b64400'
+            },
+            boxShadow: {
+              subtle: '0 0 0 1px rgb(230,230,232)'
             },
             fontFamily: {
-              sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial'],
-              heading: ['Poppins', 'Inter', 'sans-serif']
+              sans: ['Inter', 'SF Pro Display', 'Helvetica Neue', 'Arial', 'sans-serif']
             }
           }
         }
       }
     </script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&family=Poppins:wght@500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-      :root { color-scheme: light; }
-      .glass { background: linear-gradient(135deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02)); backdrop-filter: blur(6px); }
-      .soft-card { box-shadow: 0 6px 20px rgba(12,18,29,0.08); }
-      .carousel-btn { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.06); }
-      .video-poster { background: radial-gradient(circle at top, rgba(0,255,214,0.18), transparent 40%), linear-gradient(135deg, #020617, #0f172a); }
+      :root {
+        color-scheme: light;
+      }
+      html { scroll-behavior: smooth; }
+      body {
+        background: #ffffff;
+        color: #1d1d1f;
+      }
+      .apple-shell {
+        background: linear-gradient(180deg, #ffffff 0%, #ffffff 100%);
+      }
+      .section-band {
+        background: #f5f5f7;
+      }
+      .glass-line { border: 1px solid rgba(134, 134, 139, 0.18); }
+      .feature-card { border-radius: 28px; border: 1px solid rgba(230,230,232,0.8); }
+      .outline-pill {
+        border-radius: 9999px;
+        border: 1px solid #86868b;
+      }
+      .pill-blue {
+        background: #0071e3;
+        color: #ffffff;
+        border-radius: 9999px;
+      }
+      .ink-link {
+        color: #0066cc;
+      }
+      .hero-title {
+        letter-spacing: -1.2px;
+      }
+      .tracking-body {
+        letter-spacing: -0.374px;
+      }
+      .card-hover {
+        transition: transform 0.2s ease, border-color 0.2s ease;
+      }
+      .card-hover:hover {
+        transform: translateY(-2px);
+        border-color: rgba(0,102,204,0.25);
+      }
     </style>
   </head>
 
-  <body class="antialiased bg-gradient-to-b from-white to-slate-50 text-ink">
-    <header class="sticky top-0 z-40 bg-white/80 backdrop-blur border-b border-slate-200">
-      <nav class="max-w-7xl mx-auto px-6 lg:px-8">
-        <div class="flex items-center justify-between h-16">
-          <a href="#inicio" class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-brand-500 to-indigo-700 flex items-center justify-center text-white font-bold shadow-md">A</div>
-            <span class="font-semibold text-lg" style="font-family: Poppins, Inter, sans-serif">Argos</span>
-          </a>
-          <div class="hidden md:flex items-center gap-8 text-sm">
-            <a href="#acerca" class="hover:text-slate-900">Acerca</a>
-            <a href="#features" class="hover:text-slate-900">Características</a>
-            <a href="#tecnologia" class="hover:text-slate-900">Tecnología</a>
-            <a href="#contacto" class="text-slate-600">Contacto</a>
+  <body class="apple-shell font-sans antialiased">
+    <header class="sticky top-0 z-50 border-b border-[#d6d6d6] bg-white/80 backdrop-blur-xl">
+      <div class="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8">
+        <nav class="hidden md:flex items-center justify-between h-[44px] text-[12px] leading-[1] tracking-[-0.12px] text-[#1d1d1f]">
+          <div class="flex items-center gap-6">
+            <span class="font-semibold">Argos</span>
+            <a href="#acerca" class="text-[#707070] hover:text-[#1d1d1f]">Proyecto</a>
+            <a href="#features" class="text-[#707070] hover:text-[#1d1d1f]">Características</a>
+            <a href="#tecnologia" class="text-[#707070] hover:text-[#1d1d1f]">Tecnología</a>
           </div>
-          <div class="md:hidden">
-            <button id="menuBtn" aria-label="Abrir menú" class="p-2 rounded-md hover:bg-slate-100">
-              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16"/></svg>
-            </button>
+          <div class="flex items-center gap-5">
+            <a href="#contacto" class="text-[#707070] hover:text-[#1d1d1f]">Contacto</a>
+            <button class="outline-pill px-3 py-1.5 text-[12px] font-medium text-[#1d1d1f] bg-white">Descubre</button>
           </div>
-        </div>
-      </nav>
-      <div id="menu" class="md:hidden hidden border-t border-slate-200 bg-white/80">
-        <div class="px-6 py-4 flex flex-col gap-3">
-          <a href="#acerca" class="py-2">Acerca</a>
-          <a href="#features" class="py-2">Características</a>
-          <a href="#tecnologia" class="py-2">Tecnología</a>
-          <a href="#contacto" class="py-2">Contacto</a>
-        </div>
+        </nav>
       </div>
     </header>
 
     <main>
       <section id="inicio" class="relative overflow-hidden">
-        <div class="absolute inset-0">
-          <svg class="w-full h-full" preserveAspectRatio="none" viewBox="0 0 1440 700" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <linearGradient id="gradA" x1="0" x2="1"><stop offset="0" stop-color="#0ea5b7" stop-opacity="0.12"/><stop offset="1" stop-color="#7c3aed" stop-opacity="0.08"/></linearGradient>
-            </defs>
-            <rect width="1440" height="700" fill="transparent"/>
-            <ellipse cx="300" cy="300" rx="420" ry="220" fill="url(#gradA)" />
-            <ellipse cx="1130" cy="180" rx="360" ry="140" fill="#06b6d4" fill-opacity="0.04" />
-          </svg>
-        </div>
+        <div class="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 pt-8 md:pt-10 pb-8 md:pb-14">
+          <div class="mx-auto max-w-[980px] text-center">
+            <p class="text-[21px] font-semibold leading-[1.05] tracking-[0.23px] text-[#1d1d1f]">Argos</p>
+            <h1 class="hero-title mt-4 text-[46px] md:text-[80px] md:leading-[1.05] font-semibold text-[#1d1d1f]">
+              Navegación en Realidad Mixta para Interiores.
+            </h1>
+            <p class="mx-auto mt-5 max-w-3xl text-[17px] md:text-[20px] leading-[1.47] tracking-[-0.374px] text-[#707070]">
+              Revolucionando la forma de explorar la Universidad Iberoamericana a través de tecnología inmersiva e inteligencia de datos.
+            </p>
+            <div class="mt-8 flex items-center justify-center gap-4">
+              <a href="#acerca" class="pill-blue px-6 py-3 text-[12px] font-medium tracking-[-0.12px]">Descubre el Proyecto.</a>
+              <a href="#tecnologia" class="text-[12px] font-medium text-[#0066cc]">Ver stack tecnológico</a>
+            </div>
+          </div>
 
-        <div class="relative max-w-7xl mx-auto px-6 lg:px-8 py-24 lg:py-28">
-          <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-            <div class="space-y-6 z-10">
-              <p class="inline-flex items-center gap-2 text-sm font-medium text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full w-max">Nuevo proyecto</p>
-              <h1 class="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight" style="font-family: Poppins, Inter, sans-serif">Argos: Navegación en Realidad Mixta para Interiores.</h1>
-              <p class="text-lg text-slate-700 max-w-xl">Revolucionando la forma de explorar la Universidad Iberoamericana a través de tecnología inmersiva e inteligencia de datos.</p>
-              <div class="flex items-center gap-4">
-                <a href="#acerca" class="inline-flex items-center justify-center rounded-md bg-gradient-to-r from-brand-500 to-indigo-600 text-white px-6 py-3 text-sm font-medium shadow-lg">Descubre el Proyecto.</a>
-                <a href="#tecnologia" class="text-sm text-slate-600 hover:text-slate-900">Ver stack tecnológico &rarr;</a>
-              </div>
+          <div class="relative mt-12 md:mt-16">
+            <div class="relative mx-auto max-w-[1180px] overflow-hidden rounded-[28px] border border-[#d6d6d6] bg-[#ffffff] px-2 py-2 md:px-4 md:py-4">
+              <img
+                src="/map.png"
+                alt="Mapa del campus de la Universidad Iberoamericana"
+                class="block w-full rounded-[24px] object-cover"
+                style="max-height: 760px;"
+              />
+            </div>
 
-              <div class="mt-6 grid grid-cols-3 gap-3">
-                <div class="p-3 glass rounded-lg soft-card">
-                  <p class="text-xs text-slate-500">Plataforma</p>
-                  <p class="text-sm font-semibold">Meta Quest 3S</p>
-                </div>
-                <div class="p-3 glass rounded-lg soft-card">
-                  <p class="text-xs text-slate-500">Ámbito</p>
-                  <p class="text-sm font-semibold">Universidad Iberoamericana</p>
-                </div>
-                <div class="p-3 glass rounded-lg soft-card">
-                  <p class="text-xs text-slate-500">Tecnología</p>
-                  <p class="text-sm font-semibold">Realidad Mixta & NavMesh</p>
+            <div class="pointer-events-none absolute bottom-5 left-1/2 -translate-x-1/2 md:bottom-10">
+              <div class="mx-auto w-fit rounded-[28px] border border-[#d6d6d6] bg-white/90 px-4 py-3 shadow-[0_0_0_1px_rgba(230,230,232,0.7)] backdrop-blur-sm">
+                <div class="flex items-center gap-4">
+                  <div>
+                    <div class="text-[12px] tracking-[-0.12px] text-[#707070]">Meta Quest 3S</div>
+                    <div class="mt-1 text-[14px] font-semibold tracking-[-0.224px] text-[#1d1d1f]">Navegación inmersiva</div>
+                  </div>
+                  <div class="pill-blue px-4 py-2 text-[12px] font-medium">Descubre</div>
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      </section>
 
-            <div class="relative z-10">
-              <div class="mx-auto w-full max-w-2xl">
-                <div class="rounded-2xl overflow-hidden soft-card border border-slate-100 bg-slate-900">
-                  <div id="carousel" class="relative bg-black">
-                    <img id="mainMedia" src="/assets/images/map.png" alt="Mapa del campus - Argos" class="w-full h-[420px] object-cover" loading="lazy" />
+      <section id="acerca" class="py-16 md:py-24">
+        <div class="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
+          <div class="grid items-center gap-10 lg:grid-cols-[1.1fr_0.9fr]">
+            <div>
+              <p class="text-[21px] font-semibold tracking-[0.231px] text-[#1d1d1f]">Acerca del Proyecto</p>
+              <h2 class="mt-4 text-[28px] md:text-[40px] font-semibold leading-[1.1] tracking-[-0.6px] text-[#1d1d1f]">
+                Una guía inteligente para moverse dentro del campus con precisión.
+              </h2>
+              <p class="mt-6 max-w-[560px] text-[17px] leading-[1.47] tracking-[-0.374px] text-[#707070]">
+                Argos es un sistema avanzado de navegación espacial desarrollado específicamente para la Universidad Iberoamericana. Utilizando el poder de la Realidad Mixta a través de los visores Meta Quest 3S, Argos permite a los usuarios encontrar la ruta más óptima hacia cualquier punto de interés dentro del campus, superando las limitaciones de precisión del GPS tradicional en interiores.
+              </p>
+            </div>
 
-                    <button id="prevBtn" class="absolute left-4 top-1/2 -translate-y-1/2 p-2 rounded-full carousel-btn text-white/90 shadow">◀</button>
-                    <button id="nextBtn" class="absolute right-4 top-1/2 -translate-y-1/2 p-2 rounded-full carousel-btn text-white/90 shadow">▶</button>
-
-                    <div class="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2">
-                      <button class="thumb w-16 h-10 rounded-md overflow-hidden ring-2 ring-transparent" data-src="/assets/images/map.png" aria-label="Mapa campus"><img src="/assets/images/map.png" class="w-full h-full object-cover" alt="mini map"></button>
-                      <button class="thumb w-16 h-10 rounded-md overflow-hidden ring-2 ring-transparent" data-src="/assets/images/unity_scene1.png" aria-label="Escena Unity"><img src="/assets/images/unity_scene1.png" class="w-full h-full object-cover" alt="mini unity"></button>
-                      <button class="thumb w-16 h-10 rounded-md overflow-hidden ring-2 ring-transparent" data-src="/assets/images/unity_inspector.png" aria-label="Inspector Unity"><img src="/assets/images/unity_inspector.png" class="w-full h-full object-cover" alt="mini inspector"></button>
-                      <button id="playVideoBtn" class="w-16 h-10 rounded-md bg-white/6 text-white flex items-center justify-center">▶</button>
-                    </div>
+            <div class="rounded-[28px] border border-[#d6d6d6] bg-[#ffffff] p-6 md:p-8">
+              <div class="grid gap-6">
+                <div class="flex items-start gap-3">
+                  <span class="mt-0.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#0066cc] text-[10px] font-bold text-white">✓</span>
+                  <div>
+                    <div class="text-[17px] font-medium tracking-[-0.374px] text-[#1d1d1f]">Orientación precisa</div>
+                    <p class="mt-1 text-[14px] leading-[1.4] text-[#707070]">
+                      Traza rutas óptimas sin depender del GPS tradicional en interiores.
+                    </p>
                   </div>
                 </div>
-                <div class="mt-3 text-xs text-slate-400">Capturas y vista previa del proyecto. Si no ves el video, espera 1-2 minutos o fuerza recarga.</div>
+
+                <div class="flex items-start gap-3">
+                  <span class="mt-0.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#0066cc] text-[10px] font-bold text-white">✓</span>
+                  <div>
+                    <div class="text-[17px] font-medium tracking-[-0.374px] text-[#1d1d1f]">Interacción natural</div>
+                    <p class="mt-1 text-[14px] leading-[1.4] text-[#707070]">
+                      Hand tracking y Passthrough para mantener el contexto del entorno real.
+                    </p>
+                  </div>
+                </div>
+
+                <div class="flex items-start gap-3">
+                  <span class="mt-0.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#0066cc] text-[10px] font-bold text-white">✓</span>
+                  <div>
+                    <div class="text-[17px] font-medium tracking-[-0.374px] text-[#1d1d1f]">Mapeo estructural</div>
+                    <p class="mt-1 text-[14px] leading-[1.4] text-[#707070]">
+                      Modelos 3D del campus a partir de datos espaciales y OpenStreetMap.
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      <section id="acerca" class="py-16 bg-white">
-        <div class="max-w-6xl mx-auto px-6 lg:px-8">
-          <div class="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
+      <section id="features" class="section-band py-16 md:py-24">
+        <div class="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8">
+          <div class="flex items-end justify-between gap-6">
             <div>
-              <h2 class="text-2xl font-semibold mb-4" style="font-family: Poppins, Inter, sans-serif">Acerca del Proyecto</h2>
-              <p class="text-slate-700 leading-relaxed">Argos es un sistema avanzado de navegación espacial desarrollado específicamente para la Universidad Iberoamericana. Utilizando el poder de la Realidad Mixta a través de los visores Meta Quest 3S, Argos permite a los usuarios encontrar la ruta más óptima hacia cualquier punto de interés dentro del campus, superando las limitaciones de precisión del GPS tradicional en interiores.</p>
+              <p class="text-[21px] font-semibold tracking-[0.231px] text-[#1d1d1f]">Características</p>
+              <h2 class="mt-3 text-[28px] md:text-[40px] font-semibold leading-[1.1] tracking-[-0.6px] text-[#1d1d1f]">
+                Tecnología que conecta el campus con la experiencia inmersiva.
+              </h2>
             </div>
+            <a href="#tecnologia" class="hidden md:inline-block text-[12px] font-medium text-[#0066cc]">Ver stack</a>
+          </div>
+
+          <div class="mt-10 grid gap-6 md:grid-cols-3">
+            <article class="feature-card card-hover bg-white p-6 md:p-7">
+              <div class="inline-flex h-11 w-11 items-center justify-center rounded-full bg-[#f5f5f7] text-[#1d1d1f] text-[20px]">◎</div>
+              <h3 class="mt-6 text-[24px] font-semibold tracking-[-0.4px] text-[#1d1d1f]">Mapeo de Precisión Estructural</h3>
+              <p class="mt-4 text-[17px] leading-[1.47] tracking-[-0.374px] text-[#707070]">
+                Integración de datos espaciales extraídos de OpenStreetMap para generar modelos 3D exactos del campus, abarcando puntos clave como la Biblioteca, La Karpa y los accesos principales.
+              </p>
+            </article>
+
+            <article class="feature-card card-hover bg-white p-6 md:p-7">
+              <div class="inline-flex h-11 w-11 items-center justify-center rounded-full bg-[#f5f5f7] text-[#1d1d1f] text-[20px]">↗</div>
+              <h3 class="mt-6 text-[24px] font-semibold tracking-[-0.4px] text-[#1d1d1f]">Cálculo de Rutas Inteligente</h3>
+              <p class="mt-4 text-[17px] leading-[1.47] tracking-[-0.374px] text-[#707070]">
+                Implementación de algoritmos de búsqueda de rutas y NavMesh para trazar el camino más corto, esquivando obstáculos de manera dinámica en tiempo real.
+              </p>
+            </article>
+
+            <article class="feature-card card-hover bg-white p-6 md:p-7">
+              <div class="inline-flex h-11 w-11 items-center justify-center rounded-full bg-[#f5f5f7] text-[#1d1d1f] text-[20px]">◌</div>
+              <h3 class="mt-6 text-[24px] font-semibold tracking-[-0.4px] text-[#1d1d1f]">Interacción Inmersiva e Intuitiva</h3>
+              <p class="mt-4 text-[17px] leading-[1.47] tracking-[-0.374px] text-[#707070]">
+                Interfaz holográfica anclada al espacio real (World Space) que se controla de forma natural mediante el rastreo de manos (Hand Tracking), permitiendo al usuario no perder de vista su entorno físico gracias a la tecnología Passthrough.
+              </p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section id="tecnologia" class="py-16 md:py-24">
+        <div class="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8">
+          <div class="grid items-center gap-8 lg:grid-cols-[0.9fr_1.1fr]">
             <div>
-              <div class="rounded-xl bg-slate-50 p-6 border border-slate-100 shadow-sm">
-                <h3 class="text-sm text-slate-600 mb-3">Beneficios clave</h3>
-                <ul class="space-y-3 text-slate-700">
-                  <li class="flex items-start gap-3"><svg class="w-5 h-5 text-indigo-600 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg><span>Orientación precisa en interiores</span></li>
-                  <li class="flex items-start gap-3"><svg class="w-5 h-5 text-indigo-600 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg><span>Interacción inmersiva sin perder el entorno físico</span></li>
-                  <li class="flex items-start gap-3"><svg class="w-5 h-5 text-indigo-600 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg><span>Modelos 3D del campus basados en datos abiertos</span></li>
-                </ul>
+              <p class="text-[21px] font-semibold tracking-[0.231px] text-[#1d1d1f]">Tecnología</p>
+              <h2 class="mt-3 text-[28px] md:text-[40px] font-semibold leading-[1.1] tracking-[-0.6px] text-[#1d1d1f]">
+                Construido con herramientas líderes del desarrollo espacial.
+              </h2>
+            </div>
+            <div class="rounded-[28px] border border-[#d6d6d6] bg-[#ffffff] p-6 md:p-8">
+              <p class="text-[17px] leading-[1.47] tracking-[-0.374px] text-[#707070]">
+                Construido con herramientas líderes en la industria para el desarrollo espacial: Unity 3D, programación orientada a objetos en C#, procesamiento de datos JSON/XML y el Meta XR SDK.
+              </p>
+              <div class="mt-7 flex flex-wrap gap-3">
+                <span class="rounded-full border border-[#d6d6d6] bg-white px-4 py-2 text-[12px] font-medium text-[#1d1d1f]">Unity 3D</span>
+                <span class="rounded-full border border-[#d6d6d6] bg-white px-4 py-2 text-[12px] font-medium text-[#1d1d1f]">C#</span>
+                <span class="rounded-full border border-[#d6d6d6] bg-white px-4 py-2 text-[12px] font-medium text-[#1d1d1f]">JSON / XML</span>
+                <span class="rounded-full border border-[#d6d6d6] bg-white px-4 py-2 text-[12px] font-medium text-[#1d1d1f]">Meta XR SDK</span>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      <section id="features" class="py-16">
-        <div class="max-w-7xl mx-auto px-6 lg:px-8">
-          <div class="text-center mb-12">
-            <h2 class="text-2xl font-semibold">Características Principales</h2>
-            <p class="text-slate-600 mt-2">Diseñadas para precisión, rendimiento y una experiencia de usuario natural.</p>
-          </div>
-
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <article class="p-6 bg-white rounded-2xl border border-slate-100 shadow-sm">
-              <div class="flex items-center gap-4 mb-4">
-                <div class="p-3 rounded-lg bg-indigo-50 text-indigo-600"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A2 2 0 013 15.382V6a2 2 0 011.447-1.894L9 2l6 2 5.553 1.106A2 2 0 0122 6v9.382a2 2 0 01-1.553 1.894L15 20l-6-2z"/></svg></div>
-                <h3 class="text-lg font-semibold">Mapeo de Precisión Estructural</h3>
+      <section class="section-band py-16 md:py-24">
+        <div class="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8">
+          <div class="rounded-[28px] bg-white p-6 md:p-8 lg:p-10 border border-[#d6d6d6]">
+            <div class="grid gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
+              <div>
+                <p class="text-[21px] font-semibold tracking-[0.231px] text-[#1d1d1f]">Visión</p>
+                <h3 class="mt-3 text-[28px] md:text-[40px] font-semibold leading-[1.1] tracking-[-0.6px] text-[#1d1d1f]">
+                  Un campus más navegable, accesible y consciente del entorno.
+                </h3>
+                <p class="mt-5 text-[17px] leading-[1.47] tracking-[-0.374px] text-[#707070]">
+                  Argos transforma la manera en que los usuarios exploran espacios interiores, integrando información espacial, rutas inteligentes y experiencias inmersivas en una sola capa de navegación.
+                </p>
+                <a href="#contacto" class="mt-7 inline-block text-[12px] font-medium text-[#0066cc]">Contactar</a>
               </div>
-              <p class="text-slate-600">Integración de datos espaciales extraídos de OpenStreetMap para generar modelos 3D exactos del campus, abarcando puntos clave como la Biblioteca, La Karpa y los accesos principales.</p>
-            </article>
 
-            <article class="p-6 bg-white rounded-2xl border border-slate-100 shadow-sm">
-              <div class="flex items-center gap-4 mb-4">
-                <div class="p-3 rounded-lg bg-indigo-50 text-indigo-600"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7h18M3 12h18M3 17h18"/></svg></div>
-                <h3 class="text-lg font-semibold">Cálculo de Rutas Inteligente</h3>
+              <div class="overflow-hidden rounded-[28px] border border-[#d6d6d6] bg-[#f5f5f7] p-2">
+                <img src="/unity_scene1.png" alt="Escena de Unity del proyecto Argos" class="block w-full rounded-[22px] object-cover" style="max-height: 550px;" />
               </div>
-              <p class="text-slate-600">Implementación de algoritmos de búsqueda de rutas y NavMesh para trazar el camino más corto, esquivando obstáculos de manera dinámica en tiempo real.</p>
-            </article>
-
-            <article class="p-6 bg-white rounded-2xl border border-slate-100 shadow-sm">
-              <div class="flex items-center gap-4 mb-4">
-                <div class="p-3 rounded-lg bg-indigo-50 text-indigo-600"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 2l2 7h7l-5.5 4L19 20l-7-4-7 4 2.5-7L2 9h7z"/></svg></div>
-                <h3 class="text-lg font-semibold">Interacción Inmersiva e Intuitiva</h3>
-              </div>
-              <p class="text-slate-600">Interfaz holográfica anclada al espacio real (World Space) que se controla de forma natural mediante el rastreo de manos (Hand Tracking), permitiendo al usuario no perder de vista su entorno físico gracias a la tecnología Passthrough.</p>
-            </article>
-          </div>
-        </div>
-      </section>
-
-      <section id="tecnologia" class="py-16 bg-slate-50">
-        <div class="max-w-5xl mx-auto px-6 lg:px-8">
-          <div class="text-center mb-8">
-            <h2 class="text-2xl font-semibold">Tecnología</h2>
-          </div>
-          <div class="bg-white rounded-2xl p-8 border border-slate-100 shadow-sm">
-            <p class="text-slate-700">Construido con herramientas líderes en la industria para el desarrollo espacial: Unity 3D, programación orientada a objetos en C#, procesamiento de datos JSON/XML y el Meta XR SDK.</p>
-            <div class="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <div class="p-3 rounded-lg bg-slate-50 border border-slate-100 text-center">Unity 3D</div>
-              <div class="p-3 rounded-lg bg-slate-50 border border-slate-100 text-center">C#</div>
-              <div class="p-3 rounded-lg bg-slate-50 border border-slate-100 text-center">JSON / XML</div>
-              <div class="p-3 rounded-lg bg-slate-50 border border-slate-100 text-center">Meta XR SDK</div>
             </div>
           </div>
         </div>
       </section>
 
-      <section id="contacto" class="py-12">
-        <div class="max-w-3xl mx-auto px-6 lg:px-8 text-center">
-          <h3 class="text-xl font-semibold">¿Quieres ver una demo o colaborar?</h3>
-          <p class="text-slate-600 mt-2">Ponte en contacto para programar una demostración o para integrar Argos en tu entorno.</p>
-          <div class="mt-6">
-            <a href="mailto:contacto@argos.example" class="inline-block bg-gradient-to-r from-brand-500 to-indigo-600 text-white px-6 py-3 rounded-md shadow hover:from-brand-700">Contactar</a>
+      <section id="contacto" class="py-16 md:py-24">
+        <div class="max-w-[760px] mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <p class="text-[21px] font-semibold tracking-[0.231px] text-[#1d1d1f]">¿Quieres ver una demo o colaborar?</p>
+          <h2 class="mt-4 text-[28px] md:text-[40px] font-semibold leading-[1.1] tracking-[-0.6px] text-[#1d1d1f]">
+            Exploremos cómo Argos puede transformar la experiencia de navegación del campus.
+          </h2>
+          <div class="mt-8 flex items-center justify-center gap-4">
+            <a href="mailto:contacto@argos.example" class="pill-blue px-6 py-3 text-[12px] font-medium">Contactar</a>
+            <a href="#inicio" class="text-[12px] font-medium text-[#0066cc]">Volver arriba</a>
           </div>
         </div>
       </section>
     </main>
 
-    <footer class="border-t border-slate-200 mt-12">
-      <div class="max-w-7xl mx-auto px-6 lg:px-8 py-8 flex flex-col md:flex-row items-center justify-between">
-        <div class="flex items-center gap-3">
-          <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-brand-500 to-indigo-600 flex items-center justify-center text-white font-bold">A</div>
-          <div>
-            <div class="font-semibold">Argos</div>
-            <div class="text-xs text-slate-500">Navegación en Realidad Mixta</div>
-          </div>
+    <footer class="border-t border-[#d6d6d6] bg-[#fafafc]">
+      <div class="max-w-[1280px] mx-auto flex flex-col gap-4 px-4 py-8 text-center text-[12px] text-[#707070] md:flex-row md:items-center md:justify-between md:px-8">
+        <div class="flex items-center justify-center gap-3 md:justify-start">
+          <span class="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-[#06b6d4] to-[#0071e3] text-[12px] font-semibold text-white">A</span>
+          <span class="text-[#1d1d1f] font-medium">Argos</span>
         </div>
-        <p class="text-xs text-slate-500 mt-4 md:mt-0">© <span id="year"></span> Argos. Todos los derechos reservados.</p>
+        <div>Navegación en Realidad Mixta</div>
+        <div>© <span id="year"></span> Argos</div>
       </div>
     </footer>
 
-    <div id="videoModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/60">
-      <div class="max-w-3xl w-full bg-slate-950 rounded-lg overflow-hidden border border-slate-800 shadow-2xl">
-        <div class="flex justify-end p-2 bg-slate-900/50">
-          <button id="closeVideo" class="text-white/80 p-1">✕</button>
-        </div>
-        <video id="demoVideo" controls class="w-full h-[420px] bg-black">
-          <source src="/assets/video/collisions.mp4" type="video/mp4">
-          Tu navegador no soporta video HTML5.
-        </video>
-      </div>
-    </div>
-
     <script>
-      document.getElementById('menuBtn')?.addEventListener('click', () => {
-        const menu = document.getElementById('menu');
-        if (menu) menu.classList.toggle('hidden');
-      });
-
-      const mediaOrder = ['/assets/images/map.png', '/assets/images/unity_scene1.png', '/assets/images/unity_inspector.png'];
-      let idx = 0;
-      const mainMedia = document.getElementById('mainMedia');
-      const prevBtn = document.getElementById('prevBtn');
-      const nextBtn = document.getElementById('nextBtn');
-      const thumbs = document.querySelectorAll('.thumb');
-
-      function showIndex(i){
-        idx = (i + mediaOrder.length) % mediaOrder.length;
-        mainMedia.src = mediaOrder[idx];
-        thumbs.forEach(t => t.classList.remove('ring-2','ring-indigo-500'));
-        if (thumbs[idx]) thumbs[idx].classList.add('ring-2','ring-indigo-500');
-      }
-      prevBtn?.addEventListener('click', () => showIndex(idx - 1));
-      nextBtn?.addEventListener('click', () => showIndex(idx + 1));
-      thumbs.forEach((t, i) => t.addEventListener('click', () => showIndex(i)));
-
-      const playVideoBtn = document.getElementById('playVideoBtn');
-      const videoModal = document.getElementById('videoModal');
-      const closeVideo = document.getElementById('closeVideo');
-      const demoVideo = document.getElementById('demoVideo');
-
-      playVideoBtn?.addEventListener('click', () => {
-        videoModal.classList.remove('hidden');
-        demoVideo.play().catch(()=>{});
-      });
-      closeVideo?.addEventListener('click', () => {
-        videoModal.classList.add('hidden');
-        demoVideo.pause();
-        demoVideo.currentTime = 0;
-      });
-      videoModal?.addEventListener('click', (e) => {
-        if (e.target === videoModal) {
-          videoModal.classList.add('hidden');
-          demoVideo.pause();
-          demoVideo.currentTime = 0;
-        }
-      });
-
       document.getElementById('year').textContent = new Date().getFullYear();
-
-      document.querySelectorAll('a[href^="#"]').forEach(a => {
-        a.addEventListener('click', (e) => {
-          const target = document.querySelector(a.getAttribute('href'));
-          if (target) {
-            e.preventDefault();
-            target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            history.replaceState(null, '', a.getAttribute('href'));
-          }
-        });
-      });
     </script>
   </body>
 </html>
