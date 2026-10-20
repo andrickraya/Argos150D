@@ -113,79 +113,97 @@
           </div>
         </div>
       </section>
+<section id="practicas" class="pb-16 md:pb-24">
+  <div class="mx-auto max-w-7xl px-6 lg:px-8">
+    <div class="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
 
-      <section id="practicas" class="pb-16 md:pb-24">
-        <div class="mx-auto max-w-7xl px-6 lg:px-8">
-          <div class="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-            <article class="feature-card card-hover overflow-hidden">
-              <img src="unity_scene1.png" alt="Práctica 1" class="h-52 w-full object-cover" />
-              <div class="p-6">
-                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Práctica 1</p>
-                <h3 class="mt-4 text-2xl font-bold text-slate-900">Físicas Básicas y Gravedad</h3>
-                <p class="mt-4 text-slate-600 leading-7">
-                  Exploramos cómo los objetos participan en la simulación física de Unity configurando un plano base y soltando objetos para analizar la masa, la gravedad y la resistencia en la caída.
-                </p>
-              </div>
-            </article>
-
-            <article class="feature-card card-hover overflow-hidden">
-              <img src="/workspaces/Argos150D/assets/videos/practica-rueda.webm" alt="Práctica 2" class="h-52 w-full object-cover" />
-              <div class="p-6">
-                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Práctica 2</p>
-                <h3 class="mt-4 text-2xl font-bold text-slate-900">Colisiones Avanzadas</h3>
-                <p class="mt-4 text-slate-600 leading-7">
-                  Programamos la detección de colisiones mediante el evento OnCollisionEnter y evaluamos el comportamiento físico comparando los métodos de detección Discrete y Continuous.
-                </p>
-              </div>
-            </article>
-
-            <article class="feature-card card-hover overflow-hidden">
-              <img src="/workspaces/Argos150D/assets/videos/practica-canon.webm" alt="Práctica 3" class="h-52 w-full object-cover" />
-              <div class="p-6">
-                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Práctica 3</p>
-                <h3 class="mt-4 text-2xl font-bold text-slate-900">Objetos y Scripts</h3>
-                <p class="mt-4 text-slate-600 leading-7">
-                  Introducción a la programación orientada a objetos en C#. Desarrollamos un cañón virtual creando instancias de balas físicas con Rigidbody, las cuales se autodestruyen mediante código tras unos segundos para optimizar la memoria.
-                </p>
-              </div>
-            </article>
-
-            <article class="feature-card card-hover overflow-hidden">
-              <img src="unity_inspector.png" alt="Práctica 4" class="h-52 w-full object-cover" />
-              <div class="p-6">
-                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Práctica 4</p>
-                <h3 class="mt-4 text-2xl font-bold text-slate-900">Interfaz de Usuario</h3>
-                <p class="mt-4 text-slate-600 leading-7">
-                  Creamos una interfaz gráfica sobre la pantalla mediante un Canvas, utilizando elementos TextMeshPro para crear un contador de munición y botones interactivos que accionan el disparo.
-                </p>
-              </div>
-            </article>
-
-            <article class="feature-card card-hover overflow-hidden">
-              <img src="/workspaces/Argos150D/collisions.mp4" alt="Práctica 5" class="h-52 w-full object-cover" />
-              <div class="p-6">
-                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Práctica 5</p>
-                <h3 class="mt-4 text-2xl font-bold text-slate-900">Conexión y Navegación de Escenas</h3>
-                <p class="mt-4 text-slate-600 leading-7">
-                  Estructuramos el flujo del proyecto conectando diferentes niveles. Utilizamos el SceneManager y asignamos funciones de cambio de escena a los eventos OnClick de los botones en la interfaz.
-                </p>
-              </div>
-            </article>
-
-            <article class="feature-card card-hover overflow-hidden">
-              <img src="unity_inspector.png" alt="Práctica 6" class="h-52 w-full object-cover" />
-              <div class="p-6">
-                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Práctica 6</p>
-                <h3 class="mt-4 text-2xl font-bold text-slate-900">Conectividad IoT (MQTT)</h3>
-                <p class="mt-4 text-slate-600 leading-7">
-                  Integramos comunicación en tiempo real usando el protocolo MQTT en Unity. Desarrollamos interacciones de Realidad Mixta para cambiar el color de figuras y enviamos/recibimos comandos desde una placa ESP32 para controlar un carro omnidireccional.
-                </p>
-              </div>
-            </article>
-          </div>
+      <!-- Práctica 1 -->
+      <article class="feature-card card-hover overflow-hidden">
+        <video class="h-52 w-full object-cover" autoplay muted loop playsinline preload="metadata">
+          <source src="assets/videos/practica-rueda.webm" type="video/webm">
+        </video>
+        <div class="p-6">
+          <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Práctica 1</p>
+          <h3 class="mt-4 text-2xl font-bold text-slate-900">Físicas Básicas y Gravedad</h3>
+          <p class="mt-4 text-slate-600 leading-7">
+            Exploramos cómo los objetos participan en la simulación física de Unity configurando un plano base y soltando objetos para analizar la masa, la gravedad y la resistencia en la caída.
+          </p>
         </div>
-      </section>
-    </main>
+      </article>
+
+      <!-- Práctica 2 (sin media todavía) -->
+      <article class="feature-card card-hover overflow-hidden">
+        <div class="flex h-52 w-full items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200 text-sm font-semibold text-slate-400">
+          Próximamente
+        </div>
+        <div class="p-6">
+          <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Práctica 2</p>
+          <h3 class="mt-4 text-2xl font-bold text-slate-900">Colisiones Avanzadas</h3>
+          <p class="mt-4 text-slate-600 leading-7">
+            Programamos la detección de colisiones mediante el evento OnCollisionEnter y evaluamos el comportamiento físico comparando los métodos de detección Discrete y Continuous.
+          </p>
+        </div>
+      </article>
+
+      <!-- Práctica 3 -->
+      <article class="feature-card card-hover overflow-hidden">
+        <video class="h-52 w-full object-cover" autoplay muted loop playsinline preload="metadata">
+          <source src="assets/videos/practica-canon.webm" type="video/webm">
+        </video>
+        <div class="p-6">
+          <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Práctica 3</p>
+          <h3 class="mt-4 text-2xl font-bold text-slate-900">Objetos y Scripts</h3>
+          <p class="mt-4 text-slate-600 leading-7">
+            Introducción a la programación orientada a objetos en C#. Desarrollamos un cañón virtual creando instancias de balas físicas con Rigidbody, las cuales se autodestruyen mediante código tras unos segundos para optimizar la memoria.
+          </p>
+        </div>
+      </article>
+
+      <!-- Práctica 4 (sin media todavía) -->
+      <article class="feature-card card-hover overflow-hidden">
+        <div class="flex h-52 w-full items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200 text-sm font-semibold text-slate-400">
+          Próximamente
+        </div>
+        <div class="p-6">
+          <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Práctica 4</p>
+          <h3 class="mt-4 text-2xl font-bold text-slate-900">Interfaz de Usuario</h3>
+          <p class="mt-4 text-slate-600 leading-7">
+            Creamos una interfaz gráfica sobre la pantalla mediante un Canvas, utilizando elementos TextMeshPro para crear un contador de munición y botones interactivos que accionan el disparo.
+          </p>
+        </div>
+      </article>
+
+      <!-- Práctica 5 -->
+      <article class="feature-card card-hover overflow-hidden">
+        <video class="h-52 w-full object-cover" autoplay muted loop playsinline preload="metadata">
+          <source src="assets/videos/collisions.mp4" type="video/mp4">
+        </video>
+        <div class="p-6">
+          <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Práctica 5</p>
+          <h3 class="mt-4 text-2xl font-bold text-slate-900">Conexión y Navegación de Escenas</h3>
+          <p class="mt-4 text-slate-600 leading-7">
+            Estructuramos el flujo del proyecto conectando diferentes niveles. Utilizamos el SceneManager y asignamos funciones de cambio de escena a los eventos OnClick de los botones en la interfaz.
+          </p>
+        </div>
+      </article>
+
+      <!-- Práctica 6 (aún no se hace) -->
+      <article class="feature-card card-hover overflow-hidden">
+        <div class="flex h-52 w-full items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200 text-sm font-semibold text-slate-400">
+          Próximamente
+        </div>
+        <div class="p-6">
+          <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Práctica 6</p>
+          <h3 class="mt-4 text-2xl font-bold text-slate-900">Conectividad IoT (MQTT)</h3>
+          <p class="mt-4 text-slate-600 leading-7">
+            Integramos comunicación en tiempo real usando el protocolo MQTT en Unity. Desarrollamos interacciones de Realidad Mixta para cambiar el color de figuras y enviamos/recibimos comandos desde una placa ESP32 para controlar un carro omnidireccional.
+          </p>
+        </div>
+      </article>
+
+    </div>
+  </div>
+</section>
 
     <footer class="border-t border-slate-200 bg-white">
       <div class="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 px-6 py-8 md:flex-row lg:px-8">
