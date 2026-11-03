@@ -263,19 +263,14 @@ html, body {
   z-index: 1;
 }
 
-.ar-three-container {
+.ar-floor-canvas {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
-  z-index: 2;
-  pointer-events: none;
-}
-
-.ar-three-container canvas {
-  width: 100% !important;
-  height: 100% !important;
+  z-index: 3;
   display: block;
+  touch-action: pan-y;
 }
 
 /* Cartel flotante de dirección arriba en AR */
@@ -469,6 +464,38 @@ html, body {
   background: var(--text-tertiary);
   margin: 8px auto 4px;
   cursor: pointer;
+}
+
+.sheet-toggle-bar {
+  width: 100%;
+  border: none;
+  background: transparent;
+  padding: 8px 16px 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+}
+
+.sheet-handle-pill {
+  width: 42px;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(60, 60, 67, 0.28);
+}
+
+.sheet-toggle-text {
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--accent);
+  background: rgba(0, 113, 227, 0.1);
+  padding: 3px 12px;
+  border-radius: 999px;
+}
+
+.nav-bottom-sheet.is-collapsed .sheet-details {
+  display: none !important;
 }
 
 .sheet-summary {

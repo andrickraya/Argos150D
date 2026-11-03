@@ -69,7 +69,6 @@
     };
   }
 
-  // Rumbo en grados (0° = Norte/+Z, 90° = Este/+X)
   function calcularRumboGrados(ax, az, bx, bz) {
     const dx = bx - ax;
     const dz = bz - az;
@@ -87,28 +86,27 @@
   }
 
   // ============================================================================
-  // 2. ESTADO REACTIVO DE NAVEGACIÓN Y POSICIÓN CONTINUA (usuarioX, usuarioZ)
+  // 2. ESTADO REACTIVO DE NAVEGACIÓN Y UBICACIÓN CONTINUA
   // ============================================================================
   const estado = {
     origenId: "N07",     // Salón C (Aulas B/C)
     destinoId: "N10",    // Cafetería El Cubo
-    indiceActual: 0,     // Índice del tramo actual dentro de estado.ruta
-    progresoTramo: 0,    // 0.0 a 1.0 a lo largo del tramo actual
-    usuarioX: -88.24,    // Coordenada X continua en metros del usuario
-    usuarioZ: -9.85,     // Coordenada Z continua en metros del usuario
+    indiceActual: 0,
+    progresoTramo: 0,
+    usuarioX: -88.24,
+    usuarioZ: -9.85,
     ruta: [],
     distanciaTotal: 0,
     mostrarEtiquetas: true,
-    modoVista: "ar",     // "ar" por defecto para ver las flechas 3D de inmediato
-    caminandoSim: false, // Botón "▶️ Caminar" activo
+    modoVista: "ar",
+    caminandoSim: false,
     gpsActivo: false,
     gpsWatchId: null,
     pasosDetectados: 0,
-    // Orientación de la cámara AR:
-    // desfaseMiradaGrados = cuánto ha girado el usuario respecto al pasillo activo (0° = mirando directo a las flechas)
     desfaseMiradaGrados: 0,
     brjSensorBase: null,
-    brjSensorActual: null
+    brjSensorActual: null,
+    menuColapsado: true  // Inicia colapsado para que las flechas 3D se vean completas en el celular
   };
 
   // Referencias DOM
@@ -117,6 +115,10 @@
   const viewAR = document.getElementById("viewAR");
   const viewMap = document.getElementById("viewMap");
   const locationModeBadge = document.getElementById("locationModeBadge");
+
+  const bottomSheet = document.getElementById("bottomSheet");
+  const btnToggleSheet = document.getElementById("btnToggleSheet");
+  const sheetToggleLabel = document.getElementById("sheetToggleLabel");
 
   const selectOrigen = document.getElementById("selectOrigen");
   const selectDestino = document.getElementById("selectDestino");
@@ -144,24 +146,67 @@
   const kpiDistanceMeters = document.getElementById("kpiDistanceMeters");
   const stepsList = document.getElementById("stepsList");
 
+  const arFloorCanvas = document.getElementById("arFloorCanvas");
+  const arCtx = arFloorCanvas.getContext("2d");
   const campusCanvas = document.getElementById("campusCanvas");
   const ctx = campusCanvas.getContext("2d");
   const minimapCanvas = document.getElementById("minimapCanvas");
   const miniCtx = minimapCanvas.getContext("2d");
   const mapViewport = document.getElementById("mapViewport");
 
-  // Imagen satelital/mapa 2D opcional de fondo
   const imgMapa = new Image();
   let mapaCargado = false;
   imgMapa.onload = () => {
     mapaCargado = true;
     dibujarMapa2D();
-    dibujarMinimapa();
   };
   imgMapa.src = "campus_map.png";
 
   // ============================================================================
-  // 3. CÁLCULO DE POSICIÓN Y TRAMO ACTIVO
+  // 3. CONTROL DEL MENÚ INFERIOR (ABRIR / BAJAR CON BOTÓN O DESLIZANDO EL DEDO)
+  // ============================================================================
+  function fijarEstadoMenu(colapsado) {
+    estado.menuColapsado = colapsado;
+    bottomSheet.classList.toggle("is-collapsed", colapsado);
+    btnToggleSheet.setAttribute("aria-expanded", String(!colapsado));
+    sheetToggleLabel.textContent = colapsado
+      ? "🔼 Cambiar Origen / Destino (20 Nodos)"
+      : "🔽 Bajar Menú (Ver Piso AR)";
+  }
+
+  btnToggleSheet.addEventListener("click", () => {
+    fijarEstadoMenu(!estado.menuColapsado);
+  });
+
+  // Soporte táctil para deslizar el menú hacia abajo o hacia arriba con el dedo
+  let touchInicioY = null;
+  bottomSheet.addEventListener(
+    "touchstart",
+    (e) => {
+      if (e.touches && e.touches.length === 1) {
+        touchInicioY = e.touches[0].clientY;
+      }
+    },
+    { passive: true }
+  );
+
+  bottomSheet.addEventListener(
+    "touchend",
+    (e) => {
+      if (touchInicioY === null || !e.changedTouches || e.changedTouches.length === 0) return;
+      const dy = e.changedTouches[0].clientY - touchInicioY;
+      if (dy > 35 && !estado.menuColapsado) {
+        fijarEstadoMenu(true); // Deslizó hacia abajo -> ocultar detalles
+      } else if (dy < -35 && estado.menuColapsado) {
+        fijarEstadoMenu(false); // Deslizó hacia arriba -> abrir detalles
+      }
+      touchInicioY = null;
+    },
+    { passive: true }
+  );
+
+  // ============================================================================
+  // 4. CÁLCULO DE POSICIÓN CONTINUA Y AVANCE EN LA RUTA
   // ============================================================================
   function obtenerTramoActivo() {
     if (estado.ruta.length === 0) {
@@ -198,11 +243,9 @@
     estado.usuarioZ = actual.z + (siguiente.z - actual.z) * t;
   }
 
-  // Avanza a lo largo del pasillo actual una cantidad de metros (por botón Caminar o por Podómetro)
   function avanzarMetrosEnRuta(metros) {
     if (estado.ruta.length < 2) return;
     if (estado.indiceActual >= estado.ruta.length - 1) {
-      // Ya estaba en el destino: reiniciar desde el origen para volver a recorrer
       estado.indiceActual = 0;
       estado.progresoTramo = 0;
     }
@@ -221,7 +264,6 @@
         restantePorAvanzar -= metrosEnTramo;
         estado.indiceActual += 1;
         estado.progresoTramo = 0;
-        // Al doblar una esquina hacia un nuevo nodo, alineamos suavemente las flechas al nuevo pasillo
         estado.desfaseMiradaGrados = 0;
         estado.brjSensorBase = estado.brjSensorActual;
       }
@@ -231,7 +273,6 @@
     actualizarHUD();
     dibujarMapa2D();
     dibujarMinimapa();
-    actualizarGeometriaFlechas3D();
 
     if (estado.indiceActual >= estado.ruta.length - 1 && estado.caminandoSim) {
       detenerSimulacionCaminata();
@@ -239,231 +280,82 @@
   }
 
   // ============================================================================
-  // 4. ESCENA 3D THREE.JS: CINTA DE PISO + FLECHAS 3D ANIMADAS FRENTE AL USUARIO
+  // 5. MOTOR 3D NATIVO DE ALTA VISIBILIDAD EN EL PISO (#arFloorCanvas)
+  //    Funciona al 100% en cualquier navegador móvil o PC sin depender de CDNs externos
   // ============================================================================
-  let arScene = null;
-  let arCamera = null;
-  let arRenderer = null;
-  let arCorridorGroup = null;
-  let arChevrons = [];
-  let arBeaconMesh = null;
-  let arBeaconRing = null;
-
-  function inicializarEscena3DAR() {
-    const contenedor = document.getElementById("arThreeContainer");
-    if (!contenedor || typeof THREE === "undefined") return;
-
-    arScene = new THREE.Scene();
-
-    // Cámara a 1.55 m de altura (celular en mano) mirando ligeramente hacia el piso frente a los pies
-    arCamera = new THREE.PerspectiveCamera(
-      62,
-      window.innerWidth / window.innerHeight,
-      0.1,
-      150
-    );
-    arCamera.position.set(0, 1.55, 0);
-    arCamera.rotation.order = "YXZ";
-    arCamera.rotation.x = -0.22; // ~12.5° hacia el suelo para ver las flechas desde 1.4m de distancia
-
-    arRenderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
-    arRenderer.setSize(window.innerWidth, window.innerHeight);
-    arRenderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    arRenderer.setClearColor(0x000000, 0);
-    contenedor.innerHTML = "";
-    contenedor.appendChild(arRenderer.domElement);
-
-    const luzAmbiente = new THREE.AmbientLight(0xffffff, 1.0);
-    arScene.add(luzAmbiente);
-
-    const luzDir = new THREE.DirectionalLight(0xffffff, 0.9);
-    luzDir.position.set(3, 12, 5);
-    arScene.add(luzDir);
-
-    // Grupo del pasillo activo que apunta hacia -Z cuando desfaseMiradaGrados === 0
-    arCorridorGroup = new THREE.Group();
-    arScene.add(arCorridorGroup);
-
-    construirGeometriaCorredor3D();
-
-    window.addEventListener("resize", () => {
-      if (!arCamera || !arRenderer) return;
-      arCamera.aspect = window.innerWidth / window.innerHeight;
-      arCamera.updateProjectionMatrix();
-      arRenderer.setSize(window.innerWidth, window.innerHeight);
-    });
-
-    // Permitir girar la vista en 3D arrastrando con el dedo/mouse sobre la cámara AR
-    let arrastrandoAR = false;
-    let ultimoX = 0;
-    viewAR.addEventListener("pointerdown", (e) => {
-      if (e.target.closest("button") || e.target.closest("#arMinimap")) return;
-      arrastrandoAR = true;
-      ultimoX = e.clientX;
-    });
-    window.addEventListener("pointermove", (e) => {
-      if (!arrastrandoAR) return;
-      const dx = e.clientX - ultimoX;
-      ultimoX = e.clientX;
-      estado.desfaseMiradaGrados = ((estado.desfaseMiradaGrados - dx * 0.35 + 540) % 360) - 180;
-    });
-    window.addEventListener("pointerup", () => {
-      arrastrandoAR = false;
-    });
-
-    requestAnimationFrame(animarEscena3DAR);
+  function ajustarTamanoCanvasAR() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    arFloorCanvas.width = Math.round(w * dpr);
+    arFloorCanvas.height = Math.round(h * dpr);
+    arCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
 
-  // Crea la alfombra luminosa y 8 flechas Chevron 3D grandes desde 1.4m hasta 12.6m frente al usuario
-  function construirGeometriaCorredor3D() {
-    if (!arCorridorGroup) return;
-    while (arCorridorGroup.children.length > 0) {
-      arCorridorGroup.remove(arCorridorGroup.children[0]);
-    }
-    arChevrons = [];
+  window.addEventListener("resize", ajustarTamanoCanvasAR);
+  ajustarTamanoCanvasAR();
 
-    // 1. Cinta/alfombra azul translúcida en el piso
-    const largoCinta = 13.5;
-    const geomCinta = new THREE.PlaneGeometry(1.15, largoCinta);
-    geomCinta.rotateX(-Math.PI / 2);
-    const matCinta = new THREE.MeshBasicMaterial({
-      color: 0x0071e3,
-      transparent: true,
-      opacity: 0.28,
-      side: THREE.DoubleSide
-    });
-    const mallaCinta = new THREE.Mesh(geomCinta, matCinta);
-    mallaCinta.position.set(0, 0.01, -largoCinta / 2 - 0.8);
-    arCorridorGroup.add(mallaCinta);
+  // Permitir girar la cámara 3D arrastrando horizontalmente sobre la vista AR
+  let arrastrandoAR = false;
+  let ultimoXAR = 0;
+  arFloorCanvas.addEventListener("pointerdown", (e) => {
+    arrastrandoAR = true;
+    ultimoXAR = e.clientX;
+  });
+  window.addEventListener("pointermove", (e) => {
+    if (!arrastrandoAR) return;
+    const dx = e.clientX - ultimoXAR;
+    ultimoXAR = e.clientX;
+    estado.desfaseMiradaGrados = ((estado.desfaseMiradaGrados - dx * 0.35 + 540) % 360) - 180;
+    dibujarMinimapa();
+  });
+  window.addEventListener("pointerup", () => {
+    arrastrandoAR = false;
+  });
 
-    // Bordes laterales brillantes cian de la cinta
-    const geomBorde = new THREE.PlaneGeometry(0.06, largoCinta);
-    geomBorde.rotateX(-Math.PI / 2);
-    const matBorde = new THREE.MeshBasicMaterial({
-      color: 0x38bdf8,
-      transparent: true,
-      opacity: 0.85,
-      side: THREE.DoubleSide
-    });
-    const bordeIzq = new THREE.Mesh(geomBorde, matBorde);
-    bordeIzq.position.set(-0.56, 0.02, -largoCinta / 2 - 0.8);
-    const bordeDer = new THREE.Mesh(geomBorde, matBorde);
-    bordeDer.position.set(0.56, 0.02, -largoCinta / 2 - 0.8);
-    arCorridorGroup.add(bordeIzq, bordeDer);
+  // Proyecta un punto 3D del piso (xMetros lateral, yMetros altura, zMetros distancia hacia adelante)
+  // a coordenadas de pantalla (sx, sy) ubicadas entre el 40% y el 82% de la altura (arriba del menú compacto)
+  function proyectarPuntoPiso3D(xMetros, yMetros, zMetros, w, h, yawRad) {
+    // Rotar según el giro de la cámara (yawRad)
+    const cosY = Math.cos(yawRad);
+    const sinY = Math.sin(yawRad);
+    const rx = xMetros * cosY - zMetros * sinY;
+    const rz = xMetros * sinY + zMetros * cosY;
 
-    // 2. Molde extruido de Flecha Chevron 3D (>) apuntando hacia adelante (-Z)
-    const shape = new THREE.Shape();
-    shape.moveTo(0, 0.42);       // Punta delantera
-    shape.lineTo(0.46, -0.18);   // Ala derecha exterior
-    shape.lineTo(0.30, -0.32);   // Ala derecha interior
-    shape.lineTo(0, 0.08);       // Centro interior
-    shape.lineTo(-0.30, -0.32);  // Ala izquierda interior
-    shape.lineTo(-0.46, -0.18);  // Ala izquierda exterior
-    shape.closePath();
+    if (rz <= 0.45) return null; // Detrás de la cámara
 
-    const extrudeOpts = {
-      depth: 0.07,
-      bevelEnabled: true,
-      bevelSegments: 2,
-      steps: 1,
-      bevelSize: 0.015,
-      bevelThickness: 0.015
-    };
-    const geomFlecha = new THREE.ExtrudeGeometry(shape, extrudeOpts);
-    geomFlecha.rotateX(-Math.PI / 2); // Acostada sobre el piso XZ apuntando hacia -Z
+    const horizonteY = h * 0.39;
+    const alturaCamara = 1.55;
+    const fovEscala = Math.min(w, h) * 0.78;
 
-    const numFlechas = 8;
-    for (let i = 0; i < numFlechas; i++) {
-      const matFlecha = new THREE.MeshStandardMaterial({
-        color: 0x00d2ff,
-        emissive: 0x0066ff,
-        emissiveIntensity: 0.75,
-        roughness: 0.2,
-        metalness: 0.1,
-        transparent: true,
-        opacity: 0.95
-      });
-      const mesh = new THREE.Mesh(geomFlecha, matFlecha);
-      const zBase = -(1.4 + i * 1.45); // Desde 1.4m frente a los pies hasta ~11.6m
-      mesh.position.set(0, 0.04, zBase);
-      mesh.userData = { indice: i, zBase };
-      arCorridorGroup.add(mesh);
-      arChevrons.push(mesh);
-    }
+    const sx = w * 0.5 + (rx / rz) * fovEscala;
+    const sy = horizonteY + ((alturaCamara - yMetros) / rz) * (h * 0.46);
+    const escala = fovEscala / rz;
 
-    // 3. Pin 3D flotante al final del corredor visible indicando el siguiente nodo
-    const geomPin = new THREE.OctahedronGeometry(0.32, 0);
-    const matPin = new THREE.MeshStandardMaterial({
-      color: 0x34c759,
-      emissive: 0x15803d,
-      emissiveIntensity: 0.7
-    });
-    arBeaconMesh = new THREE.Mesh(geomPin, matPin);
-    arBeaconMesh.position.set(0, 1.1, -11.5);
-    arCorridorGroup.add(arBeaconMesh);
-
-    const geomAnillo = new THREE.RingGeometry(0.45, 0.62, 32);
-    geomAnillo.rotateX(-Math.PI / 2);
-    const matAnillo = new THREE.MeshBasicMaterial({
-      color: 0x34c759,
-      side: THREE.DoubleSide,
-      transparent: true,
-      opacity: 0.85
-    });
-    arBeaconRing = new THREE.Mesh(geomAnillo, matAnillo);
-    arBeaconRing.position.set(0, 0.03, -11.5);
-    arCorridorGroup.add(arBeaconRing);
+    return { sx, sy, rz, escala };
   }
 
-  function actualizarGeometriaFlechas3D() {
-    if (!arCorridorGroup) return;
-    const { actual, siguiente, distRestanteTramo } = obtenerTramoActivo();
-    const enDestino = actual.id === siguiente.id || distRestanteTramo < 0.5;
+  function renderizarBucleAR(tiempoMs) {
+    requestAnimationFrame(renderizarBucleAR);
+    if (estado.modoVista !== "ar") return;
 
-    // Color verde esmeralda si ya estamos llegando al destino final, azul cian en ruta
-    const colorPunta = enDestino ? 0x34c759 : 0x00e5ff;
-    const colorEmisivo = enDestino ? 0x16a34a : 0x0066ff;
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    arCtx.clearRect(0, 0, w, h);
 
-    arChevrons.forEach((mesh) => {
-      mesh.material.color.setHex(colorPunta);
-      mesh.material.emissive.setHex(colorEmisivo);
-    });
-
-    // Acercar el pin 3D si el nodo está a menos de 11.5 m
-    const zPin = -Math.max(2.2, Math.min(11.5, distRestanteTramo));
-    if (arBeaconMesh && arBeaconRing) {
-      arBeaconMesh.position.z = zPin;
-      arBeaconRing.position.z = zPin;
-      const esDestinoFinal = estado.indiceActual >= estado.ruta.length - 2;
-      arBeaconMesh.material.color.setHex(esDestinoFinal ? 0xc8102e : 0x34c759);
-      arBeaconRing.material.color.setHex(esDestinoFinal ? 0xc8102e : 0x34c759);
-    }
-  }
-
-  function animarEscena3DAR(tiempoMs) {
-    requestAnimationFrame(animarEscena3DAR);
-    if (!arRenderer || !arScene || !arCamera) return;
-
-    const t = tiempoMs * 0.001;
-    const velocidadOnda = estado.caminandoSim ? 5.5 : 3.0;
-
-    // Si el sensor del teléfono está enviando rumbo, calculamos cuánto ha girado respecto al momento de alinear
-    if (estado.brjSensorActual !== null && estado.brjSensorBase !== null) {
+    // Sincronizar giroscopio/brújula si está disponible
+    if (estado.brjSensorActual !== null && estado.brjSensorBase !== null && !arrastrandoAR) {
       estado.desfaseMiradaGrados = diferenciaAngularGrados(
         estado.brjSensorActual,
         estado.brjSensorBase
       );
     }
 
-    // Rotar el corredor 3D según el giro del usuario (0° = corredor justo frente a la cámara)
-    if (arCorridorGroup) {
-      const radGiro = THREE.MathUtils.degToRad(estado.desfaseMiradaGrados);
-      arCorridorGroup.rotation.y = radGiro;
-    }
+    const yawRad = (-estado.desfaseMiradaGrados * Math.PI) / 180;
 
-    // Avisar si el usuario giró más de 35° lejos del corredor de flechas
+    // Aviso si el usuario giró más de 38° lejos del pasillo
     if (arTurnHint && arTurnHintText) {
-      if (Math.abs(estado.desfaseMiradaGrados) > 35) {
+      if (Math.abs(estado.desfaseMiradaGrados) > 38) {
         arTurnHint.hidden = false;
         arTurnHintText.textContent =
           estado.desfaseMiradaGrados > 0
@@ -474,32 +366,184 @@
       }
     }
 
-    // Onda luminosa tipo "carril de aterrizaje" que avanza hacia adelante (-Z)
-    arChevrons.forEach((mesh, idx) => {
-      // Deslizamiento continuo hacia adelante
-      const desplazamiento = ((t * (estado.caminandoSim ? 2.4 : 1.1) + idx * 0.18) % 1) * 1.45;
-      mesh.position.z = -(1.2 + idx * 1.35 + desplazamiento);
+    const { actual, siguiente, distRestanteTramo } = obtenerTramoActivo();
+    const enDestino = actual.id === siguiente.id || distRestanteTramo < 0.8;
 
-      const pulso = (Math.sin(t * velocidadOnda - idx * 0.7) + 1) * 0.5;
-      const escala = 0.92 + pulso * 0.28;
-      mesh.scale.set(escala, escala, escala);
-      mesh.material.emissiveIntensity = 0.45 + pulso * 0.95;
-      mesh.material.opacity = 0.65 + pulso * 0.35;
-    });
+    // 1. Dibujar la alfombra 3D perspectiva del pasillo (de z = 1.1m a z = 12.5m)
+    const zCerca = 1.1;
+    const zLejos = 12.5;
+    const anchoMedio = 0.62;
 
-    if (arBeaconMesh && arBeaconRing) {
-      arBeaconMesh.position.y = 1.05 + Math.sin(t * 3.2) * 0.15;
-      arBeaconMesh.rotation.y = t * 1.8;
-      const sAnillo = 0.85 + ((t * 1.4) % 1) * 0.75;
-      arBeaconRing.scale.set(sAnillo, sAnillo, 1);
-      arBeaconRing.material.opacity = 1 - ((t * 1.4) % 1);
+    const pIzqCerca = proyectarPuntoPiso3D(-anchoMedio, 0, zCerca, w, h, yawRad);
+    const pDerCerca = proyectarPuntoPiso3D(anchoMedio, 0, zCerca, w, h, yawRad);
+    const pDerLejos = proyectarPuntoPiso3D(anchoMedio, 0, zLejos, w, h, yawRad);
+    const pIzqLejos = proyectarPuntoPiso3D(-anchoMedio, 0, zLejos, w, h, yawRad);
+
+    if (pIzqCerca && pDerCerca && pDerLejos && pIzqLejos) {
+      const gradCinta = arCtx.createLinearGradient(0, pIzqCerca.sy, 0, pIzqLejos.sy);
+      if (enDestino) {
+        gradCinta.addColorStop(0, "rgba(52, 199, 89, 0.55)");
+        gradCinta.addColorStop(1, "rgba(52, 199, 89, 0.08)");
+      } else {
+        gradCinta.addColorStop(0, "rgba(0, 113, 227, 0.62)");
+        gradCinta.addColorStop(0.7, "rgba(0, 198, 255, 0.35)");
+        gradCinta.addColorStop(1, "rgba(0, 198, 255, 0.05)");
+      }
+
+      arCtx.beginPath();
+      arCtx.moveTo(pIzqCerca.sx, pIzqCerca.sy);
+      arCtx.lineTo(pDerCerca.sx, pDerCerca.sy);
+      arCtx.lineTo(pDerLejos.sx, pDerLejos.sy);
+      arCtx.lineTo(pIzqLejos.sx, pIzqLejos.sy);
+      arCtx.closePath();
+      arCtx.fillStyle = gradCinta;
+      arCtx.fill();
+
+      // Rieles laterales luminosos
+      arCtx.strokeStyle = enDestino ? "#4ade80" : "#38bdf8";
+      arCtx.lineWidth = 3.5;
+      arCtx.beginPath();
+      arCtx.moveTo(pIzqCerca.sx, pIzqCerca.sy);
+      arCtx.lineTo(pIzqLejos.sx, pIzqLejos.sy);
+      arCtx.moveTo(pDerCerca.sx, pDerCerca.sy);
+      arCtx.lineTo(pDerLejos.sx, pDerLejos.sy);
+      arCtx.stroke();
     }
 
-    arRenderer.render(arScene, arCamera);
+    // 2. Dibujar 7 Flechas Chevron 3D grandes y extruidas que avanzan por el piso
+    const t = tiempoMs * 0.001;
+    const velocidad = estado.caminandoSim ? 2.6 : 1.25;
+    const numFlechas = 7;
+
+    // Dibujar de atrás hacia adelante para superposición 3D correcta
+    for (let i = numFlechas - 1; i >= 0; i--) {
+      const avanceCiclo = ((t * velocidad + (numFlechas - 1 - i) * 0.16) % 1);
+      const zCentro = 1.35 + i * 1.45 + avanceCiclo * 1.45;
+      if (zCentro > 11.8) continue;
+
+      // Vértices 3D del Chevron sobre el piso (y = 0) y su cara superior extruida (y = 0.06)
+      const punta = proyectarPuntoPiso3D(0, 0.05, zCentro + 0.45, w, h, yawRad);
+      const alaDer = proyectarPuntoPiso3D(0.46, 0.05, zCentro - 0.16, w, h, yawRad);
+      const intDer = proyectarPuntoPiso3D(0.28, 0.05, zCentro - 0.34, w, h, yawRad);
+      const centroInt = proyectarPuntoPiso3D(0, 0.05, zCentro + 0.08, w, h, yawRad);
+      const intIzq = proyectarPuntoPiso3D(-0.28, 0.05, zCentro - 0.34, w, h, yawRad);
+      const alaIzq = proyectarPuntoPiso3D(-0.46, 0.05, zCentro - 0.16, w, h, yawRad);
+
+      if (!punta || !alaDer || !intDer || !centroInt || !intIzq || !alaIzq) continue;
+
+      const pulso = (Math.sin(t * 4.5 - i * 0.7) + 1) * 0.5;
+      const alpha = Math.min(1, Math.max(0.35, 1.15 - zCentro / 12.5));
+
+      // Sombra 3D bajo la flecha para darle volumen sobre el piso real
+      arCtx.save();
+      arCtx.translate(0, 5);
+      arCtx.beginPath();
+      arCtx.moveTo(punta.sx, punta.sy);
+      arCtx.lineTo(alaDer.sx, alaDer.sy);
+      arCtx.lineTo(intDer.sx, intDer.sy);
+      arCtx.lineTo(centroInt.sx, centroInt.sy);
+      arCtx.lineTo(intIzq.sx, intIzq.sy);
+      arCtx.lineTo(alaIzq.sx, alaIzq.sy);
+      arCtx.closePath();
+      arCtx.fillStyle = `rgba(0, 20, 60, ${0.45 * alpha})`;
+      arCtx.fill();
+      arCtx.restore();
+
+      // Cara superior brillante de la flecha 3D
+      arCtx.beginPath();
+      arCtx.moveTo(punta.sx, punta.sy);
+      arCtx.lineTo(alaDer.sx, alaDer.sy);
+      arCtx.lineTo(intDer.sx, intDer.sy);
+      arCtx.lineTo(centroInt.sx, centroInt.sy);
+      arCtx.lineTo(intIzq.sx, intIzq.sy);
+      arCtx.lineTo(alaIzq.sx, alaIzq.sy);
+      arCtx.closePath();
+
+      if (enDestino) {
+        arCtx.fillStyle = `rgba(74, 222, 128, ${alpha})`;
+        arCtx.strokeStyle = "#ffffff";
+      } else {
+        const r = Math.round(0 + pulso * 90);
+        const g = Math.round(205 + pulso * 50);
+        arCtx.fillStyle = `rgba(${r}, ${g}, 255, ${alpha})`;
+        arCtx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
+      }
+      arCtx.lineWidth = Math.max(1.5, 3.2 - zCentro * 0.2);
+      arCtx.fill();
+      arCtx.stroke();
+    }
+
+    // 3. Pin 3D de Destino/Parada al final del corredor
+    const zPin = Math.max(2.6, Math.min(10.8, distRestanteTramo));
+    const reboteY = Math.sin(t * 3.5) * 0.12;
+    const pPinBase = proyectarPuntoPiso3D(0, 0, zPin, w, h, yawRad);
+    const pPinAlto = proyectarPuntoPiso3D(0, 1.15 + reboteY, zPin, w, h, yawRad);
+
+    if (pPinBase && pPinAlto) {
+      // Anillo pulsante en el suelo
+      const radioAnillo = Math.max(14, 46 / (zPin * 0.25));
+      arCtx.beginPath();
+      arCtx.ellipse(
+        pPinBase.sx,
+        pPinBase.sy,
+        radioAnillo,
+        radioAnillo * 0.38,
+        0,
+        0,
+        Math.PI * 2
+      );
+      arCtx.strokeStyle = enDestino ? "#4ade80" : "#38bdf8";
+      arCtx.lineWidth = 3;
+      arCtx.stroke();
+
+      // Poste de luz vertical
+      arCtx.beginPath();
+      arCtx.moveTo(pPinBase.sx, pPinBase.sy);
+      arCtx.lineTo(pPinAlto.sx, pPinAlto.sy);
+      arCtx.strokeStyle = "rgba(255, 255, 255, 0.75)";
+      arCtx.lineWidth = 2.5;
+      arCtx.stroke();
+
+      // Rombo 3D flotante
+      const tamRombo = Math.max(12, 26 / (zPin * 0.28));
+      arCtx.beginPath();
+      arCtx.moveTo(pPinAlto.sx, pPinAlto.sy - tamRombo);
+      arCtx.lineTo(pPinAlto.sx + tamRombo * 0.8, pPinAlto.sy);
+      arCtx.lineTo(pPinAlto.sx, pPinAlto.sy + tamRombo);
+      arCtx.lineTo(pPinAlto.sx - tamRombo * 0.8, pPinAlto.sy);
+      arCtx.closePath();
+      arCtx.fillStyle = estado.indiceActual >= estado.ruta.length - 2 ? "#ef4444" : "#34c759";
+      arCtx.fill();
+      arCtx.lineWidth = 2.5;
+      arCtx.strokeStyle = "#ffffff";
+      arCtx.stroke();
+
+      // Etiqueta flotante sobre el pin 3D
+      const textoPin = `${siguiente.id} · ${siguiente.name} (${Math.round(distRestanteTramo)} m)`;
+      arCtx.font = "800 12px Inter, -apple-system, sans-serif";
+      const tw = arCtx.measureText(textoPin).width;
+      const bx = pPinAlto.sx - tw / 2 - 10;
+      const by = pPinAlto.sy - tamRombo - 30;
+      arCtx.fillStyle = "rgba(15, 23, 42, 0.88)";
+      arCtx.beginPath();
+      if (arCtx.roundRect) {
+        arCtx.roundRect(bx, by, tw + 20, 24, 12);
+      } else {
+        arCtx.rect(bx, by, tw + 20, 24);
+      }
+      arCtx.fill();
+      arCtx.strokeStyle = "#38bdf8";
+      arCtx.lineWidth = 1.5;
+      arCtx.stroke();
+
+      arCtx.fillStyle = "#ffffff";
+      arCtx.textAlign = "center";
+      arCtx.fillText(textoPin, pPinAlto.sx, by + 16);
+    }
   }
 
   // ============================================================================
-  // 5. MAPA 2D INTERACTIVO Y MINIMAPA EN VIVO (CON PUNTO DEL USUARIO EN MOVIMIENTO)
+  // 6. MAPA 2D INTERACTIVO Y MINIMAPA EN VIVO
   // ============================================================================
   function mundoACanvas(x, z) {
     const b = datos.bounds;
@@ -517,7 +561,6 @@
   function dibujarMapa2D() {
     ctx.clearRect(0, 0, campusCanvas.width, campusCanvas.height);
 
-    // Fondo arquitectónico limpio
     ctx.fillStyle = "#f4f3ee";
     ctx.fillRect(0, 0, campusCanvas.width, campusCanvas.height);
 
@@ -528,7 +571,6 @@
       ctx.restore();
     }
 
-    // Cuadrícula métrica sutil
     ctx.strokeStyle = "rgba(0, 0, 0, 0.04)";
     ctx.lineWidth = 1;
     for (let x = 0; x < campusCanvas.width; x += 50) {
@@ -544,7 +586,7 @@
       ctx.stroke();
     }
 
-    // 1. Pasillos caminables base
+    // Pasillos base
     ctx.strokeStyle = "rgba(100, 116, 139, 0.28)";
     ctx.lineWidth = 5;
     ctx.lineCap = "round";
@@ -560,11 +602,10 @@
       ctx.stroke();
     });
 
-    // 2. Ruta activa desde la posición actual del usuario hasta el destino
+    // Ruta activa desde (usuarioX, usuarioZ)
     if (estado.ruta.length >= 2) {
       const posUsuario = mundoACanvas(estado.usuarioX, estado.usuarioZ);
 
-      // Sombra de la ruta
       ctx.strokeStyle = "rgba(0, 113, 227, 0.2)";
       ctx.lineWidth = 14;
       ctx.lineJoin = "round";
@@ -576,7 +617,6 @@
       }
       ctx.stroke();
 
-      // Línea principal azul
       ctx.strokeStyle = "#0071e3";
       ctx.lineWidth = 6;
       ctx.beginPath();
@@ -586,32 +626,9 @@
         ctx.lineTo(p.cx, p.cy);
       }
       ctx.stroke();
-
-      // Chevrons blancos sobre el tramo activo
-      const sigNodo = estado.ruta[Math.min(estado.indiceActual + 1, estado.ruta.length - 1)];
-      const pSig = mundoACanvas(sigNodo.x, sigNodo.z);
-      const ang = Math.atan2(pSig.cy - posUsuario.cy, pSig.cx - posUsuario.cx);
-      const distPx = Math.hypot(pSig.cx - posUsuario.cx, pSig.cy - posUsuario.cy);
-      const pasos = Math.max(1, Math.floor(distPx / 32));
-      for (let s = 1; s <= pasos; s++) {
-        const t = s / (pasos + 1);
-        const mx = posUsuario.cx + (pSig.cx - posUsuario.cx) * t;
-        const my = posUsuario.cy + (pSig.cy - posUsuario.cy) * t;
-        ctx.save();
-        ctx.translate(mx, my);
-        ctx.rotate(ang);
-        ctx.strokeStyle = "#ffffff";
-        ctx.lineWidth = 2.5;
-        ctx.beginPath();
-        ctx.moveTo(-5, -5);
-        ctx.lineTo(4, 0);
-        ctx.lineTo(-5, 5);
-        ctx.stroke();
-        ctx.restore();
-      }
     }
 
-    // 3. Dibujar los 20 Nodos del Campus
+    // Nodos
     const idsEnRuta = new Set(estado.ruta.map((n) => n.id));
     datos.nodes.forEach((nodo) => {
       const { cx, cy } = mundoACanvas(nodo.x, nodo.z);
@@ -650,26 +667,23 @@
         ctx.font = enRuta ? "700 12px Inter, sans-serif" : "600 11px Inter, sans-serif";
         const tw = ctx.measureText(texto).width;
         ctx.fillStyle = "rgba(255, 255, 255, 0.92)";
-        ctx.beginPath();
-        ctx.roundRect(cx - tw / 2 - 6, cy - radio - 24, tw + 12, 18, 6);
-        ctx.fill();
+        ctx.fillRect(cx - tw / 2 - 6, cy - radio - 24, tw + 12, 18);
         ctx.fillStyle = esDestino ? "#c8102e" : enRuta ? "#0071e3" : "#1c1c1e";
         ctx.textAlign = "center";
         ctx.fillText(texto, cx, cy - radio - 11);
       }
     });
 
-    // 4. Marcador en vivo del USUARIO ("TÚ") con cono de visión
+    // Marcador en vivo del USUARIO ("TÚ")
     const posU = mundoACanvas(estado.usuarioX, estado.usuarioZ);
     const { rumboTramo } = obtenerTramoActivo();
     const rumboMirada = (rumboTramo + estado.desfaseMiradaGrados + 360) % 360;
     const radCanvas = ((rumboMirada - 90) * Math.PI) / 180;
 
-    // Cono de visión en el mapa 2D
     ctx.save();
     ctx.translate(posU.cx, posU.cy);
     ctx.rotate(radCanvas);
-    ctx.fillStyle = "rgba(52, 199, 89, 0.25)";
+    ctx.fillStyle = "rgba(52, 199, 89, 0.28)";
     ctx.beginPath();
     ctx.moveTo(0, 0);
     ctx.arc(0, 0, 38, -0.45, 0.45);
@@ -677,7 +691,6 @@
     ctx.fill();
     ctx.restore();
 
-    // Halo verde pulsante del usuario
     ctx.beginPath();
     ctx.arc(posU.cx, posU.cy, 16, 0, Math.PI * 2);
     ctx.fillStyle = "rgba(52, 199, 89, 0.28)";
@@ -697,7 +710,6 @@
     ctx.fillText("TÚ", posU.cx, posU.cy + 24);
   }
 
-  // Minimapa tipo Radar que sigue en vivo la coordenada (usuarioX, usuarioZ)
   function dibujarMinimapa() {
     if (!miniCtx) return;
     const w = minimapCanvas.width;
@@ -707,7 +719,6 @@
     miniCtx.fillStyle = "#0f172a";
     miniCtx.fillRect(0, 0, w, h);
 
-    // Anillos de radar concéntricos alrededor del usuario
     miniCtx.strokeStyle = "rgba(148, 163, 184, 0.18)";
     miniCtx.lineWidth = 1;
     [28, 56, 82].forEach((r) => {
@@ -716,14 +727,12 @@
       miniCtx.stroke();
     });
 
-    // Escala: 1 metro del campus = 0.65 px en el minimapa centrado en (usuarioX, usuarioZ)
     const escala = 0.65;
     const aMini = (x, z) => ({
       mx: w / 2 + (x - estado.usuarioX) * escala,
       my: h / 2 - (z - estado.usuarioZ) * escala
     });
 
-    // Pasillos cercanos en gris
     miniCtx.strokeStyle = "rgba(148, 163, 184, 0.35)";
     miniCtx.lineWidth = 2.5;
     datos.edges.forEach(([u, v]) => {
@@ -738,7 +747,6 @@
       miniCtx.stroke();
     });
 
-    // Ruta activa en azul brillante desde el centro (usuario)
     if (estado.ruta.length >= 2) {
       miniCtx.strokeStyle = "#38bdf8";
       miniCtx.lineWidth = 4.5;
@@ -752,7 +760,6 @@
       miniCtx.stroke();
     }
 
-    // Nodos en el minimapa
     datos.nodes.forEach((n) => {
       const p = aMini(n.x, n.z);
       if (p.mx < -10 || p.mx > w + 10 || p.my < -10 || p.my > h + 10) return;
@@ -762,7 +769,6 @@
       miniCtx.fill();
     });
 
-    // Cono de hacia dónde mira el celular
     const { rumboTramo } = obtenerTramoActivo();
     const rumboMirada = (rumboTramo + estado.desfaseMiradaGrados + 360) % 360;
     const radMini = ((rumboMirada - 90) * Math.PI) / 180;
@@ -770,7 +776,7 @@
     miniCtx.save();
     miniCtx.translate(w / 2, h / 2);
     miniCtx.rotate(radMini);
-    miniCtx.fillStyle = "rgba(56, 189, 248, 0.32)";
+    miniCtx.fillStyle = "rgba(56, 189, 248, 0.34)";
     miniCtx.beginPath();
     miniCtx.moveTo(0, 0);
     miniCtx.arc(0, 0, 34, -0.5, 0.5);
@@ -778,7 +784,6 @@
     miniCtx.fill();
     miniCtx.restore();
 
-    // Punto verde del usuario en el centro exacto del minimapa
     miniCtx.beginPath();
     miniCtx.arc(w / 2, h / 2, 6.5, 0, Math.PI * 2);
     miniCtx.fillStyle = "#34c759";
@@ -797,7 +802,6 @@
     });
   }
 
-  // Permitir tocar cualquier nodo en el Mapa 2D para seleccionarlo como ubicación actual ("Estoy aquí")
   campusCanvas.addEventListener("click", (e) => {
     const rect = campusCanvas.getBoundingClientRect();
     const scaleX = campusCanvas.width / rect.width;
@@ -822,7 +826,7 @@
   });
 
   // ============================================================================
-  // 6. ACTUALIZACIÓN DE INTERFAZ Y RECALCULAR RUTA
+  // 7. ACTUALIZACIÓN DE INTERFAZ Y RECÁLCULO DE RUTA
   // ============================================================================
   function recalcularRutaCompleta() {
     const res = calcularRutaDijkstra(estado.origenId, estado.destinoId);
@@ -830,8 +834,6 @@
     estado.distanciaTotal = res.distanciaTotal;
     estado.indiceActual = 0;
     estado.progresoTramo = 0;
-
-    // Alinear las flechas 3D justo frente al usuario al iniciar o cambiar ruta
     estado.desfaseMiradaGrados = 0;
     estado.brjSensorBase = estado.brjSensorActual;
 
@@ -839,8 +841,6 @@
     actualizarHUD();
     dibujarMapa2D();
     dibujarMinimapa();
-    actualizarGeometriaFlechas3D();
-    publicarEventoMQTT();
   }
 
   function actualizarHUD() {
@@ -861,7 +861,7 @@
     } else {
       const mTramo = Math.round(distRestanteTramo);
       hudInstruction.textContent = `Camina ${mTramo} m hacia ${siguiente.name}`;
-      hudSub.textContent = `${Math.round(distTotalRestante)} m restantes en total · ~${minutos} min`;
+      hudSub.textContent = `${Math.round(distTotalRestante)} m restantes · ~${minutos} min`;
       if (arSignTurnIcon) arSignTurnIcon.textContent = "⬆️";
       if (arSignTitle) arSignTitle.textContent = `Sigue hacia ${siguiente.name}`;
       if (arSignDist) {
@@ -879,7 +879,6 @@
     kpiNodesCount.textContent = String(estado.ruta.length);
     kpiDistanceMeters.textContent = `${Math.round(estado.distanciaTotal)} m totales`;
 
-    // Lista de paradas
     stepsList.innerHTML = "";
     estado.ruta.forEach((nodo, idx) => {
       const li = document.createElement("li");
@@ -902,14 +901,14 @@
         actualizarHUD();
         dibujarMapa2D();
         dibujarMinimapa();
-        actualizarGeometriaFlechas3D();
+        fijarEstadoMenu(true);
       });
       stepsList.appendChild(li);
     });
   }
 
   // ============================================================================
-  // 7. SIMULACIÓN DE CAMINATA EN VIVO ("▶️ CAMINAR") + PODÓMETRO + GPS REAL
+  // 8. SIMULACIÓN DE CAMINATA EN VIVO ("▶️ CAMINAR") + PODÓMETRO + GPS
   // ============================================================================
   let idIntervaloCaminata = null;
 
@@ -920,14 +919,15 @@
       estado.progresoTramo = 0;
       sincronizarCoordenadasUsuarioConProgreso();
     }
+    // Bajar automáticamente el menú al caminar para que se vea todo el piso AR
+    fijarEstadoMenu(true);
     estado.caminandoSim = true;
     btnWalkSim.classList.add("is-walking");
     btnWalkSimText.textContent = "⏸️ Pausar";
-    locationModeBadge.textContent = "🏃 Caminando en vivo (Simulación)";
+    locationModeBadge.textContent = "🏃 Caminando en vivo";
 
-    // Avanza suavemente cada 80ms (~7.5 metros por segundo para demostración ágil)
     idIntervaloCaminata = setInterval(() => {
-      avanzarMetrosEnRuta(0.6);
+      avanzarMetrosEnRuta(0.65);
     }, 80);
   }
 
@@ -941,7 +941,7 @@
     btnWalkSimText.textContent = "▶️ Caminar";
     locationModeBadge.textContent = estado.gpsActivo
       ? "🛰️ Ubicación: GPS Activo"
-      : `📍 En ${estado.origenId} (QR + Pasos)`;
+      : `📍 ${estado.origenId} (QR + Pasos)`;
   }
 
   btnWalkSim.addEventListener("click", () => {
@@ -952,7 +952,7 @@
     }
   });
 
-  // Podómetro con acelerómetro del celular (avanza 0.85 m por cada paso real detectado)
+  // Podómetro con acelerómetro del celular
   let ultimoPasoMs = 0;
   window.addEventListener("devicemotion", (e) => {
     const acc = e.accelerationIncludingGravity;
@@ -963,13 +963,12 @@
       ultimoPasoMs = ahora;
       estado.pasosDetectados += 1;
       if (!estado.caminandoSim) {
-        locationModeBadge.textContent = `👣 Paso #${estado.pasosDetectados} detectado`;
+        locationModeBadge.textContent = `👣 Paso #${estado.pasosDetectados}`;
         avanzarMetrosEnRuta(0.85);
       }
     }
   });
 
-  // Brújula / Giroscopio relativo
   window.addEventListener(
     "deviceorientation",
     (e) => {
@@ -989,15 +988,13 @@
     true
   );
 
-  // Botón "🎯 Centrar flechas frente a mí"
   btnAlignArrows.addEventListener("click", () => {
     estado.desfaseMiradaGrados = 0;
     estado.brjSensorBase = estado.brjSensorActual;
     if (arTurnHint) arTurnHint.hidden = true;
+    dibujarMinimapa();
   });
 
-  // GPS Real opcional para cuando el usuario está físicamente dentro del campus IBERO Santa Fe
-  // Coordenadas centrales aproximadas de la IBERO CDMX: Lat 19.3705, Lon -99.2636
   const IBERO_LAT0 = 19.3705;
   const IBERO_LON0 = -99.2636;
   btnToggleGps.addEventListener("click", () => {
@@ -1014,17 +1011,15 @@
     }
 
     estado.gpsActivo = true;
-    btnToggleGps.textContent = "🛰️ GPS Activo (Toca para apagar)";
-    locationModeBadge.textContent = "🛰️ Buscando señal GPS...";
+    btnToggleGps.textContent = "🛰️ GPS Activo (Apagar)";
+    locationModeBadge.textContent = "🛰️ Buscando GPS...";
 
     estado.gpsWatchId = navigator.geolocation.watchPosition(
       (pos) => {
         const { latitude, longitude } = pos.coords;
-        // Convertir diferencia de lat/lon a metros respecto al centro de la IBERO
         const dxMetros = (longitude - IBERO_LON0) * 111320 * Math.cos((IBERO_LAT0 * Math.PI) / 180);
         const dzMetros = (latitude - IBERO_LAT0) * 110540;
 
-        // Verificar si está dentro de un radio razonable (600 m) del campus IBERO
         if (Math.hypot(dxMetros, dzMetros) < 600) {
           estado.usuarioX = dxMetros;
           estado.usuarioZ = dzMetros;
@@ -1043,7 +1038,7 @@
   });
 
   // ============================================================================
-  // 8. CÁMARA WEB Y ESCÁNER DE CÓDIGOS QR EN VIVO
+  // 9. CÁMARA WEB Y ESCÁNER DE CÓDIGOS QR
   // ============================================================================
   let streamCamara = null;
   let detectorQR = null;
@@ -1066,9 +1061,7 @@
       }
       videoEl.srcObject = streamCamara;
       await videoEl.play();
-    } catch (err) {
-      console.warn("Cámara en modo simulado (sin permiso o en PC sin webcam):", err);
-    }
+    } catch (_) {}
   }
 
   function fijarUbicacionPorNodo(idNodo, fuente = "QR") {
@@ -1084,12 +1077,12 @@
     locationModeBadge.textContent = `📍 ${fuente}: ${nodo.id} ${nodo.name}`;
     recalcularRutaCompleta();
     centrarMapaEnUsuario();
+    fijarEstadoMenu(true);
 
     const dlg = document.getElementById("dialogQrScanner");
     if (dlg && dlg.open) dlg.close();
   }
 
-  // Escaneo automático periódico sobre el video activo si el navegador soporta BarcodeDetector
   setInterval(async () => {
     if (!detectorQR || !streamCamara) return;
     const videoActivo = document.getElementById("dialogQrScanner")?.open
@@ -1112,7 +1105,7 @@
   }, 900);
 
   // ============================================================================
-  // 9. POBLAR SELECTORES, TARJETAS QR Y EVENTOS DE INTERFAZ
+  // 10. SELECTORES, TARJETAS QR Y EVENTOS
   // ============================================================================
   function inicializarControles() {
     datos.nodes.forEach((nodo) => {
@@ -1131,12 +1124,13 @@
     selectDestino.value = estado.destinoId;
 
     selectOrigen.addEventListener("change", () => {
-      fijarUbicacionPorNodo(selectOrigen.value, "Selector");
+      fijarUbicacionPorNodo(selectOrigen.value, "Origen");
     });
 
     selectDestino.addEventListener("change", () => {
       estado.destinoId = selectDestino.value;
       recalcularRutaCompleta();
+      fijarEstadoMenu(true);
     });
 
     btnInvert.addEventListener("click", () => {
@@ -1146,6 +1140,7 @@
       selectOrigen.value = estado.origenId;
       selectDestino.value = estado.destinoId;
       recalcularRutaCompleta();
+      fijarEstadoMenu(true);
     });
 
     btnNextNode.addEventListener("click", () => {
@@ -1161,7 +1156,6 @@
       actualizarHUD();
       dibujarMapa2D();
       dibujarMinimapa();
-      actualizarGeometriaFlechas3D();
     });
 
     document.querySelectorAll("[data-preset]").forEach((btn) => {
@@ -1172,10 +1166,10 @@
         selectOrigen.value = o;
         selectDestino.value = d;
         recalcularRutaCompleta();
+        fijarEstadoMenu(true);
       });
     });
 
-    // Cambiar entre pestaña Cámara AR y Mapa 2D
     function cambiarVista(modo) {
       estado.modoVista = modo;
       const esAR = modo === "ar";
@@ -1204,7 +1198,6 @@
       dibujarMapa2D();
     });
 
-    // Poblar los 20 chips de simulación QR ("Estoy aquí")
     const chipsContainer = document.getElementById("simulatedQrChips");
     datos.nodes.forEach((nodo) => {
       const chip = document.createElement("button");
@@ -1215,12 +1208,17 @@
       chipsContainer.appendChild(chip);
     });
 
-    // Poblar las 20 tarjetas QR imprimibles
     const qrGrid = document.getElementById("qrCardsGrid");
     datos.nodes.forEach((nodo) => {
       const card = document.createElement("div");
       card.className = "qr-card-item";
       const qrBox = document.createElement("div");
+      qrBox.style.minHeight = "100px";
+      qrBox.style.display = "flex";
+      qrBox.style.alignItems = "center";
+      qrBox.style.justifyContent = "center";
+      qrBox.innerHTML = `<code style="font-size:0.75rem;padding:8px;background:#fff;border-radius:8px;border:1px solid #cbd5e1;">ARGOS:${nodo.id}</code>`;
+
       card.innerHTML = `
         <strong style="font-size:0.8rem;color:var(--accent);">${nodo.id}</strong>
         <span style="font-size:0.75rem;font-weight:600;">${nodo.name}</span>
@@ -1239,32 +1237,33 @@
       card.appendChild(btnAqui);
       qrGrid.appendChild(card);
 
-      if (typeof QRCode !== "undefined") {
-        new QRCode(qrBox, {
-          text: `ARGOS:${nodo.id}`,
-          width: 100,
-          height: 100,
-          colorDark: "#1c1c1e",
-          colorLight: "#ffffff"
-        });
+      // Si la librería opcional QRCode ya cargó o cuando cargue, dibuja el QR gráfico
+      const intentarDibujarQR = () => {
+        if (typeof window.QRCode !== "undefined") {
+          qrBox.innerHTML = "";
+          new window.QRCode(qrBox, {
+            text: `ARGOS:${nodo.id}`,
+            width: 100,
+            height: 100,
+            colorDark: "#1c1c1e",
+            colorLight: "#ffffff"
+          });
+          return true;
+        }
+        return false;
+      };
+      if (!intentarDibujarQR()) {
+        window.addEventListener("load", intentarDibujarQR, { once: true });
       }
     });
 
     document.getElementById("btnPrintCards")?.addEventListener("click", () => window.print());
-
-    // Colapsar/expandir detalles de la tarjeta inferior tocando la barra superior
-    const sheetDetails = document.getElementById("sheetDetails");
-    document.getElementById("sheetHandle")?.addEventListener("click", () => {
-      const oculto = sheetDetails.style.display === "none";
-      sheetDetails.style.display = oculto ? "flex" : "none";
-    });
   }
 
   // ============================================================================
-  // 10. FALLBACKS WEB MODERNOS (DECLARATIVE DIALOG, LIGHT DISMISS, 2D PANNING)
+  // 11. FALLBACKS WEB MODERNOS (DECLARATIVE DIALOG, LIGHT DISMISS, 2D PANNING)
   // ============================================================================
   function configurarFallbacksWebModernos() {
-    // 1. Fallback para commandfor / command en navegadores sin Invoker Commands nativo
     if (!("commandForElement" in HTMLButtonElement.prototype)) {
       document.querySelectorAll("[commandfor]").forEach((btn) => {
         btn.addEventListener("click", () => {
@@ -1290,7 +1289,6 @@
       });
     }
 
-    // 2. Fallback para closedby="any" (light-dismiss-a-dialog)
     if (!("closedBy" in HTMLDialogElement.prototype)) {
       document.querySelectorAll('dialog[closedby="any"]').forEach((dlg) => {
         dlg.addEventListener("click", (e) => {
@@ -1299,7 +1297,6 @@
       });
     }
 
-    // 3. Arrastre 2D (2d-panning) con puntero sobre el contenedor del mapa
     let arrastrandoMapa = false;
     let inicioX = 0;
     let inicioY = 0;
@@ -1326,37 +1323,11 @@
   }
 
   // ============================================================================
-  // 11. TELEMETRÍA MQTT OPCIONAL (SINCRONIZACIÓN CON META QUEST 3S / PRÁCTICA 6)
-  // ============================================================================
-  let clienteMqtt = null;
-  function publicarEventoMQTT() {
-    if (typeof mqtt === "undefined") return;
-    try {
-      if (!clienteMqtt) {
-        clienteMqtt = mqtt.connect("wss://broker.emqx.io:8084/mqtt");
-      }
-      if (clienteMqtt && clienteMqtt.connected) {
-        clienteMqtt.publish(
-          "ibero/argos/navegacion",
-          JSON.stringify({
-            origen: estado.origenId,
-            destino: estado.destinoId,
-            usuarioX: Math.round(estado.usuarioX * 10) / 10,
-            usuarioZ: Math.round(estado.usuarioZ * 10) / 10,
-            distanciaRestante: Math.round(calcularDistanciaTotalRestante()),
-            timestamp: Date.now()
-          })
-        );
-      }
-    } catch (_) {}
-  }
-
-  // ============================================================================
-  // 12. ARRANQUE INMEDIATO EN MODO CÁMARA AR CON FLECHAS 3D VISIBLES
+  // 12. ARRANQUE INMEDIATO
   // ============================================================================
   inicializarControles();
   configurarFallbacksWebModernos();
-  inicializarEscena3DAR();
   recalcularRutaCompleta();
   activarCamara(document.getElementById("arVideo"));
+  requestAnimationFrame(renderizarBucleAR);
 })();
