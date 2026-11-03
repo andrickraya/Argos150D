@@ -1,0 +1,792 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    <title>ARGOS — Navegación AR Campus IBERO</title>
+    <style>
+      :root {
+        --bg-app: #0f172a;
+        --surface: rgba(255, 255, 255, 0.94);
+        --surface-solid: #ffffff;
+        --text-primary: #1c1c1e;
+        --text-secondary: #64748b;
+        --border: rgba(15, 23, 42, 0.12);
+        --accent: #0071e3;
+        --accent-soft: rgba(0, 113, 227, 0.12);
+        --green: #16a34a;
+        --red-ibero: #c8102e;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      html, body {
+        width: 100%;
+        height: 100%;
+        height: 100dvh;
+        overflow: hidden;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        background: var(--bg-app);
+        color: var(--text-primary);
+        user-select: none;
+      }
+
+      /* BARRA SUPERIOR */
+      .app-header {
+        position: fixed;
+        top: max(10px, env(safe-area-inset-top));
+        left: 10px;
+        right: 10px;
+        z-index: 50;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 6px;
+        pointer-events: none;
+      }
+      .app-header > * { pointer-events: auto; }
+
+      .brand-pill {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 5px 10px 5px 5px;
+        background: var(--surface);
+        border-radius: 999px;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+        max-width: 155px;
+      }
+      .brand-logo {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--accent), var(--red-ibero));
+        color: #fff;
+        font-weight: 800;
+        font-size: 0.85rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+      }
+      .brand-text {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+      }
+      .brand-name {
+        font-weight: 800;
+        font-size: 0.78rem;
+        line-height: 1.1;
+      }
+      .brand-tag {
+        font-size: 0.62rem;
+        color: var(--text-secondary);
+        font-weight: 600;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .view-switcher {
+        display: flex;
+        align-items: center;
+        background: var(--surface);
+        border-radius: 999px;
+        padding: 3px;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+      }
+      .switch-btn {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        padding: 6px 11px;
+        border: none;
+        background: transparent;
+        color: var(--text-secondary);
+        font-weight: 700;
+        font-size: 0.75rem;
+        border-radius: 999px;
+        cursor: pointer;
+      }
+      .switch-btn.is-active {
+        background: var(--accent);
+        color: #ffffff;
+      }
+      .live-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #4ade80;
+      }
+
+      .header-actions {
+        display: flex;
+        gap: 5px;
+      }
+      .icon-btn, .fab-btn {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        border: none;
+        background: var(--surface);
+        color: var(--text-primary);
+        font-weight: 800;
+        font-size: 0.78rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+        cursor: pointer;
+      }
+
+      /* CONTENEDOR DE VISTAS */
+      .main-viewport {
+        position: fixed;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+      }
+      .view-panel {
+        position: absolute;
+        inset: 0;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.2s ease;
+      }
+      .view-panel.is-visible {
+        opacity: 1;
+        pointer-events: auto;
+      }
+
+      /* VISTA CÁMARA AR */
+      #viewAR {
+        background: radial-gradient(circle at 50% 60%, #1e293b 0%, #090d16 100%);
+        overflow: hidden;
+      }
+      #arVideo {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        z-index: 1;
+      }
+      .ar-floor-canvas {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 3;
+        display: block;
+        touch-action: pan-y;
+      }
+
+      /* Cartel de dirección arriba a la izquierda en AR */
+      .ar-floating-sign {
+        position: fixed;
+        top: 58px;
+        left: 10px;
+        right: 122px;
+        z-index: 20;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        border-radius: 16px;
+        background: rgba(15, 23, 42, 0.86);
+        border: 1.5px solid rgba(56, 189, 248, 0.65);
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+        color: #fff;
+      }
+      .ar-sign-icon {
+        width: 34px;
+        height: 34px;
+        border-radius: 10px;
+        background: linear-gradient(135deg, #0071e3, #00c6ff);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.1rem;
+        flex-shrink: 0;
+      }
+      .ar-sign-body { min-width: 0; flex: 1; }
+      .ar-sign-title {
+        font-size: 0.82rem;
+        font-weight: 800;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .ar-sign-sub {
+        font-size: 0.68rem;
+        color: #bae6fd;
+        font-weight: 600;
+      }
+
+      .ar-sensor-bar {
+        position: fixed;
+        top: 116px;
+        left: 10px;
+        z-index: 20;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        background: rgba(15, 23, 42, 0.8);
+        color: #fff;
+        padding: 4px 10px;
+        border-radius: 999px;
+        font-size: 0.7rem;
+        font-weight: 700;
+      }
+      .chip-sm {
+        padding: 3px 8px;
+        border-radius: 999px;
+        border: 1px solid #38bdf8;
+        background: rgba(56, 189, 248, 0.2);
+        color: #fff;
+        font-size: 0.66rem;
+        font-weight: 700;
+        cursor: pointer;
+      }
+
+      .ar-turn-hint {
+        position: fixed;
+        top: 46%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 25;
+        padding: 10px 16px;
+        border-radius: 999px;
+        background: rgba(200, 16, 46, 0.95);
+        color: #fff;
+        font-size: 0.8rem;
+        font-weight: 700;
+        box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+        white-space: nowrap;
+      }
+
+      /* Minimapa circular en vivo arriba a la derecha */
+      .ar-minimap-card {
+        position: fixed;
+        top: 58px;
+        right: 10px;
+        z-index: 20;
+        width: 102px;
+        height: 102px;
+        border-radius: 50%;
+        border: 2.5px solid #38bdf8;
+        background: #0f172a;
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+        overflow: hidden;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+      }
+      #minimapCanvas { width: 100%; height: 100%; }
+      .minimap-label {
+        position: absolute;
+        bottom: 5px;
+        font-size: 0.54rem;
+        font-weight: 800;
+        color: #0f172a;
+        background: #38bdf8;
+        padding: 1px 6px;
+        border-radius: 6px;
+      }
+
+      /* VISTA MAPA 2D */
+      .map-pan-container {
+        width: 100%;
+        height: 100%;
+        overflow: auto;
+        scroll-axis-lock: none;
+        overscroll-behavior: contain;
+        background: #f4f3ee;
+        cursor: grab;
+      }
+      @supports not (scroll-axis-lock: none) {
+        .map-pan-container { touch-action: none; }
+      }
+      .map-canvas-wrapper { width: 1200px; height: 1000px; position: relative; }
+      #campusCanvas { display: block; width: 1200px; height: 1000px; }
+      .map-floating-controls {
+        position: fixed;
+        right: 14px;
+        bottom: 145px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        z-index: 30;
+      }
+
+      /* TARJETA INFERIOR COMPACTA / DESPLEGABLE */
+      .nav-bottom-sheet {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        z-index: 45;
+        background: var(--surface);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border-top: 1px solid var(--border);
+        border-radius: 22px 22px 0 0;
+        box-shadow: 0 -6px 28px rgba(0, 0, 0, 0.28);
+        max-width: 540px;
+        margin: 0 auto;
+        padding-bottom: env(safe-area-inset-bottom);
+      }
+
+      .sheet-toggle-bar {
+        width: 100%;
+        border: none;
+        background: transparent;
+        padding: 7px 14px 3px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        cursor: pointer;
+      }
+      .sheet-handle-pill {
+        width: 40px;
+        height: 4px;
+        border-radius: 999px;
+        background: rgba(15, 23, 42, 0.25);
+      }
+      .sheet-toggle-text {
+        font-size: 0.73rem;
+        font-weight: 800;
+        color: #ffffff;
+        background: var(--accent);
+        padding: 4px 14px;
+        border-radius: 999px;
+        box-shadow: 0 2px 8px rgba(0, 113, 227, 0.3);
+      }
+
+      .sheet-summary {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 6px 14px 10px;
+        gap: 8px;
+      }
+      .instruction-box {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+        flex: 1;
+      }
+      .compass-mini { width: 36px; height: 36px; flex-shrink: 0; }
+      .compass-svg { width: 100%; height: 100%; transition: transform 0.25s ease; }
+      .instruction-text { min-width: 0; flex: 1; }
+      .step-pill {
+        font-size: 0.64rem;
+        font-weight: 800;
+        color: var(--accent);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .instruction-title {
+        font-size: 0.92rem;
+        font-weight: 800;
+        color: var(--text-primary);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .instruction-sub {
+        font-size: 0.72rem;
+        color: var(--text-secondary);
+        font-weight: 600;
+      }
+
+      .sheet-actions {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        flex-shrink: 0;
+      }
+      .action-btn {
+        padding: 9px 12px;
+        border-radius: 999px;
+        border: none;
+        font-size: 0.78rem;
+        font-weight: 800;
+        cursor: pointer;
+        color: #fff;
+      }
+      .btn-primary { background: var(--accent); }
+      .btn-sim { background: var(--green); }
+      .btn-sim.is-walking { background: var(--red-ibero); }
+
+      /* Cuando está colapsado, oculta por completo los selectores para dejar libre el 85% de la pantalla */
+      .nav-bottom-sheet.is-collapsed .sheet-details {
+        display: none !important;
+      }
+
+      .sheet-details {
+        padding: 4px 14px 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        max-height: 48dvh;
+        overflow-y: auto;
+        border-top: 1px solid var(--border);
+      }
+      .route-selectors { display: flex; flex-direction: column; gap: 6px; }
+      .selector-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: #f8fafc;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 6px 10px;
+      }
+      .selector-icon { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+      .icon-origin { background: var(--green); }
+      .icon-dest { background: var(--red-ibero); }
+      .selector-field { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+      .selector-field label { font-size: 0.64rem; color: var(--text-secondary); font-weight: 700; }
+      .clean-select {
+        border: none;
+        background: transparent;
+        font-size: 0.82rem;
+        font-weight: 700;
+        color: var(--text-primary);
+        outline: none;
+        width: 100%;
+      }
+      .btn-scan-mini, .btn-swap-mini {
+        padding: 5px 9px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background: #fff;
+        font-size: 0.72rem;
+        font-weight: 800;
+        color: var(--accent);
+        cursor: pointer;
+      }
+      .presets-scroll {
+        display: flex;
+        gap: 6px;
+        overflow-x: auto;
+        padding-bottom: 2px;
+      }
+      .preset-pill {
+        white-space: nowrap;
+        padding: 6px 11px;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        background: #fff;
+        font-size: 0.73rem;
+        font-weight: 700;
+        color: var(--text-primary);
+        cursor: pointer;
+      }
+      .itinerary-header {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.73rem;
+        color: var(--text-secondary);
+        font-weight: 700;
+        margin-bottom: 6px;
+      }
+      .itinerary-list { list-style: none; display: flex; flex-direction: column; gap: 5px; }
+      .itinerary-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 6px 10px;
+        border-radius: 8px;
+        background: #f1f5f9;
+        font-size: 0.78rem;
+        cursor: pointer;
+      }
+      .itinerary-item.is-current {
+        background: var(--accent-soft);
+        color: var(--accent);
+        font-weight: 800;
+      }
+      .itinerary-code { font-family: monospace; font-weight: 800; margin-right: 6px; }
+
+      /* MODALES */
+      .clean-dialog {
+        border: none;
+        border-radius: 22px;
+        padding: 0;
+        background: transparent;
+        max-width: 500px;
+        width: calc(100vw - 24px);
+        margin: auto;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+      }
+      .clean-dialog::backdrop {
+        background: rgba(0, 0, 0, 0.55);
+        backdrop-filter: blur(6px);
+      }
+      .dialog-card { background: #fff; border-radius: 22px; padding: 18px; color: var(--text-primary); }
+      .dialog-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+      .dialog-top h3 { font-size: 1.05rem; font-weight: 800; }
+      .dialog-close-btn {
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        border: none;
+        background: #f1f5f9;
+        font-weight: 800;
+        cursor: pointer;
+      }
+      .dialog-desc { font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 10px; line-height: 1.4; }
+      .scanner-feed-box {
+        width: 100%;
+        height: 180px;
+        background: #000;
+        border-radius: 14px;
+        position: relative;
+        overflow: hidden;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      #qrScannerVideo { width: 100%; height: 100%; object-fit: cover; }
+      .scanner-status {
+        position: absolute;
+        bottom: 8px;
+        font-size: 0.7rem;
+        color: #fff;
+        background: rgba(0, 0, 0, 0.65);
+        padding: 3px 10px;
+        border-radius: 999px;
+      }
+      .simulated-chips-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        max-height: 150px;
+        overflow-y: auto;
+        margin-top: 8px;
+      }
+      .cards-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: 10px;
+        max-height: 58dvh;
+        overflow-y: auto;
+      }
+      .qr-card-item {
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 8px;
+        text-align: center;
+        background: #f8fafc;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 5px;
+      }
+    </style>
+  </head>
+  <body class="mode-ar">
+    <!-- BARRA SUPERIOR FLOTANTE -->
+    <header class="app-header">
+      <div class="brand-pill">
+        <span class="brand-logo">A</span>
+        <div class="brand-text">
+          <span class="brand-name">ARGOS IBERO</span>
+          <span id="locationModeBadge" class="brand-tag">📍 Salón C (QR)</span>
+        </div>
+      </div>
+
+      <nav class="view-switcher" role="tablist" aria-label="Modo de visualización">
+        <button id="tabAR" class="switch-btn is-active" type="button" role="tab" aria-selected="true">
+          <span class="live-dot"></span>
+          <span>🥽 Cámara AR</span>
+        </button>
+        <button id="tabMap" class="switch-btn" type="button" role="tab" aria-selected="false">
+          <span>🗺️ Mapa 2D</span>
+        </button>
+      </nav>
+
+      <div class="header-actions">
+        <button id="btnOpenQrModal" class="icon-btn" commandfor="dialogQrScanner" command="show-modal" title="Elegir nodo o escanear QR" type="button">QR</button>
+        <button id="btnOpenPrintModal" class="icon-btn" commandfor="dialogQrCards" command="show-modal" title="20 Códigos QR" type="button">🖨️</button>
+        <button id="btnOpenHelpModal" class="icon-btn" commandfor="dialogHowItWorks" command="show-modal" title="Ayuda" type="button">?</button>
+      </div>
+    </header>
+
+    <!-- VISTAS PRINCIPALES -->
+    <main class="main-viewport">
+      <!-- 1. VISTA CÁMARA AR -->
+      <section id="viewAR" class="view-panel is-visible" aria-label="Cámara de Realidad Aumentada">
+        <video id="arVideo" playsinline autoplay muted></video>
+        <canvas id="arFloorCanvas" class="ar-floor-canvas"></canvas>
+
+        <div id="arFloatingSign" class="ar-floating-sign">
+          <div class="ar-sign-icon" id="arSignTurnIcon">⬆️</div>
+          <div class="ar-sign-body">
+            <div id="arSignTitle" class="ar-sign-title">Sigue hacia Paso Noreste</div>
+            <div id="arSignDist" class="ar-sign-sub">87 m al Este · Sigue las flechas en el piso</div>
+          </div>
+        </div>
+
+        <div id="arTurnHint" class="ar-turn-hint" hidden>
+          <span id="arTurnHintText">⬅️ Gira a la izquierda para ver el pasillo</span>
+        </div>
+
+        <div class="ar-sensor-bar">
+          <span id="arHeadingText">🧭 Rumbo: 106° Este</span>
+          <button id="btnAlignArrows" class="chip-sm" type="button">🎯 Centrar flechas</button>
+        </div>
+
+        <div id="arMinimap" class="ar-minimap-card" title="Toca para abrir el Mapa 2D">
+          <canvas id="minimapCanvas" width="180" height="180"></canvas>
+          <span class="minimap-label">Minimapa en vivo</span>
+        </div>
+      </section>
+
+      <!-- 2. VISTA MAPA 2D -->
+      <section id="viewMap" class="view-panel" aria-label="Mapa 2D del campus IBERO">
+        <div id="mapViewport" class="map-pan-container">
+          <div class="map-canvas-wrapper">
+            <canvas id="campusCanvas" width="1200" height="1000"></canvas>
+          </div>
+        </div>
+        <div class="map-floating-controls">
+          <button id="btnCenterRoute" class="fab-btn" title="Centrar en mi ubicación" type="button">🎯</button>
+          <button id="btnToggleLabels" class="fab-btn" title="Mostrar/ocultar nombres" type="button">🏷️</button>
+        </div>
+      </section>
+    </main>
+
+    <!-- TARJETA INFERIOR (INICIA COMPACTA ABAJO PARA DEJAR LIBRES LAS FLECHAS 3D) -->
+    <aside class="nav-bottom-sheet is-collapsed" id="bottomSheet">
+      <button id="btnToggleSheet" class="sheet-toggle-bar" type="button" aria-expanded="false">
+        <span class="sheet-handle-pill"></span>
+        <span id="sheetToggleLabel" class="sheet-toggle-text">🔼 Cambiar Origen / Destino (20 Nodos)</span>
+      </button>
+
+      <div class="sheet-summary">
+        <div class="instruction-box">
+          <div class="compass-mini">
+            <svg id="hudCompass" class="compass-svg" viewBox="0 0 48 48" fill="none">
+              <circle cx="24" cy="24" r="22" stroke="rgba(0,113,227,0.25)" stroke-width="2.5"/>
+              <polygon points="24,5 31,26 24,21 17,26" fill="#0071e3"/>
+              <polygon points="24,43 31,26 24,21 17,26" fill="#cbd5e1"/>
+            </svg>
+          </div>
+          <div class="instruction-text">
+            <div id="hudStepBadge" class="step-pill">N07 Salón C ➔ N10 Cafetería El Cubo</div>
+            <h1 id="hudInstruction" class="instruction-title">Camina 87 m hacia Paso Noreste</h1>
+            <p id="hudSub" class="instruction-sub">138 m restantes · ~1.7 min</p>
+          </div>
+        </div>
+
+        <div class="sheet-actions">
+          <button id="btnWalkSim" class="action-btn btn-sim" type="button">
+            <span id="btnWalkSimText">▶️ Caminar</span>
+          </button>
+          <button id="btnNextNode" class="action-btn btn-primary" type="button">
+            <span>Siguiente</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="sheet-details" id="sheetDetails">
+        <div class="route-selectors">
+          <div class="selector-row">
+            <span class="selector-icon icon-origin"></span>
+            <div class="selector-field">
+              <label for="selectOrigen">📍 Estoy en (Origen / QR actual):</label>
+              <select id="selectOrigen" class="clean-select"></select>
+            </div>
+            <button id="btnScanOrigin" class="btn-scan-mini" commandfor="dialogQrScanner" command="show-modal" type="button">📷 QR</button>
+          </div>
+
+          <div class="selector-row">
+            <span class="selector-icon icon-dest"></span>
+            <div class="selector-field">
+              <label for="selectDestino">🎯 Quiero ir a (Destino):</label>
+              <select id="selectDestino" class="clean-select"></select>
+            </div>
+            <button id="btnInvert" class="btn-swap-mini" type="button">⇄</button>
+          </div>
+        </div>
+
+        <div class="presets-scroll">
+          <button type="button" class="preset-pill" data-preset="N07,N10">Salón C → El Cubo</button>
+          <button type="button" class="preset-pill" data-preset="N01,N15">Puerta 3 → La Karpa</button>
+          <button type="button" class="preset-pill" data-preset="N02,N07">Biblioteca → Salón C</button>
+          <button type="button" id="btnToggleGps" class="preset-pill">🛰️ Activar GPS Real</button>
+        </div>
+
+        <div class="itinerary-block">
+          <div class="itinerary-header">
+            <span>Ruta nodo por nodo (<strong id="kpiNodesCount">4</strong> paradas)</span>
+            <span id="kpiDistanceMeters">138 m totales</span>
+          </div>
+          <ul id="stepsList" class="itinerary-list"></ul>
+        </div>
+      </div>
+    </aside>
+
+    <!-- MODAL 1: ESCÁNER QR / SELECCIÓN RÁPIDA DE NODO -->
+    <dialog id="dialogQrScanner" class="clean-dialog" closedby="any" aria-labelledby="qrScannerDialogTitle">
+      <div class="dialog-card">
+        <div class="dialog-top">
+          <h3 id="qrScannerDialogTitle">📍 ¿En qué nodo del campus estás?</h3>
+          <button class="dialog-close-btn" commandfor="dialogQrScanner" command="close" type="button">✕</button>
+        </div>
+        <p class="dialog-desc">Apunta a un QR o <strong>toca cualquiera de los 20 nodos abajo</strong> para fijar tu ubicación ahí:</p>
+        <div class="scanner-feed-box">
+          <video id="qrScannerVideo" playsinline autoplay muted></video>
+          <span class="scanner-status">Cámara lista para escanear QR...</span>
+        </div>
+        <div id="simulatedQrChips" class="simulated-chips-grid"></div>
+      </div>
+    </dialog>
+
+    <!-- MODAL 2: 20 TARJETAS QR -->
+    <dialog id="dialogQrCards" class="clean-dialog" closedby="any" aria-labelledby="qrCardsDialogTitle">
+      <div class="dialog-card">
+        <div class="dialog-top">
+          <h3 id="qrCardsDialogTitle">🏷️ 20 Nodos QR del Campus IBERO</h3>
+          <button class="dialog-close-btn" commandfor="dialogQrCards" command="close" type="button">✕</button>
+        </div>
+        <div id="qrCardsGrid" class="cards-grid"></div>
+      </div>
+    </dialog>
+
+    <!-- MODAL 3: EXPLICACIÓN -->
+    <dialog id="dialogHowItWorks" class="clean-dialog" closedby="any" aria-labelledby="howItWorksTitle">
+      <div class="dialog-card">
+        <div class="dialog-top">
+          <h3 id="howItWorksTitle">💡 ¿Cómo funciona ARGOS?</h3>
+          <button class="dialog-close-btn" commandfor="dialogHowItWorks" command="close" type="button">✕</button>
+        </div>
+        <div style="font-size:0.84rem;line-height:1.5;display:flex;flex-direction:column;gap:8px;">
+          <p><strong>1. Flechas 3D en Realidad Aumentada:</strong> En la vista <em>🥽 Cámara AR</em> ves la alfombra azul y las 7 flechas 3D animadas sobre el piso frente a ti.</p>
+          <p><strong>2. Botón verde "▶️ Caminar":</strong> Tócalo para simular tu caminata metro por metro y ver cómo se mueven en vivo el <strong>Minimapa</strong>, el <strong>Mapa 2D</strong> y las flechas en cada esquina.</p>
+          <p><strong>3. Puntos QR (N01 a N20):</strong> Toca el botón <em>QR</em> arriba a la derecha para ubicarte en cualquiera de los 20 edificios/accesos del campus.</p>
+        </div>
+      </div>
+    </dialog>
+
+    <!-- DATOS Y LÓGICA INTEGRADOS (SIN CACHÉ DESINCRONIZADO NI SCRIPTS BLOQUEANTES) -->
+    <script src="campus_data.js?v=5"></script>
+    <script src="app.js?v=5"></script>
+  </body>
+</html>
