@@ -2,57 +2,99 @@
 <html lang="es">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>ARGOS — Navegación AR Campus IBERO</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="styles.css" />
-    <!-- Three.js para la proyección de flechas 3D sobre la cámara en Realidad Aumentada -->
+    <!-- Three.js para dibujar la cinta de flechas 3D en el piso sobre la cámara -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <!-- Generador de códigos QR -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-    <!-- Cliente MQTT opcional para sincronizar visor Meta Quest 3S -->
+    <!-- Cliente MQTT opcional para sincronizar con Meta Quest 3S -->
     <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+    <script type="module">
+      // MANDATORY (declarative-dialog-popover-control): Feature detect 'commandForElement' on HTMLButtonElement.prototype
+      if (!('commandForElement' in HTMLButtonElement.prototype)) {
+        import('https://esm.run/invokers-polyfill').catch(() => {});
+      }
+    </script>
   </head>
-  <body class="mode-map">
+  <body class="mode-ar">
     <!-- BARRA SUPERIOR FLOTANTE -->
     <header class="app-header">
       <div class="brand-pill">
         <span class="brand-logo">A</span>
         <div class="brand-text">
           <span class="brand-name">ARGOS</span>
-          <span class="brand-tag">Campus IBERO · Realidad Mixta</span>
+          <span id="locationModeBadge" class="brand-tag">📍 Modo: QR + Pasos</span>
         </div>
       </div>
 
-      <!-- Selector de Modo de Vista -->
+      <!-- Selector de Modo: Cámara AR (por defecto para ver las flechas de inmediato) / Mapa 2D -->
       <nav class="view-switcher" role="tablist" aria-label="Modo de visualización">
-        <button id="tabMap" class="switch-btn is-active" type="button" role="tab" aria-selected="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 6v16l7-4 8 4 7-4V2l-7 4-8-4-7 4z"/><path d="M8 2v16M16 6v16"/></svg>
-          <span>Mapa 2D</span>
-        </button>
-        <button id="tabAR" class="switch-btn" type="button" role="tab" aria-selected="false">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        <button id="tabAR" class="switch-btn is-active" type="button" role="tab" aria-selected="true">
           <span class="live-dot"></span>
-          <span>Cámara AR</span>
+          <span>🥽 Cámara AR</span>
+        </button>
+        <button id="tabMap" class="switch-btn" type="button" role="tab" aria-selected="false">
+          <span>🗺️ Mapa 2D</span>
         </button>
       </nav>
 
       <div class="header-actions">
-        <button id="btnOpenQrModal" class="icon-btn" title="Escanear Código QR" type="button">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M10 7h1M7 10v1M17 10v1M10 17h1"/></svg>
+        <button id="btnOpenQrModal" class="icon-btn" commandfor="dialogQrScanner" command="show-modal" title="Cambiar ubicación con QR" type="button">
+          QR
         </button>
-        <button id="btnOpenPrintModal" class="icon-btn" title="Ver 20 Códigos QR" type="button">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+        <button id="btnOpenPrintModal" class="icon-btn" commandfor="dialogQrCards" command="show-modal" title="Ver los 20 QRs imprimibles" type="button">
+          🖨️
+        </button>
+        <button id="btnOpenHelpModal" class="icon-btn" commandfor="dialogHowItWorks" command="show-modal" title="¿Cómo funciona?" type="button">
+          ?
         </button>
       </div>
     </header>
 
-    <!-- CONTENEDOR PRINCIPAL: VISTA DE MAPA Y VISTA DE CÁMARA AR -->
+    <!-- CONTENEDOR PRINCIPAL -->
     <main class="main-viewport">
-      <!-- 1. VISTA MAPA 2D -->
-      <section id="viewMap" class="view-panel is-visible" aria-label="Mapa interactivo del campus">
+      <!-- 1. VISTA CÁMARA AR (ACTIVA POR DEFECTO PARA VER LAS FLECHAS EN REALIDAD MIXTA) -->
+      <section id="viewAR" class="view-panel is-visible" aria-label="Cámara de Realidad Aumentada con flechas 3D">
+        <!-- Video en vivo de la cámara trasera del celular -->
+        <video id="arVideo" playsinline autoplay muted></video>
+
+        <!-- Escena 3D Three.js superpuesta con la cinta de flechas animadas en el suelo -->
+        <div id="arThreeContainer" class="ar-three-container"></div>
+
+        <!-- Cartel flotante de dirección hacia el siguiente nodo -->
+        <div id="arFloatingSign" class="ar-floating-sign">
+          <div class="ar-sign-icon" id="arSignTurnIcon">⬆️</div>
+          <div class="ar-sign-body">
+            <div id="arSignTitle" class="ar-sign-title">Hacia Paso Noreste</div>
+            <div id="arSignDist" class="ar-sign-sub">87 m al Este · Sigue las flechas azules</div>
+          </div>
+        </div>
+
+        <!-- Aviso cuando el usuario gira el celular lejos de la ruta -->
+        <div id="arTurnHint" class="ar-turn-hint" hidden>
+          <span id="arTurnHintText">⬅️ Gira a la izquierda para ver las flechas</span>
+        </div>
+
+        <!-- Barra de sensores y alineación arriba a la izquierda -->
+        <div class="ar-sensor-bar">
+          <span id="arHeadingText">🧭 Rumbo alineado</span>
+          <button id="btnAlignArrows" class="chip-sm" type="button">🎯 Centrar flechas frente a mí</button>
+        </div>
+
+        <!-- Minimapa interactivo en vivo arriba a la derecha -->
+        <div id="arMinimap" class="ar-minimap-card" title="Toca para centrar o abrir el Mapa 2D">
+          <canvas id="minimapCanvas" width="180" height="180"></canvas>
+          <span class="minimap-label">Minimapa en vivo</span>
+        </div>
+      </section>
+
+      <!-- 2. VISTA MAPA 2D INTERACTIVO -->
+      <section id="viewMap" class="view-panel" aria-label="Mapa 2D del campus IBERO">
         <div id="mapViewport" class="map-pan-container">
           <div class="map-canvas-wrapper">
             <canvas id="campusCanvas" width="1200" height="1000"></canvas>
@@ -60,107 +102,79 @@
         </div>
 
         <div class="map-floating-controls">
-          <button id="btnCenterRoute" class="fab-btn" title="Centrar ruta" type="button">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
-          </button>
-          <button id="btnToggleLabels" class="fab-btn" title="Mostrar/ocultar etiquetas" type="button">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
-          </button>
-        </div>
-      </section>
-
-      <!-- 2. VISTA CÁMARA AR (LIVE VIEW CON FLECHAS EN EL PISO) -->
-      <section id="viewAR" class="view-panel" aria-label="Cámara de Realidad Aumentada">
-        <!-- Feed de video de la cámara trasera -->
-        <video id="arVideo" playsinline autoplay muted></video>
-
-        <!-- Canvas 3D de Three.js superpuesto con flechas holográficas pegadas al piso -->
-        <div id="arThreeContainer" class="ar-three-container"></div>
-
-        <!-- Retícula de mira y horizonte AR -->
-        <div class="ar-overlay-crosshair">
-          <div class="crosshair-h"></div>
-          <div class="crosshair-v"></div>
-          <span class="ar-floor-hint">Apunta al pasillo frente a ti</span>
-        </div>
-
-        <!-- Minimapa circular flotante en modo AR -->
-        <div id="arMinimap" class="ar-minimap-card" title="Toca para volver al mapa completo">
-          <canvas id="minimapCanvas" width="160" height="160"></canvas>
-          <span class="minimap-label">Campus 2D</span>
-        </div>
-
-        <!-- Indicador de rumbo y sensores -->
-        <div class="ar-sensor-bar">
-          <span id="arHeadingText">🧭 Rumbo: 0° Norte</span>
-          <button id="btnCalibrateHeading" class="chip-sm" type="button">Alinear a mano</button>
+          <button id="btnCenterRoute" class="fab-btn" title="Centrar en mi ubicación" type="button">🎯</button>
+          <button id="btnToggleLabels" class="fab-btn" title="Mostrar/ocultar los 20 nombres" type="button">🏷️</button>
         </div>
       </section>
     </main>
 
-    <!-- TARJETA INFERIOR FLOTANTE (BOTTOM SHEET ESTILO APPLE MAPS) -->
+    <!-- TARJETA INFERIOR DE NAVEGACIÓN Y CONTROL DE AVANCE -->
     <aside class="nav-bottom-sheet" id="bottomSheet">
-      <div class="sheet-handle" id="sheetHandle"></div>
+      <div class="sheet-handle" id="sheetHandle" title="Mostrar/ocultar selector de nodos"></div>
 
-      <!-- Barra de Estado Principal (Siempre visible) -->
+      <!-- Resumen del paso actual y botones de avance en vivo -->
       <div class="sheet-summary">
         <div class="instruction-box">
           <div class="compass-mini">
             <svg id="hudCompass" class="compass-svg" viewBox="0 0 48 48" fill="none">
-              <circle cx="24" cy="24" r="22" stroke="rgba(255,255,255,0.2)" stroke-width="2"/>
-              <polygon points="24,6 30,24 24,20 18,24" fill="#0071e3"/>
-              <polygon points="24,42 30,24 24,20 18,24" fill="rgba(255,255,255,0.4)"/>
+              <circle cx="24" cy="24" r="22" stroke="rgba(0,113,227,0.25)" stroke-width="2.5"/>
+              <polygon points="24,5 31,26 24,21 17,26" fill="#0071e3"/>
+              <polygon points="24,43 31,26 24,21 17,26" fill="#cbd5e1"/>
             </svg>
           </div>
           <div class="instruction-text">
-            <div id="hudStepBadge" class="step-pill">Salón C ➔ Cafetería El Cubo</div>
-            <h1 id="hudInstruction" class="instruction-title">Camina derecho por el corredor</h1>
-            <p id="hudSub" class="instruction-sub">138 m · ~1.6 min restantes</p>
+            <div id="hudStepBadge" class="step-pill">N07 Salón C ➔ N10 Cafetería El Cubo</div>
+            <h1 id="hudInstruction" class="instruction-title">Avanza 87 m hacia Paso Noreste</h1>
+            <p id="hudSub" class="instruction-sub">138 m restantes · ~1.6 min caminando</p>
           </div>
         </div>
 
         <div class="sheet-actions">
-          <button id="btnNextNode" class="action-btn btn-primary" type="button">
-            <span>Llegué</span>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+          <button id="btnWalkSim" class="action-btn btn-sim" type="button" title="Simular caminata metro por metro como en Unity">
+            <span id="btnWalkSimText">▶️ Caminar</span>
+          </button>
+          <button id="btnNextNode" class="action-btn btn-primary" type="button" title="Saltar al siguiente nodo">
+            <span>Siguiente</span>
           </button>
         </div>
       </div>
 
-      <!-- Controles Expandibles (Ruta, Origen/Destino y Pasos) -->
+      <!-- Selectores de Origen ("Estoy en...") y Destino ("Voy a...") -->
       <div class="sheet-details" id="sheetDetails">
         <div class="route-selectors">
           <div class="selector-row">
             <span class="selector-icon icon-origin"></span>
             <div class="selector-field">
-              <label for="selectOrigen">Origen (Estoy aquí):</label>
+              <label for="selectOrigen">📍 Estoy en (Origen / QR actual):</label>
               <select id="selectOrigen" class="clean-select"></select>
             </div>
-            <button id="btnScanOrigin" class="btn-scan-mini" type="button" title="Escanear QR de ubicación">QR</button>
+            <button id="btnScanOrigin" class="btn-scan-mini" commandfor="dialogQrScanner" command="show-modal" type="button">
+              📷 Escanear QR
+            </button>
           </div>
 
           <div class="selector-row">
             <span class="selector-icon icon-dest"></span>
             <div class="selector-field">
-              <label for="selectDestino">Destino:</label>
+              <label for="selectDestino">🎯 Quiero ir a (Destino):</label>
               <select id="selectDestino" class="clean-select"></select>
             </div>
-            <button id="btnInvert" class="btn-swap-mini" type="button" title="Invertir ruta">⇄</button>
+            <button id="btnInvert" class="btn-swap-mini" type="button" title="Invertir origen y destino">⇄</button>
           </div>
         </div>
 
-        <!-- Rutas Rápidas -->
+        <!-- Rutas rápidas + GPS opcional -->
         <div class="presets-scroll">
           <button type="button" class="preset-pill" data-preset="N07,N10">Salón C → El Cubo</button>
           <button type="button" class="preset-pill" data-preset="N01,N15">Puerta 3 → La Karpa</button>
           <button type="button" class="preset-pill" data-preset="N02,N07">Biblioteca → Salón C</button>
-          <button type="button" class="preset-pill" data-preset="N17,N10">Entrada Sur → El Cubo</button>
+          <button type="button" id="btnToggleGps" class="preset-pill">🛰️ Activar GPS Real</button>
         </div>
 
         <!-- Lista de Nodos del Trayecto -->
         <div class="itinerary-block">
           <div class="itinerary-header">
-            <span>Nodos en la ruta (<strong id="kpiNodesCount">4</strong>)</span>
+            <span>Ruta nodo por nodo (<strong id="kpiNodesCount">4</strong> paradas)</span>
             <span id="kpiDistanceMeters">138 m totales</span>
           </div>
           <ul id="stepsList" class="itinerary-list"></ul>
@@ -168,44 +182,69 @@
       </div>
     </aside>
 
-    <!-- MODAL 1: ESCÁNER QR CON CÁMARA O SIMULACIÓN RÁPIDA -->
-    <dialog id="dialogQrScanner" class="clean-dialog">
+    <!-- MODAL 1: ESCÁNER QR / SELECCIÓN RÁPIDA DE NODO ("ESTOY AQUÍ") -->
+    <dialog id="dialogQrScanner" class="clean-dialog" closedby="any" aria-labelledby="qrScannerDialogTitle">
       <div class="dialog-card">
         <div class="dialog-top">
-          <h3>Escanear Código QR del Campus</h3>
-          <button id="btnCloseQrDialog" class="dialog-close-btn" type="button">✕</button>
+          <h3 id="qrScannerDialogTitle">📍 ¿En qué punto del campus estás?</h3>
+          <button class="dialog-close-btn" commandfor="dialogQrScanner" command="close" type="button">✕</button>
         </div>
-        <p class="dialog-desc">Apunta la cámara al código QR pegado en la puerta o pared para ubicarte automáticamente:</p>
+        <p class="dialog-desc">
+          Apunta con tu cámara a un código QR del campus, o <strong>toca cualquiera de los 20 nodos abajo</strong> para ubicarte ahí al instante:
+        </p>
         <div class="scanner-feed-box">
           <video id="qrScannerVideo" playsinline autoplay muted></video>
           <div class="scanner-laser"></div>
-          <span id="scannerStatusText" class="scanner-status">Cargando cámara...</span>
+          <span id="scannerStatusText" class="scanner-status">Buscando código QR con la cámara...</span>
         </div>
         <div class="quick-sim-section">
-          <span class="quick-sim-title">O toca un nodo para simular lectura instantánea:</span>
+          <span class="quick-sim-title">⚡ Toca un nodo para decir "Estoy aquí" (Simular QR):</span>
           <div id="simulatedQrChips" class="simulated-chips-grid"></div>
         </div>
       </div>
     </dialog>
 
-    <!-- MODAL 2: 20 CÓDIGOS QR IMPRIMIBLES DEL CAMPUS -->
-    <dialog id="dialogQrCards" class="clean-dialog">
+    <!-- MODAL 2: 20 CÓDIGOS QR IMPRIMIBLES -->
+    <dialog id="dialogQrCards" class="clean-dialog" closedby="any" aria-labelledby="qrCardsDialogTitle">
       <div class="dialog-card dialog-wide">
         <div class="dialog-top">
           <div>
-            <h3>20 Códigos QR del Campus IBERO</h3>
-            <p class="dialog-desc" style="margin: 0;">Escanea cualquiera con la cámara de tu celular o pruébalos directamente:</p>
+            <h3 id="qrCardsDialogTitle">🏷️ 20 Códigos QR de los Nodos IBERO</h3>
+            <p class="dialog-desc" style="margin: 0;">Escanea cualquiera con la cámara de tu celular o toca "Ubicarse aquí":</p>
           </div>
           <div style="display:flex;gap:0.5rem;">
             <button id="btnPrintCards" class="btn-secondary" type="button">🖨️ Imprimir</button>
-            <button id="btnClosePrintDialog" class="dialog-close-btn" type="button">✕</button>
+            <button class="dialog-close-btn" commandfor="dialogQrCards" command="close" type="button">✕</button>
           </div>
         </div>
         <div id="qrCardsGrid" class="cards-grid"></div>
       </div>
     </dialog>
 
-    <!-- Datos geoespaciales y lógica principal -->
+    <!-- MODAL 3: EXPLICACIÓN CLARA DE CÓMO FUNCIONA LA UBICACIÓN -->
+    <dialog id="dialogHowItWorks" class="clean-dialog" closedby="any" aria-labelledby="howItWorksTitle">
+      <div class="dialog-card">
+        <div class="dialog-top">
+          <h3 id="howItWorksTitle">💡 ¿Cómo sabe ARGOS tu ubicación?</h3>
+          <button class="dialog-close-btn" commandfor="dialogHowItWorks" command="close" type="button">✕</button>
+        </div>
+        <div style="font-size:0.86rem;line-height:1.5;color:var(--text-primary);display:flex;flex-direction:column;gap:10px;">
+          <p>
+            <strong>1. Puntos de Control por Código QR (Sin depender de GPS en interiores):</strong><br/>
+            Cada lugar del campus tiene un nodo (<code>N01</code> a <code>N20</code>). Cuando escaneas el QR de la puerta donde estás (o lo eliges en <em>"📍 Estoy en"</em>), la app fija tu coordenada exacta en metros sobre el mapa de la IBERO.
+          </p>
+          <p>
+            <strong>2. Avance en Vivo (Minimapa + Podómetro + Botón "▶️ Caminar"):</strong><br/>
+            Mientras caminas con el celular en la mano, el sensor de movimiento cuenta tus pasos y avanza tu punto verde por el pasillo en el <strong>Minimapa</strong> y en el <strong>Mapa 2D</strong>. Si estás probándolo sentado en clase, presiona el botón verde <strong>"▶️ Caminar"</strong> para ver cómo tu ubicación avanza sola metro por metro hasta llegar al destino.
+          </p>
+          <p>
+            <strong>3. Flechas 3D en Realidad Aumentada:</strong><br/>
+            En la pestaña <strong>🥽 Cámara AR</strong>, se dibuja una cinta de flechas 3D sobre el piso real frente a tus pies indicando hacia qué pasillo caminar. Si giras tu celular (o arrastras la pantalla con el dedo), las flechas rotan en 3D.
+          </p>
+        </div>
+      </div>
+    </dialog>
+
     <script src="campus_data.js"></script>
     <script src="app.js"></script>
   </body>

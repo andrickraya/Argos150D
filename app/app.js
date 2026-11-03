@@ -1,888 +1,1362 @@
 (() => {
-  'use strict';
+  const datos = window.CAMPUS_DATA;
+  if (!datos) {
+    console.error("No se encontró window.CAMPUS_DATA.");
+    return;
+  }
 
-  const DATA = window.ARGOS_CAMPUS_DATA;
-  const VELOCIDAD_CAMINATA = 1.4; // m/s
+  // ============================================================================
+  // 1. GRAFO DE LOS 20 NODOS CAMINABLES DEL CAMPUS IBERO (DIJKSTRA)
+  // ============================================================================
+  const nodosPorId = new Map(datos.nodes.map((n) => [n.id, n]));
+  const adyacencia = new Map();
+  datos.nodes.forEach((n) => adyacencia.set(n.id, []));
 
-  // Mapeo de Nodos
-  const nodosPorId = new Map();
-  DATA.nodos.forEach((n) => nodosPorId.set(n.id, n));
+  function distanciaMetros(a, b) {
+    return Math.hypot(b.x - a.x, b.z - a.z);
+  }
 
-  // Grafo con distancias euclidianas reales
-  const grafo = new Map();
-  DATA.nodos.forEach((n) => grafo.set(n.id, []));
-  DATA.aristas.forEach(([u, v]) => {
-    const nu = nodosPorId.get(u);
-    const nv = nodosPorId.get(v);
-    if (!nu || !nv) return;
-    const dist = Math.hypot(nv.x - nu.x, nv.z - nu.z);
-    grafo.get(u).push({ vecino: v, peso: dist });
-    grafo.get(v).push({ vecino: u, peso: dist });
+  datos.edges.forEach(([u, v]) => {
+    const na = nodosPorId.get(u);
+    const nb = nodosPorId.get(v);
+    if (!na || !nb) return;
+    const peso = distanciaMetros(na, nb);
+    adyacencia.get(u).push({ Vecino: v, Peso: peso });
+    adyacencia.get(v).push({ Vecino: u, Peso: peso });
   });
 
-  // Estado global de la aplicación
-  const estado = {
-    modoVista: 'mapa', // 'mapa' o 'ar'
-    origenId: 'N07',   // Salón C por defecto
-    destinoId: 'N10',  // Cafetería El Cubo por defecto
-    ruta: [],
-    mostrarNombres: false,
-    offsetAnim: 0,
-    rumboUsuarioDeg: 0,  // Ángulo de la brújula del usuario (0 = Norte)
-    rumboManualDeg: 0,
-    usandoSensores: false,
-    cameraStream: null,
-    scannerStream: null,
-    scannerTimer: null,
-    mqttClient: null
-  };
-
-  // Referencias DOM
-  const tabMap = document.getElementById('tabMap');
-  const tabAR = document.getElementById('tabAR');
-  const viewMap = document.getElementById('viewMap');
-  const viewAR = document.getElementById('viewAR');
-  const arVideo = document.getElementById('arVideo');
-  const arThreeContainer = document.getElementById('arThreeContainer');
-  const arHeadingText = document.getElementById('arHeadingText');
-  const btnCalibrateHeading = document.getElementById('btnCalibrateHeading');
-  const arMinimap = document.getElementById('arMinimap');
-  const minimapCanvas = document.getElementById('minimapCanvas');
-  const miniCtx = minimapCanvas.getContext('2d');
-
-  const selectOrigen = document.getElementById('selectOrigen');
-  const selectDestino = document.getElementById('selectDestino');
-  const hudStepBadge = document.getElementById('hudStepBadge');
-  const hudInstruction = document.getElementById('hudInstruction');
-  const hudSub = document.getElementById('hudSub');
-  const hudCompass = document.getElementById('hudCompass');
-  const btnNextNode = document.getElementById('btnNextNode');
-  const btnInvert = document.getElementById('btnInvert');
-  const btnScanOrigin = document.getElementById('btnScanOrigin');
-  const stepsList = document.getElementById('stepsList');
-  const kpiNodesCount = document.getElementById('kpiNodesCount');
-  const kpiDistanceMeters = document.getElementById('kpiDistanceMeters');
-
-  const canvasMap = document.getElementById('campusCanvas');
-  const ctxMap = canvasMap.getContext('2d');
-  const mapViewport = document.getElementById('mapViewport');
-  const btnCenterRoute = document.getElementById('btnCenterRoute');
-  const btnToggleLabels = document.getElementById('btnToggleLabels');
-
-  // Modales
-  const dialogQrScanner = document.getElementById('dialogQrScanner');
-  const btnOpenQrModal = document.getElementById('btnOpenQrModal');
-  const btnCloseQrDialog = document.getElementById('btnCloseQrDialog');
-  const qrScannerVideo = document.getElementById('qrScannerVideo');
-  const scannerStatusText = document.getElementById('scannerStatusText');
-  const simulatedQrChips = document.getElementById('simulatedQrChips');
-
-  const dialogQrCards = document.getElementById('dialogQrCards');
-  const btnOpenPrintModal = document.getElementById('btnOpenPrintModal');
-  const btnClosePrintDialog = document.getElementById('btnClosePrintDialog');
-  const btnPrintCards = document.getElementById('btnPrintCards');
-  const qrCardsGrid = document.getElementById('qrCardsGrid');
-
-  // ---------------------------------------------------------------------------
-  // 1. Algoritmo Dijkstra para encontrar la ruta más corta
-  // ---------------------------------------------------------------------------
-  function calcularRutaOptima(inicioId, finId) {
-    if (inicioId === finId) return [inicioId];
-
+  function calcularRutaDijkstra(origenId, destinoId) {
     const dist = new Map();
-    const prev = new Map();
+    const previo = new Map();
     const visitados = new Set();
-    DATA.nodos.forEach((n) => dist.set(n.id, Infinity));
-    dist.set(inicioId, 0);
 
-    while (visitados.size < DATA.nodos.length) {
+    datos.nodes.forEach((n) => dist.set(n.id, Infinity));
+    dist.set(origenId, 0);
+
+    while (visitados.size < datos.nodes.length) {
       let actual = null;
-      let mejorD = Infinity;
+      let mejor = Infinity;
       for (const [id, d] of dist.entries()) {
-        if (!visitados.has(id) && d < mejorD) {
-          mejorD = d;
+        if (!visitados.has(id) && d < mejor) {
+          mejor = d;
           actual = id;
         }
       }
-      if (actual === null || actual === finId) break;
+      if (actual === null || actual === destinoId) break;
       visitados.add(actual);
 
-      for (const arista of grafo.get(actual) || []) {
-        const alt = dist.get(actual) + arista.peso;
-        if (alt < dist.get(arista.vecino)) {
-          dist.set(arista.vecino, alt);
-          prev.set(arista.vecino, actual);
+      for (const arista of adyacencia.get(actual) || []) {
+        if (visitados.has(arista.Vecino)) continue;
+        const nuevo = dist.get(actual) + arista.Peso;
+        if (nuevo < dist.get(arista.Vecino)) {
+          dist.set(arista.Vecino, nuevo);
+          previo.set(arista.Vecino, actual);
         }
       }
     }
 
-    const camino = [];
-    let curr = finId;
-    while (curr) {
-      camino.unshift(curr);
-      curr = prev.get(curr);
+    const ruta = [];
+    let cursor = destinoId;
+    if (previo.has(cursor) || cursor === origenId) {
+      while (cursor) {
+        ruta.unshift(nodosPorId.get(cursor));
+        cursor = previo.get(cursor);
+      }
     }
-    return camino[0] === inicioId ? camino : [inicioId];
-  }
-
-  function calcularRumboGrados(a, b) {
-    // 0° = Norte (+Z), 90° = Este (+X)
-    const rad = Math.atan2(b.x - a.x, b.z - a.z);
-    return ((rad * 180) / Math.PI + 360) % 360;
-  }
-
-  function rumboCardinal(grados) {
-    const dirs = ['Norte', 'Noreste', 'Este', 'Sureste', 'Sur', 'Suroeste', 'Oeste', 'Noroeste'];
-    const idx = Math.round((((grados % 360) + 360) % 360) / 45) % 8;
-    return dirs[idx];
-  }
-
-  // ---------------------------------------------------------------------------
-  // 2. Actualización de UI y Hoja de Ruta
-  // ---------------------------------------------------------------------------
-  function actualizarRuta() {
-    estado.ruta = calcularRutaOptima(estado.origenId, estado.destinoId);
-    selectOrigen.value = estado.origenId;
-    selectDestino.value = estado.destinoId;
-
-    let totalMetros = 0;
-    for (let i = 1; i < estado.ruta.length; i++) {
-      const a = nodosPorId.get(estado.ruta[i - 1]);
-      const b = nodosPorId.get(estado.ruta[i]);
-      totalMetros += Math.hypot(b.x - a.x, b.z - a.z);
-    }
-
-    const nodoActual = nodosPorId.get(estado.origenId);
-    const nodoFinal = nodosPorId.get(estado.destinoId);
-
-    kpiNodesCount.textContent = `${estado.ruta.length}`;
-    kpiDistanceMeters.textContent = `${Math.round(totalMetros)} m totales`;
-
-    if (estado.ruta.length <= 1) {
-      hudStepBadge.textContent = '🎉 ¡Llegaste a tu destino!';
-      hudInstruction.textContent = `Estás en ${nodoActual.nombre}`;
-      hudSub.textContent = `${nodoActual.id} · ${nodoActual.desc}`;
-      hudCompass.style.transform = 'rotate(0deg)';
-      btnNextNode.style.display = 'none';
-    } else {
-      btnNextNode.style.display = 'flex';
-      const sigNodo = nodosPorId.get(estado.ruta[1]);
-      const distTramo = Math.round(Math.hypot(sigNodo.x - nodoActual.x, sigNodo.z - nodoActual.z));
-      const rumbo = calcularRumboGrados(nodoActual, sigNodo);
-      const cardinal = rumboCardinal(rumbo);
-
-      hudStepBadge.textContent = `${nodoActual.nombre} ➔ ${nodoFinal.nombre}`;
-      hudInstruction.textContent = `Avanza ${distTramo} m al ${cardinal} hacia ${sigNodo.nombre}`;
-      const minutos = (totalMetros / VELOCIDAD_CAMINATA / 60).toFixed(1);
-      hudSub.textContent = `${Math.round(totalMetros)} m restantes · ~${minutos} min caminando`;
-      hudCompass.style.transform = `rotate(${rumbo}deg)`;
-    }
-
-    // Lista de pasos expandible
-    stepsList.innerHTML = '';
-    estado.ruta.forEach((id, idx) => {
-      const n = nodosPorId.get(id);
-      const li = document.createElement('li');
-      li.className = `itinerary-item ${idx === 0 ? 'is-current' : ''}`;
-      li.innerHTML = `
-        <div>
-          <span class="itinerary-code">${n.id}</span>
-          <span>${n.nombre}</span>
-        </div>
-        <span style="font-size:0.75rem;color:var(--text-secondary);">${idx === 0 ? '📍 Inicio' : idx === estado.ruta.length - 1 ? '🎯 Meta' : `Paso ${idx}`}</span>
-      `;
-      li.addEventListener('click', () => {
-        estado.origenId = id;
-        actualizarRuta();
-      });
-      stepsList.appendChild(li);
-    });
-
-    // Actualizar escena 3D de Realidad Aumentada
-    actualizarFlechas3DAR();
-    publicarMqtt();
-  }
-
-  // ---------------------------------------------------------------------------
-  // 3. Renderizado del Mapa 2D Elegante (Estilo Vectorial Limpio)
-  // ---------------------------------------------------------------------------
-  function mundoACanvas(x, z, w = canvasMap.width, h = canvasMap.height) {
-    const cx = w * 0.48 + x * 2.3;
-    const cy = h * 0.44 - z * 1.95;
-    return [cx, cy];
-  }
-
-  function dibujarMapa2D() {
-    ctxMap.clearRect(0, 0, canvasMap.width, canvasMap.height);
-
-    // Fondo plano limpio
-    ctxMap.fillStyle = '#f8f8f5';
-    ctxMap.fillRect(0, 0, canvasMap.width, canvasMap.height);
-
-    // Cuadrícula sutil
-    ctxMap.strokeStyle = 'rgba(0,0,0,0.03)';
-    ctxMap.lineWidth = 1;
-    for (let x = 0; x < canvasMap.width; x += 60) {
-      ctxMap.beginPath(); ctxMap.moveTo(x, 0); ctxMap.lineTo(x, canvasMap.height); ctxMap.stroke();
-    }
-    for (let y = 0; y < canvasMap.height; y += 60) {
-      ctxMap.beginPath(); ctxMap.moveTo(0, y); ctxMap.lineTo(canvasMap.width, y); ctxMap.stroke();
-    }
-
-    // Polígonos de OpenStreetMap (edificios y áreas)
-    const orden = { pasto: 1, estacionamiento: 2, cancha: 3, edificio: 4, ibero: 5 };
-    const colores = {
-      pasto: '#e2f0d9',
-      estacionamiento: '#e5e7eb',
-      cancha: '#d1fae5',
-      edificio: '#e5e2da',
-      ibero: '#d97d74'
+    return {
+      ruta,
+      distanciaTotal: dist.get(destinoId) || 0
     };
-
-    const poligonos = [...DATA.poligonos].sort((a, b) => (orden[a.tipo] || 0) - (orden[b.tipo] || 0));
-    poligonos.forEach((poly) => {
-      if (!poly.pts || poly.pts.length < 3) return;
-      ctxMap.beginPath();
-      poly.pts.forEach(([x, z], idx) => {
-        const [cx, cy] = mundoACanvas(x, z);
-        if (idx === 0) ctxMap.moveTo(cx, cy);
-        else ctxMap.lineTo(cx, cy);
-      });
-      ctxMap.closePath();
-      ctxMap.fillStyle = colores[poly.tipo] || '#e5e5ea';
-      ctxMap.fill();
-      if (poly.tipo === 'ibero' || poly.tipo === 'edificio') {
-        ctxMap.strokeStyle = poly.tipo === 'ibero' ? '#b54e44' : '#cdc8be';
-        ctxMap.lineWidth = 1.2;
-        ctxMap.stroke();
-      }
-    });
-
-    // Pasillos peatonales (grafo completo en gris claro)
-    ctxMap.save();
-    ctxMap.strokeStyle = 'rgba(100, 116, 139, 0.25)';
-    ctxMap.lineWidth = 2.5;
-    ctxMap.setLineDash([4, 4]);
-    DATA.aristas.forEach(([u, v]) => {
-      const nu = nodosPorId.get(u);
-      const nv = nodosPorId.get(v);
-      if (!nu || !nv) return;
-      const [x1, y1] = mundoACanvas(nu.x, nu.z);
-      const [x2, y2] = mundoACanvas(nv.x, nv.z);
-      ctxMap.beginPath(); ctxMap.moveTo(x1, y1); ctxMap.lineTo(x2, y2); ctxMap.stroke();
-    });
-    ctxMap.restore();
-
-    // Ruta óptima con flechas animadas
-    if (estado.ruta.length >= 2) {
-      const pts = estado.ruta.map((id) => mundoACanvas(nodosPorId.get(id).x, nodosPorId.get(id).z));
-
-      // Sombra exterior
-      ctxMap.save();
-      ctxMap.strokeStyle = 'rgba(0, 113, 227, 0.2)';
-      ctxMap.lineWidth = 16;
-      ctxMap.lineCap = 'round';
-      ctxMap.lineJoin = 'round';
-      ctxMap.beginPath();
-      pts.forEach(([x, y], i) => (i === 0 ? ctxMap.moveTo(x, y) : ctxMap.lineTo(x, y)));
-      ctxMap.stroke();
-
-      // Línea azul principal
-      ctxMap.strokeStyle = '#0071e3';
-      ctxMap.lineWidth = 8;
-      ctxMap.beginPath();
-      pts.forEach(([x, y], i) => (i === 0 ? ctxMap.moveTo(x, y) : ctxMap.lineTo(x, y)));
-      ctxMap.stroke();
-
-      // Flechas chevron (>) blancas en movimiento
-      const paso = 24;
-      for (let i = 0; i < pts.length - 1; i++) {
-        const [x1, y1] = pts[i];
-        const [x2, y2] = pts[i + 1];
-        const dist = Math.hypot(x2 - x1, y2 - y1);
-        const ang = Math.atan2(y2 - y1, x2 - x1);
-        for (let d = (estado.offsetAnim % paso); d < dist; d += paso) {
-          const fx = x1 + Math.cos(ang) * d;
-          const fy = y1 + Math.sin(ang) * d;
-          ctxMap.save();
-          ctxMap.translate(fx, fy);
-          ctxMap.rotate(ang);
-          ctxMap.strokeStyle = '#ffffff';
-          ctxMap.lineWidth = 2.2;
-          ctxMap.beginPath();
-          ctxMap.moveTo(-3.5, -4);
-          ctxMap.lineTo(3.5, 0);
-          ctxMap.lineTo(-3.5, 4);
-          ctxMap.stroke();
-          ctxMap.restore();
-        }
-      }
-      ctxMap.restore();
-    }
-
-    // Nodos en el mapa
-    const enRuta = new Set(estado.ruta);
-    DATA.nodos.forEach((n) => {
-      const [cx, cy] = mundoACanvas(n.x, n.z);
-      const esOrigen = n.id === estado.origenId;
-      const esDestino = n.id === estado.destinoId;
-      const estaEnRuta = enRuta.has(n.id);
-
-      if (esOrigen || esDestino) {
-        ctxMap.beginPath();
-        ctxMap.arc(cx, cy, 14, 0, Math.PI * 2);
-        ctxMap.fillStyle = esOrigen ? 'rgba(52, 199, 89, 0.25)' : 'rgba(200, 16, 46, 0.25)';
-        ctxMap.fill();
-      }
-
-      ctxMap.beginPath();
-      ctxMap.arc(cx, cy, esOrigen || esDestino ? 8.5 : estaEnRuta ? 6.5 : 5, 0, Math.PI * 2);
-      ctxMap.fillStyle = esOrigen ? '#34c759' : esDestino ? '#c8102e' : estaEnRuta ? '#0071e3' : '#64748b';
-      ctxMap.fill();
-      ctxMap.lineWidth = 2;
-      ctxMap.strokeStyle = '#ffffff';
-      ctxMap.stroke();
-
-      // Etiquetas limpias
-      if (esOrigen || esDestino || estado.mostrarNombres) {
-        const texto = `${n.id} · ${n.nombre}`;
-        ctxMap.font = esOrigen || esDestino ? 'bold 12px Inter, sans-serif' : '500 11px Inter, sans-serif';
-        const tw = ctxMap.measureText(texto).width;
-        ctxMap.fillStyle = 'rgba(255, 255, 255, 0.92)';
-        ctxMap.beginPath();
-        ctxMap.roundRect(cx + 8, cy - 9, tw + 8, 18, 5);
-        ctxMap.fill();
-        ctxMap.fillStyle = esOrigen ? '#1b5e20' : esDestino ? '#b71c1c' : '#1e293b';
-        ctxMap.fillText(texto, cx + 12, cy + 4);
-      }
-    });
-
-    estado.offsetAnim = (estado.offsetAnim + 0.4) % 240;
-    if (estado.modoVista === 'mapa') requestAnimationFrame(dibujarMapa2D);
   }
 
-  // ---------------------------------------------------------------------------
-  // 4. Módulo de Realidad Aumentada (Three.js 3D sobre la Cámara del Celular)
-  // ---------------------------------------------------------------------------
-  let arScene, arCamera, arRenderer, arArrowGroup;
+  // Rumbo en grados (0° = Norte/+Z, 90° = Este/+X)
+  function calcularRumboGrados(ax, az, bx, bz) {
+    const dx = bx - ax;
+    const dz = bz - az;
+    const rad = Math.atan2(dx, dz);
+    return (rad * (180 / Math.PI) + 360) % 360;
+  }
 
-  function initThreeAR() {
-    if (arScene) return;
+  function nombrePuntoCardinal(grados) {
+    const dirs = ["Norte", "Noreste", "Este", "Sureste", "Sur", "Suroeste", "Oeste", "Noroeste"];
+    return dirs[Math.round(grados / 45) % 8];
+  }
+
+  function diferenciaAngularGrados(a, b) {
+    return ((a - b + 540) % 360) - 180;
+  }
+
+  // ============================================================================
+  // 2. ESTADO REACTIVO DE NAVEGACIÓN Y POSICIÓN CONTINUA (usuarioX, usuarioZ)
+  // ============================================================================
+  const estado = {
+    origenId: "N07",     // Salón C (Aulas B/C)
+    destinoId: "N10",    // Cafetería El Cubo
+    indiceActual: 0,     // Índice del tramo actual dentro de estado.ruta
+    progresoTramo: 0,    // 0.0 a 1.0 a lo largo del tramo actual
+    usuarioX: -88.24,    // Coordenada X continua en metros del usuario
+    usuarioZ: -9.85,     // Coordenada Z continua en metros del usuario
+    ruta: [],
+    distanciaTotal: 0,
+    mostrarEtiquetas: true,
+    modoVista: "ar",     // "ar" por defecto para ver las flechas 3D de inmediato
+    caminandoSim: false, // Botón "▶️ Caminar" activo
+    gpsActivo: false,
+    gpsWatchId: null,
+    pasosDetectados: 0,
+    // Orientación de la cámara AR:
+    // desfaseMiradaGrados = cuánto ha girado el usuario respecto al pasillo activo (0° = mirando directo a las flechas)
+    desfaseMiradaGrados: 0,
+    brjSensorBase: null,
+    brjSensorActual: null
+  };
+
+  // Referencias DOM
+  const tabAR = document.getElementById("tabAR");
+  const tabMap = document.getElementById("tabMap");
+  const viewAR = document.getElementById("viewAR");
+  const viewMap = document.getElementById("viewMap");
+  const locationModeBadge = document.getElementById("locationModeBadge");
+
+  const selectOrigen = document.getElementById("selectOrigen");
+  const selectDestino = document.getElementById("selectDestino");
+  const btnInvert = document.getElementById("btnInvert");
+  const btnNextNode = document.getElementById("btnNextNode");
+  const btnWalkSim = document.getElementById("btnWalkSim");
+  const btnWalkSimText = document.getElementById("btnWalkSimText");
+  const btnToggleGps = document.getElementById("btnToggleGps");
+  const btnCenterRoute = document.getElementById("btnCenterRoute");
+  const btnToggleLabels = document.getElementById("btnToggleLabels");
+  const btnAlignArrows = document.getElementById("btnAlignArrows");
+
+  const hudStepBadge = document.getElementById("hudStepBadge");
+  const hudInstruction = document.getElementById("hudInstruction");
+  const hudSub = document.getElementById("hudSub");
+  const hudCompass = document.getElementById("hudCompass");
+  const arHeadingText = document.getElementById("arHeadingText");
+  const arSignTurnIcon = document.getElementById("arSignTurnIcon");
+  const arSignTitle = document.getElementById("arSignTitle");
+  const arSignDist = document.getElementById("arSignDist");
+  const arTurnHint = document.getElementById("arTurnHint");
+  const arTurnHintText = document.getElementById("arTurnHintText");
+
+  const kpiNodesCount = document.getElementById("kpiNodesCount");
+  const kpiDistanceMeters = document.getElementById("kpiDistanceMeters");
+  const stepsList = document.getElementById("stepsList");
+
+  const campusCanvas = document.getElementById("campusCanvas");
+  const ctx = campusCanvas.getContext("2d");
+  const minimapCanvas = document.getElementById("minimapCanvas");
+  const miniCtx = minimapCanvas.getContext("2d");
+  const mapViewport = document.getElementById("mapViewport");
+
+  // Imagen satelital/mapa 2D opcional de fondo
+  const imgMapa = new Image();
+  let mapaCargado = false;
+  imgMapa.onload = () => {
+    mapaCargado = true;
+    dibujarMapa2D();
+    dibujarMinimapa();
+  };
+  imgMapa.src = "campus_map.png";
+
+  // ============================================================================
+  // 3. CÁLCULO DE POSICIÓN Y TRAMO ACTIVO
+  // ============================================================================
+  function obtenerTramoActivo() {
+    if (estado.ruta.length === 0) {
+      const n = nodosPorId.get(estado.origenId) || datos.nodes[0];
+      return { actual: n, siguiente: n, distTramo: 0, distRestanteTramo: 0, rumboTramo: 0 };
+    }
+    const idx = Math.min(estado.indiceActual, estado.ruta.length - 1);
+    const actual = estado.ruta[idx];
+    const siguiente = estado.ruta[Math.min(idx + 1, estado.ruta.length - 1)];
+    const distTramo = distanciaMetros(actual, siguiente);
+    const distRestanteTramo = Math.max(0, distTramo * (1 - estado.progresoTramo));
+    const rumboTramo = distTramo > 0.01
+      ? calcularRumboGrados(estado.usuarioX, estado.usuarioZ, siguiente.x, siguiente.z)
+      : 0;
+    return { actual, siguiente, distTramo, distRestanteTramo, rumboTramo };
+  }
+
+  function calcularDistanciaTotalRestante() {
+    if (estado.ruta.length < 2 || estado.indiceActual >= estado.ruta.length - 1) return 0;
+    const { distRestanteTramo } = obtenerTramoActivo();
+    let total = distRestanteTramo;
+    for (let i = estado.indiceActual + 1; i < estado.ruta.length - 1; i++) {
+      total += distanciaMetros(estado.ruta[i], estado.ruta[i + 1]);
+    }
+    return total;
+  }
+
+  function sincronizarCoordenadasUsuarioConProgreso() {
+    if (estado.ruta.length === 0) return;
+    const actual = estado.ruta[Math.min(estado.indiceActual, estado.ruta.length - 1)];
+    const siguiente = estado.ruta[Math.min(estado.indiceActual + 1, estado.ruta.length - 1)];
+    const t = Math.max(0, Math.min(1, estado.progresoTramo));
+    estado.usuarioX = actual.x + (siguiente.x - actual.x) * t;
+    estado.usuarioZ = actual.z + (siguiente.z - actual.z) * t;
+  }
+
+  // Avanza a lo largo del pasillo actual una cantidad de metros (por botón Caminar o por Podómetro)
+  function avanzarMetrosEnRuta(metros) {
+    if (estado.ruta.length < 2) return;
+    if (estado.indiceActual >= estado.ruta.length - 1) {
+      // Ya estaba en el destino: reiniciar desde el origen para volver a recorrer
+      estado.indiceActual = 0;
+      estado.progresoTramo = 0;
+    }
+
+    let restantePorAvanzar = metros;
+    while (restantePorAvanzar > 0 && estado.indiceActual < estado.ruta.length - 1) {
+      const a = estado.ruta[estado.indiceActual];
+      const b = estado.ruta[estado.indiceActual + 1];
+      const longTramo = Math.max(0.1, distanciaMetros(a, b));
+      const metrosEnTramo = (1 - estado.progresoTramo) * longTramo;
+
+      if (restantePorAvanzar < metrosEnTramo) {
+        estado.progresoTramo += restantePorAvanzar / longTramo;
+        restantePorAvanzar = 0;
+      } else {
+        restantePorAvanzar -= metrosEnTramo;
+        estado.indiceActual += 1;
+        estado.progresoTramo = 0;
+        // Al doblar una esquina hacia un nuevo nodo, alineamos suavemente las flechas al nuevo pasillo
+        estado.desfaseMiradaGrados = 0;
+        estado.brjSensorBase = estado.brjSensorActual;
+      }
+    }
+
+    sincronizarCoordenadasUsuarioConProgreso();
+    actualizarHUD();
+    dibujarMapa2D();
+    dibujarMinimapa();
+    actualizarGeometriaFlechas3D();
+
+    if (estado.indiceActual >= estado.ruta.length - 1 && estado.caminandoSim) {
+      detenerSimulacionCaminata();
+    }
+  }
+
+  // ============================================================================
+  // 4. ESCENA 3D THREE.JS: CINTA DE PISO + FLECHAS 3D ANIMADAS FRENTE AL USUARIO
+  // ============================================================================
+  let arScene = null;
+  let arCamera = null;
+  let arRenderer = null;
+  let arCorridorGroup = null;
+  let arChevrons = [];
+  let arBeaconMesh = null;
+  let arBeaconRing = null;
+
+  function inicializarEscena3DAR() {
+    const contenedor = document.getElementById("arThreeContainer");
+    if (!contenedor || typeof THREE === "undefined") return;
 
     arScene = new THREE.Scene();
-    arCamera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 1000);
-    // Posición del usuario a nivel de ojos (1.6 m sobre el piso)
-    arCamera.position.set(0, 1.6, 0);
+
+    // Cámara a 1.55 m de altura (celular en mano) mirando ligeramente hacia el piso frente a los pies
+    arCamera = new THREE.PerspectiveCamera(
+      62,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      150
+    );
+    arCamera.position.set(0, 1.55, 0);
+    arCamera.rotation.order = "YXZ";
+    arCamera.rotation.x = -0.22; // ~12.5° hacia el suelo para ver las flechas desde 1.4m de distancia
 
     arRenderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
     arRenderer.setSize(window.innerWidth, window.innerHeight);
-    arRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    arThreeContainer.appendChild(arRenderer.domElement);
+    arRenderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    arRenderer.setClearColor(0x000000, 0);
+    contenedor.innerHTML = "";
+    contenedor.appendChild(arRenderer.domElement);
 
-    // Luces
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.9);
-    arScene.add(ambientLight);
-    const dirLight = new THREE.DirectionalLight(0xffffff, 0.7);
-    dirLight.position.set(0, 10, 5);
-    arScene.add(dirLight);
+    const luzAmbiente = new THREE.AmbientLight(0xffffff, 1.0);
+    arScene.add(luzAmbiente);
 
-    // Contenedor de flechas holográficas pegadas al piso
-    arArrowGroup = new THREE.Group();
-    arScene.add(arArrowGroup);
+    const luzDir = new THREE.DirectionalLight(0xffffff, 0.9);
+    luzDir.position.set(3, 12, 5);
+    arScene.add(luzDir);
 
-    window.addEventListener('resize', () => {
-      if (arCamera && arRenderer) {
-        arCamera.aspect = window.innerWidth / window.innerHeight;
-        arCamera.updateProjectionMatrix();
-        arRenderer.setSize(window.innerWidth, window.innerHeight);
-      }
+    // Grupo del pasillo activo que apunta hacia -Z cuando desfaseMiradaGrados === 0
+    arCorridorGroup = new THREE.Group();
+    arScene.add(arCorridorGroup);
+
+    construirGeometriaCorredor3D();
+
+    window.addEventListener("resize", () => {
+      if (!arCamera || !arRenderer) return;
+      arCamera.aspect = window.innerWidth / window.innerHeight;
+      arCamera.updateProjectionMatrix();
+      arRenderer.setSize(window.innerWidth, window.innerHeight);
     });
 
-    // Control manual por arrastre si no hay brújula
-    let isDragging = false;
-    let prevX = 0;
-    window.addEventListener('pointerdown', (e) => {
-      if (estado.modoVista !== 'ar') return;
-      isDragging = true;
-      prevX = e.clientX;
+    // Permitir girar la vista en 3D arrastrando con el dedo/mouse sobre la cámara AR
+    let arrastrandoAR = false;
+    let ultimoX = 0;
+    viewAR.addEventListener("pointerdown", (e) => {
+      if (e.target.closest("button") || e.target.closest("#arMinimap")) return;
+      arrastrandoAR = true;
+      ultimoX = e.clientX;
     });
-    window.addEventListener('pointermove', (e) => {
-      if (!isDragging || estado.usandoSensores) return;
-      const deltaX = e.clientX - prevX;
-      estado.rumboManualDeg += deltaX * 0.35;
-      prevX = e.clientX;
-      actualizarOrientacionAR();
+    window.addEventListener("pointermove", (e) => {
+      if (!arrastrandoAR) return;
+      const dx = e.clientX - ultimoX;
+      ultimoX = e.clientX;
+      estado.desfaseMiradaGrados = ((estado.desfaseMiradaGrados - dx * 0.35 + 540) % 360) - 180;
     });
-    window.addEventListener('pointerup', () => (isDragging = false));
+    window.addEventListener("pointerup", () => {
+      arrastrandoAR = false;
+    });
 
-    // Sensores de orientación del celular (DeviceOrientation)
-    if (window.DeviceOrientationEvent) {
-      window.addEventListener('deviceorientation', (e) => {
-        let heading = null;
-        if (e.webkitCompassHeading !== undefined) {
-          heading = e.webkitCompassHeading; // iOS Safari
-        } else if (e.alpha !== null) {
-          heading = 360 - e.alpha; // Android Chrome
-        }
-        if (heading !== null) {
-          estado.usandoSensores = true;
-          estado.rumboUsuarioDeg = heading;
-          actualizarOrientacionAR();
-        }
-      });
-    }
-
-    animateThreeAR();
+    requestAnimationFrame(animarEscena3DAR);
   }
 
-  function actualizarOrientacionAR() {
-    const rumboFinal = (estado.usandoSensores ? estado.rumboUsuarioDeg : estado.rumboManualDeg) % 360;
-    arHeadingText.textContent = `🧭 Rumbo: ${Math.round(rumboFinal)}° ${rumboCardinal(rumboFinal)}`;
-    if (arCamera) {
-      // Rotar cámara virtual en Y según la brújula
-      arCamera.rotation.y = THREE.MathUtils.degToRad(-rumboFinal);
+  // Crea la alfombra luminosa y 8 flechas Chevron 3D grandes desde 1.4m hasta 12.6m frente al usuario
+  function construirGeometriaCorredor3D() {
+    if (!arCorridorGroup) return;
+    while (arCorridorGroup.children.length > 0) {
+      arCorridorGroup.remove(arCorridorGroup.children[0]);
     }
-  }
+    arChevrons = [];
 
-  function actualizarFlechas3DAR() {
-    if (!arArrowGroup) return;
+    // 1. Cinta/alfombra azul translúcida en el piso
+    const largoCinta = 13.5;
+    const geomCinta = new THREE.PlaneGeometry(1.15, largoCinta);
+    geomCinta.rotateX(-Math.PI / 2);
+    const matCinta = new THREE.MeshBasicMaterial({
+      color: 0x0071e3,
+      transparent: true,
+      opacity: 0.28,
+      side: THREE.DoubleSide
+    });
+    const mallaCinta = new THREE.Mesh(geomCinta, matCinta);
+    mallaCinta.position.set(0, 0.01, -largoCinta / 2 - 0.8);
+    arCorridorGroup.add(mallaCinta);
 
-    // Limpiar flechas anteriores
-    while (arArrowGroup.children.length > 0) {
-      const obj = arArrowGroup.children[0];
-      arArrowGroup.remove(obj);
-      if (obj.geometry) obj.geometry.dispose();
-      if (obj.material) obj.material.dispose();
-    }
+    // Bordes laterales brillantes cian de la cinta
+    const geomBorde = new THREE.PlaneGeometry(0.06, largoCinta);
+    geomBorde.rotateX(-Math.PI / 2);
+    const matBorde = new THREE.MeshBasicMaterial({
+      color: 0x38bdf8,
+      transparent: true,
+      opacity: 0.85,
+      side: THREE.DoubleSide
+    });
+    const bordeIzq = new THREE.Mesh(geomBorde, matBorde);
+    bordeIzq.position.set(-0.56, 0.02, -largoCinta / 2 - 0.8);
+    const bordeDer = new THREE.Mesh(geomBorde, matBorde);
+    bordeDer.position.set(0.56, 0.02, -largoCinta / 2 - 0.8);
+    arCorridorGroup.add(bordeIzq, bordeDer);
 
-    if (estado.ruta.length < 2) return;
+    // 2. Molde extruido de Flecha Chevron 3D (>) apuntando hacia adelante (-Z)
+    const shape = new THREE.Shape();
+    shape.moveTo(0, 0.42);       // Punta delantera
+    shape.lineTo(0.46, -0.18);   // Ala derecha exterior
+    shape.lineTo(0.30, -0.32);   // Ala derecha interior
+    shape.lineTo(0, 0.08);       // Centro interior
+    shape.lineTo(-0.30, -0.32);  // Ala izquierda interior
+    shape.lineTo(-0.46, -0.18);  // Ala izquierda exterior
+    shape.closePath();
 
-    const actual = nodosPorId.get(estado.origenId);
-    const siguiente = nodosPorId.get(estado.ruta[1]);
-    if (!actual || !siguiente) return;
+    const extrudeOpts = {
+      depth: 0.07,
+      bevelEnabled: true,
+      bevelSegments: 2,
+      steps: 1,
+      bevelSize: 0.015,
+      bevelThickness: 0.015
+    };
+    const geomFlecha = new THREE.ExtrudeGeometry(shape, extrudeOpts);
+    geomFlecha.rotateX(-Math.PI / 2); // Acostada sobre el piso XZ apuntando hacia -Z
 
-    // Vector relativo desde el usuario (actual) hacia el siguiente nodo
-    // En Three.js: X = Este, Y = Arriba, -Z = Norte
-    const deltaX = siguiente.x - actual.x;
-    const deltaZ = -(siguiente.z - actual.z);
-    const distancia = Math.hypot(deltaX, deltaZ);
-    const anguloRumbo = Math.atan2(deltaX, deltaZ);
-
-    // Crear cinta de 5 flechas 3D holográficas que avanzan por el pasillo
-    const numFlechas = Math.min(6, Math.max(3, Math.floor(distancia / 4)));
-    const chevronGeo = new THREE.ConeGeometry(0.7, 1.4, 3);
-    chevronGeo.rotateX(Math.PI / 2);
-
-    for (let i = 1; i <= numFlechas; i++) {
-      const t = i / (numFlechas + 1);
-      const posX = deltaX * t;
-      const posZ = deltaZ * t;
-
-      // Color degradado azul brillante
-      const mat = new THREE.MeshBasicMaterial({
-        color: i === 1 ? 0x00d2ff : 0x0071e3,
-        wireframe: false,
+    const numFlechas = 8;
+    for (let i = 0; i < numFlechas; i++) {
+      const matFlecha = new THREE.MeshStandardMaterial({
+        color: 0x00d2ff,
+        emissive: 0x0066ff,
+        emissiveIntensity: 0.75,
+        roughness: 0.2,
+        metalness: 0.1,
         transparent: true,
-        opacity: 0.85
+        opacity: 0.95
       });
+      const mesh = new THREE.Mesh(geomFlecha, matFlecha);
+      const zBase = -(1.4 + i * 1.45); // Desde 1.4m frente a los pies hasta ~11.6m
+      mesh.position.set(0, 0.04, zBase);
+      mesh.userData = { indice: i, zBase };
+      arCorridorGroup.add(mesh);
+      arChevrons.push(mesh);
+    }
 
-      const arrowMesh = new THREE.Mesh(chevronGeo, mat);
-      // Sobre el suelo (Y = 0)
-      arrowMesh.position.set(posX, 0.08, posZ);
-      arrowMesh.rotation.y = anguloRumbo + Math.PI;
-      arArrowGroup.add(arrowMesh);
+    // 3. Pin 3D flotante al final del corredor visible indicando el siguiente nodo
+    const geomPin = new THREE.OctahedronGeometry(0.32, 0);
+    const matPin = new THREE.MeshStandardMaterial({
+      color: 0x34c759,
+      emissive: 0x15803d,
+      emissiveIntensity: 0.7
+    });
+    arBeaconMesh = new THREE.Mesh(geomPin, matPin);
+    arBeaconMesh.position.set(0, 1.1, -11.5);
+    arCorridorGroup.add(arBeaconMesh);
 
-      // Anillo de brillo alrededor de la primera flecha
-      if (i === 1) {
-        const ringGeo = new THREE.RingGeometry(0.8, 1.0, 16);
-        ringGeo.rotateX(-Math.PI / 2);
-        const ringMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.6, side: THREE.DoubleSide });
-        const ring = new THREE.Mesh(ringGeo, ringMat);
-        ring.position.set(posX, 0.05, posZ);
-        arArrowGroup.add(ring);
+    const geomAnillo = new THREE.RingGeometry(0.45, 0.62, 32);
+    geomAnillo.rotateX(-Math.PI / 2);
+    const matAnillo = new THREE.MeshBasicMaterial({
+      color: 0x34c759,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 0.85
+    });
+    arBeaconRing = new THREE.Mesh(geomAnillo, matAnillo);
+    arBeaconRing.position.set(0, 0.03, -11.5);
+    arCorridorGroup.add(arBeaconRing);
+  }
+
+  function actualizarGeometriaFlechas3D() {
+    if (!arCorridorGroup) return;
+    const { actual, siguiente, distRestanteTramo } = obtenerTramoActivo();
+    const enDestino = actual.id === siguiente.id || distRestanteTramo < 0.5;
+
+    // Color verde esmeralda si ya estamos llegando al destino final, azul cian en ruta
+    const colorPunta = enDestino ? 0x34c759 : 0x00e5ff;
+    const colorEmisivo = enDestino ? 0x16a34a : 0x0066ff;
+
+    arChevrons.forEach((mesh) => {
+      mesh.material.color.setHex(colorPunta);
+      mesh.material.emissive.setHex(colorEmisivo);
+    });
+
+    // Acercar el pin 3D si el nodo está a menos de 11.5 m
+    const zPin = -Math.max(2.2, Math.min(11.5, distRestanteTramo));
+    if (arBeaconMesh && arBeaconRing) {
+      arBeaconMesh.position.z = zPin;
+      arBeaconRing.position.z = zPin;
+      const esDestinoFinal = estado.indiceActual >= estado.ruta.length - 2;
+      arBeaconMesh.material.color.setHex(esDestinoFinal ? 0xc8102e : 0x34c759);
+      arBeaconRing.material.color.setHex(esDestinoFinal ? 0xc8102e : 0x34c759);
+    }
+  }
+
+  function animarEscena3DAR(tiempoMs) {
+    requestAnimationFrame(animarEscena3DAR);
+    if (!arRenderer || !arScene || !arCamera) return;
+
+    const t = tiempoMs * 0.001;
+    const velocidadOnda = estado.caminandoSim ? 5.5 : 3.0;
+
+    // Si el sensor del teléfono está enviando rumbo, calculamos cuánto ha girado respecto al momento de alinear
+    if (estado.brjSensorActual !== null && estado.brjSensorBase !== null) {
+      estado.desfaseMiradaGrados = diferenciaAngularGrados(
+        estado.brjSensorActual,
+        estado.brjSensorBase
+      );
+    }
+
+    // Rotar el corredor 3D según el giro del usuario (0° = corredor justo frente a la cámara)
+    if (arCorridorGroup) {
+      const radGiro = THREE.MathUtils.degToRad(estado.desfaseMiradaGrados);
+      arCorridorGroup.rotation.y = radGiro;
+    }
+
+    // Avisar si el usuario giró más de 35° lejos del corredor de flechas
+    if (arTurnHint && arTurnHintText) {
+      if (Math.abs(estado.desfaseMiradaGrados) > 35) {
+        arTurnHint.hidden = false;
+        arTurnHintText.textContent =
+          estado.desfaseMiradaGrados > 0
+            ? "⬅️ Gira a la izquierda o toca '🎯 Centrar flechas'"
+            : "➡️ Gira a la derecha o toca '🎯 Centrar flechas'";
+      } else {
+        arTurnHint.hidden = true;
       }
     }
 
-    // Poste holográfico de meta en el siguiente nodo
-    const pinGeo = new THREE.CylinderGeometry(0.08, 0.08, 3.2, 8);
-    const pinMat = new THREE.MeshBasicMaterial({ color: 0x34c759, transparent: true, opacity: 0.8 });
-    const pinMesh = new THREE.Mesh(pinGeo, pinMat);
-    pinMesh.position.set(deltaX, 1.6, deltaZ);
-    arArrowGroup.add(pinMesh);
+    // Onda luminosa tipo "carril de aterrizaje" que avanza hacia adelante (-Z)
+    arChevrons.forEach((mesh, idx) => {
+      // Deslizamiento continuo hacia adelante
+      const desplazamiento = ((t * (estado.caminandoSim ? 2.4 : 1.1) + idx * 0.18) % 1) * 1.45;
+      mesh.position.z = -(1.2 + idx * 1.35 + desplazamiento);
+
+      const pulso = (Math.sin(t * velocidadOnda - idx * 0.7) + 1) * 0.5;
+      const escala = 0.92 + pulso * 0.28;
+      mesh.scale.set(escala, escala, escala);
+      mesh.material.emissiveIntensity = 0.45 + pulso * 0.95;
+      mesh.material.opacity = 0.65 + pulso * 0.35;
+    });
+
+    if (arBeaconMesh && arBeaconRing) {
+      arBeaconMesh.position.y = 1.05 + Math.sin(t * 3.2) * 0.15;
+      arBeaconMesh.rotation.y = t * 1.8;
+      const sAnillo = 0.85 + ((t * 1.4) % 1) * 0.75;
+      arBeaconRing.scale.set(sAnillo, sAnillo, 1);
+      arBeaconRing.material.opacity = 1 - ((t * 1.4) % 1);
+    }
+
+    arRenderer.render(arScene, arCamera);
   }
 
-  function animateThreeAR() {
-    requestAnimationFrame(animateThreeAR);
-
-    // Animación sutil de pulso en las flechas
-    if (arArrowGroup && arArrowGroup.children.length > 0) {
-      const time = Date.now() * 0.003;
-      arArrowGroup.children.forEach((child, idx) => {
-        if (child.isMesh && child.geometry.type === 'ConeGeometry') {
-          child.position.y = 0.08 + Math.sin(time + idx * 0.8) * 0.04;
-        }
-      });
-    }
-
-    if (arRenderer && arScene && arCamera) {
-      arRenderer.render(arScene, arCamera);
-    }
-
-    if (estado.modoVista === 'ar') {
-      dibujarMinimapa();
-    }
+  // ============================================================================
+  // 5. MAPA 2D INTERACTIVO Y MINIMAPA EN VIVO (CON PUNTO DEL USUARIO EN MOVIMIENTO)
+  // ============================================================================
+  function mundoACanvas(x, z) {
+    const b = datos.bounds;
+    const pad = 70;
+    const w = campusCanvas.width - pad * 2;
+    const h = campusCanvas.height - pad * 2;
+    const nx = (x - b.minX) / (b.maxX - b.minX);
+    const nz = (b.maxZ - z) / (b.maxZ - b.minZ);
+    return {
+      cx: pad + nx * w,
+      cy: pad + nz * h
+    };
   }
 
+  function dibujarMapa2D() {
+    ctx.clearRect(0, 0, campusCanvas.width, campusCanvas.height);
+
+    // Fondo arquitectónico limpio
+    ctx.fillStyle = "#f4f3ee";
+    ctx.fillRect(0, 0, campusCanvas.width, campusCanvas.height);
+
+    if (mapaCargado) {
+      ctx.save();
+      ctx.globalAlpha = 0.25;
+      ctx.drawImage(imgMapa, 0, 0, campusCanvas.width, campusCanvas.height);
+      ctx.restore();
+    }
+
+    // Cuadrícula métrica sutil
+    ctx.strokeStyle = "rgba(0, 0, 0, 0.04)";
+    ctx.lineWidth = 1;
+    for (let x = 0; x < campusCanvas.width; x += 50) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, campusCanvas.height);
+      ctx.stroke();
+    }
+    for (let y = 0; y < campusCanvas.height; y += 50) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(campusCanvas.width, y);
+      ctx.stroke();
+    }
+
+    // 1. Pasillos caminables base
+    ctx.strokeStyle = "rgba(100, 116, 139, 0.28)";
+    ctx.lineWidth = 5;
+    ctx.lineCap = "round";
+    datos.edges.forEach(([u, v]) => {
+      const a = nodosPorId.get(u);
+      const b = nodosPorId.get(v);
+      if (!a || !b) return;
+      const pa = mundoACanvas(a.x, a.z);
+      const pb = mundoACanvas(b.x, b.z);
+      ctx.beginPath();
+      ctx.moveTo(pa.cx, pa.cy);
+      ctx.lineTo(pb.cx, pb.cy);
+      ctx.stroke();
+    });
+
+    // 2. Ruta activa desde la posición actual del usuario hasta el destino
+    if (estado.ruta.length >= 2) {
+      const posUsuario = mundoACanvas(estado.usuarioX, estado.usuarioZ);
+
+      // Sombra de la ruta
+      ctx.strokeStyle = "rgba(0, 113, 227, 0.2)";
+      ctx.lineWidth = 14;
+      ctx.lineJoin = "round";
+      ctx.beginPath();
+      ctx.moveTo(posUsuario.cx, posUsuario.cy);
+      for (let i = estado.indiceActual + 1; i < estado.ruta.length; i++) {
+        const p = mundoACanvas(estado.ruta[i].x, estado.ruta[i].z);
+        ctx.lineTo(p.cx, p.cy);
+      }
+      ctx.stroke();
+
+      // Línea principal azul
+      ctx.strokeStyle = "#0071e3";
+      ctx.lineWidth = 6;
+      ctx.beginPath();
+      ctx.moveTo(posUsuario.cx, posUsuario.cy);
+      for (let i = estado.indiceActual + 1; i < estado.ruta.length; i++) {
+        const p = mundoACanvas(estado.ruta[i].x, estado.ruta[i].z);
+        ctx.lineTo(p.cx, p.cy);
+      }
+      ctx.stroke();
+
+      // Chevrons blancos sobre el tramo activo
+      const sigNodo = estado.ruta[Math.min(estado.indiceActual + 1, estado.ruta.length - 1)];
+      const pSig = mundoACanvas(sigNodo.x, sigNodo.z);
+      const ang = Math.atan2(pSig.cy - posUsuario.cy, pSig.cx - posUsuario.cx);
+      const distPx = Math.hypot(pSig.cx - posUsuario.cx, pSig.cy - posUsuario.cy);
+      const pasos = Math.max(1, Math.floor(distPx / 32));
+      for (let s = 1; s <= pasos; s++) {
+        const t = s / (pasos + 1);
+        const mx = posUsuario.cx + (pSig.cx - posUsuario.cx) * t;
+        const my = posUsuario.cy + (pSig.cy - posUsuario.cy) * t;
+        ctx.save();
+        ctx.translate(mx, my);
+        ctx.rotate(ang);
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.moveTo(-5, -5);
+        ctx.lineTo(4, 0);
+        ctx.lineTo(-5, 5);
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
+
+    // 3. Dibujar los 20 Nodos del Campus
+    const idsEnRuta = new Set(estado.ruta.map((n) => n.id));
+    datos.nodes.forEach((nodo) => {
+      const { cx, cy } = mundoACanvas(nodo.x, nodo.z);
+      const esOrigen = nodo.id === estado.origenId;
+      const esDestino = nodo.id === estado.destinoId;
+      const enRuta = idsEnRuta.has(nodo.id);
+
+      let radio = 7;
+      let fill = "#ffffff";
+      let stroke = "#94a3b8";
+
+      if (esDestino) {
+        radio = 11;
+        fill = "#c8102e";
+        stroke = "#ffffff";
+      } else if (esOrigen) {
+        radio = 9;
+        fill = "#34c759";
+        stroke = "#ffffff";
+      } else if (enRuta) {
+        radio = 8;
+        fill = "#0071e3";
+        stroke = "#ffffff";
+      }
+
+      ctx.beginPath();
+      ctx.arc(cx, cy, radio, 0, Math.PI * 2);
+      ctx.fillStyle = fill;
+      ctx.fill();
+      ctx.lineWidth = 2.5;
+      ctx.strokeStyle = stroke;
+      ctx.stroke();
+
+      if (estado.mostrarEtiquetas || enRuta) {
+        const texto = `${nodo.id} · ${nodo.name}`;
+        ctx.font = enRuta ? "700 12px Inter, sans-serif" : "600 11px Inter, sans-serif";
+        const tw = ctx.measureText(texto).width;
+        ctx.fillStyle = "rgba(255, 255, 255, 0.92)";
+        ctx.beginPath();
+        ctx.roundRect(cx - tw / 2 - 6, cy - radio - 24, tw + 12, 18, 6);
+        ctx.fill();
+        ctx.fillStyle = esDestino ? "#c8102e" : enRuta ? "#0071e3" : "#1c1c1e";
+        ctx.textAlign = "center";
+        ctx.fillText(texto, cx, cy - radio - 11);
+      }
+    });
+
+    // 4. Marcador en vivo del USUARIO ("TÚ") con cono de visión
+    const posU = mundoACanvas(estado.usuarioX, estado.usuarioZ);
+    const { rumboTramo } = obtenerTramoActivo();
+    const rumboMirada = (rumboTramo + estado.desfaseMiradaGrados + 360) % 360;
+    const radCanvas = ((rumboMirada - 90) * Math.PI) / 180;
+
+    // Cono de visión en el mapa 2D
+    ctx.save();
+    ctx.translate(posU.cx, posU.cy);
+    ctx.rotate(radCanvas);
+    ctx.fillStyle = "rgba(52, 199, 89, 0.25)";
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.arc(0, 0, 38, -0.45, 0.45);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+
+    // Halo verde pulsante del usuario
+    ctx.beginPath();
+    ctx.arc(posU.cx, posU.cy, 16, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(52, 199, 89, 0.28)";
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(posU.cx, posU.cy, 9, 0, Math.PI * 2);
+    ctx.fillStyle = "#34c759";
+    ctx.fill();
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = "#ffffff";
+    ctx.stroke();
+
+    ctx.font = "800 11px Inter, sans-serif";
+    ctx.fillStyle = "#065f46";
+    ctx.textAlign = "center";
+    ctx.fillText("TÚ", posU.cx, posU.cy + 24);
+  }
+
+  // Minimapa tipo Radar que sigue en vivo la coordenada (usuarioX, usuarioZ)
   function dibujarMinimapa() {
-    miniCtx.clearRect(0, 0, minimapCanvas.width, minimapCanvas.height);
-    miniCtx.fillStyle = '#f8f8f5';
-    miniCtx.fillRect(0, 0, minimapCanvas.width, minimapCanvas.height);
+    if (!miniCtx) return;
+    const w = minimapCanvas.width;
+    const h = minimapCanvas.height;
+    miniCtx.clearRect(0, 0, w, h);
 
-    // Dibujar edificios en miniatura
-    DATA.poligonos.forEach((p) => {
-      if (!p.pts || p.pts.length < 3 || p.tipo !== 'ibero') return;
+    miniCtx.fillStyle = "#0f172a";
+    miniCtx.fillRect(0, 0, w, h);
+
+    // Anillos de radar concéntricos alrededor del usuario
+    miniCtx.strokeStyle = "rgba(148, 163, 184, 0.18)";
+    miniCtx.lineWidth = 1;
+    [28, 56, 82].forEach((r) => {
       miniCtx.beginPath();
-      p.pts.forEach(([x, z], idx) => {
-        const [cx, cy] = mundoACanvas(x, z, minimapCanvas.width, minimapCanvas.height);
-        if (idx === 0) miniCtx.moveTo(cx, cy);
-        else miniCtx.lineTo(cx, cy);
-      });
-      miniCtx.closePath();
-      miniCtx.fillStyle = '#d97d74';
+      miniCtx.arc(w / 2, h / 2, r, 0, Math.PI * 2);
+      miniCtx.stroke();
+    });
+
+    // Escala: 1 metro del campus = 0.65 px en el minimapa centrado en (usuarioX, usuarioZ)
+    const escala = 0.65;
+    const aMini = (x, z) => ({
+      mx: w / 2 + (x - estado.usuarioX) * escala,
+      my: h / 2 - (z - estado.usuarioZ) * escala
+    });
+
+    // Pasillos cercanos en gris
+    miniCtx.strokeStyle = "rgba(148, 163, 184, 0.35)";
+    miniCtx.lineWidth = 2.5;
+    datos.edges.forEach(([u, v]) => {
+      const na = nodosPorId.get(u);
+      const nb = nodosPorId.get(v);
+      if (!na || !nb) return;
+      const pa = aMini(na.x, na.z);
+      const pb = aMini(nb.x, nb.z);
+      miniCtx.beginPath();
+      miniCtx.moveTo(pa.mx, pa.my);
+      miniCtx.lineTo(pb.mx, pb.my);
+      miniCtx.stroke();
+    });
+
+    // Ruta activa en azul brillante desde el centro (usuario)
+    if (estado.ruta.length >= 2) {
+      miniCtx.strokeStyle = "#38bdf8";
+      miniCtx.lineWidth = 4.5;
+      miniCtx.lineCap = "round";
+      miniCtx.beginPath();
+      miniCtx.moveTo(w / 2, h / 2);
+      for (let i = estado.indiceActual + 1; i < estado.ruta.length; i++) {
+        const p = aMini(estado.ruta[i].x, estado.ruta[i].z);
+        miniCtx.lineTo(p.mx, p.my);
+      }
+      miniCtx.stroke();
+    }
+
+    // Nodos en el minimapa
+    datos.nodes.forEach((n) => {
+      const p = aMini(n.x, n.z);
+      if (p.mx < -10 || p.mx > w + 10 || p.my < -10 || p.my > h + 10) return;
+      miniCtx.beginPath();
+      miniCtx.arc(p.mx, p.my, n.id === estado.destinoId ? 5.5 : 3.5, 0, Math.PI * 2);
+      miniCtx.fillStyle = n.id === estado.destinoId ? "#ef4444" : "#cbd5e1";
       miniCtx.fill();
     });
 
-    // Ruta en el minimapa
-    if (estado.ruta.length >= 2) {
-      miniCtx.strokeStyle = '#0071e3';
-      miniCtx.lineWidth = 3.5;
-      miniCtx.beginPath();
-      estado.ruta.forEach((id, i) => {
-        const n = nodosPorId.get(id);
-        const [cx, cy] = mundoACanvas(n.x, n.z, minimapCanvas.width, minimapCanvas.height);
-        if (i === 0) miniCtx.moveTo(cx, cy);
-        else miniCtx.lineTo(cx, cy);
-      });
-      miniCtx.stroke();
+    // Cono de hacia dónde mira el celular
+    const { rumboTramo } = obtenerTramoActivo();
+    const rumboMirada = (rumboTramo + estado.desfaseMiradaGrados + 360) % 360;
+    const radMini = ((rumboMirada - 90) * Math.PI) / 180;
+
+    miniCtx.save();
+    miniCtx.translate(w / 2, h / 2);
+    miniCtx.rotate(radMini);
+    miniCtx.fillStyle = "rgba(56, 189, 248, 0.32)";
+    miniCtx.beginPath();
+    miniCtx.moveTo(0, 0);
+    miniCtx.arc(0, 0, 34, -0.5, 0.5);
+    miniCtx.closePath();
+    miniCtx.fill();
+    miniCtx.restore();
+
+    // Punto verde del usuario en el centro exacto del minimapa
+    miniCtx.beginPath();
+    miniCtx.arc(w / 2, h / 2, 6.5, 0, Math.PI * 2);
+    miniCtx.fillStyle = "#34c759";
+    miniCtx.fill();
+    miniCtx.lineWidth = 2;
+    miniCtx.strokeStyle = "#ffffff";
+    miniCtx.stroke();
+  }
+
+  function centrarMapaEnUsuario() {
+    const { cx, cy } = mundoACanvas(estado.usuarioX, estado.usuarioZ);
+    mapViewport.scrollTo({
+      left: Math.max(0, cx - mapViewport.clientWidth / 2),
+      top: Math.max(0, cy - mapViewport.clientHeight / 2),
+      behavior: "smooth"
+    });
+  }
+
+  // Permitir tocar cualquier nodo en el Mapa 2D para seleccionarlo como ubicación actual ("Estoy aquí")
+  campusCanvas.addEventListener("click", (e) => {
+    const rect = campusCanvas.getBoundingClientRect();
+    const scaleX = campusCanvas.width / rect.width;
+    const scaleY = campusCanvas.height / rect.height;
+    const clickX = (e.clientX - rect.left) * scaleX;
+    const clickY = (e.clientY - rect.top) * scaleY;
+
+    let mejorNodo = null;
+    let mejorDist = 26;
+    datos.nodes.forEach((nodo) => {
+      const { cx, cy } = mundoACanvas(nodo.x, nodo.z);
+      const d = Math.hypot(cx - clickX, cy - clickY);
+      if (d < mejorDist) {
+        mejorDist = d;
+        mejorNodo = nodo;
+      }
+    });
+
+    if (mejorNodo) {
+      fijarUbicacionPorNodo(mejorNodo.id, "Mapa 2D");
+    }
+  });
+
+  // ============================================================================
+  // 6. ACTUALIZACIÓN DE INTERFAZ Y RECALCULAR RUTA
+  // ============================================================================
+  function recalcularRutaCompleta() {
+    const res = calcularRutaDijkstra(estado.origenId, estado.destinoId);
+    estado.ruta = res.ruta;
+    estado.distanciaTotal = res.distanciaTotal;
+    estado.indiceActual = 0;
+    estado.progresoTramo = 0;
+
+    // Alinear las flechas 3D justo frente al usuario al iniciar o cambiar ruta
+    estado.desfaseMiradaGrados = 0;
+    estado.brjSensorBase = estado.brjSensorActual;
+
+    sincronizarCoordenadasUsuarioConProgreso();
+    actualizarHUD();
+    dibujarMapa2D();
+    dibujarMinimapa();
+    actualizarGeometriaFlechas3D();
+    publicarEventoMQTT();
+  }
+
+  function actualizarHUD() {
+    const { actual, siguiente, distRestanteTramo, rumboTramo } = obtenerTramoActivo();
+    const distTotalRestante = calcularDistanciaTotalRestante();
+    const minutos = Math.max(0.2, distTotalRestante / 80).toFixed(1);
+    const cardinal = nombrePuntoCardinal(rumboTramo);
+
+    const nodoDestinoFinal = nodosPorId.get(estado.destinoId);
+    hudStepBadge.textContent = `${actual.id} ${actual.name} ➔ ${nodoDestinoFinal ? nodoDestinoFinal.name : estado.destinoId}`;
+
+    if (actual.id === siguiente.id || distTotalRestante < 0.8) {
+      hudInstruction.textContent = `🎉 ¡Llegaste a ${actual.name}!`;
+      hudSub.textContent = `Destino alcanzado · 0 m restantes`;
+      if (arSignTurnIcon) arSignTurnIcon.textContent = "🏁";
+      if (arSignTitle) arSignTitle.textContent = `¡Llegaste a ${actual.name}!`;
+      if (arSignDist) arSignDist.textContent = `Has completado el recorrido`;
+    } else {
+      const mTramo = Math.round(distRestanteTramo);
+      hudInstruction.textContent = `Camina ${mTramo} m hacia ${siguiente.name}`;
+      hudSub.textContent = `${Math.round(distTotalRestante)} m restantes en total · ~${minutos} min`;
+      if (arSignTurnIcon) arSignTurnIcon.textContent = "⬆️";
+      if (arSignTitle) arSignTitle.textContent = `Sigue hacia ${siguiente.name}`;
+      if (arSignDist) {
+        arSignDist.textContent = `${mTramo} m al ${cardinal} (${Math.round(rumboTramo)}°) · Sigue las flechas en el piso`;
+      }
     }
 
-    // Usuario actual (punto verde)
-    const actual = nodosPorId.get(estado.origenId);
-    if (actual) {
-      const [ux, uy] = mundoACanvas(actual.x, actual.z, minimapCanvas.width, minimapCanvas.height);
-      miniCtx.beginPath();
-      miniCtx.arc(ux, uy, 5.5, 0, Math.PI * 2);
-      miniCtx.fillStyle = '#34c759';
-      miniCtx.fill();
-      miniCtx.strokeStyle = '#fff';
-      miniCtx.lineWidth = 1.5;
-      miniCtx.stroke();
+    if (hudCompass) {
+      hudCompass.style.transform = `rotate(${rumboTramo}deg)`;
+    }
+    if (arHeadingText) {
+      arHeadingText.textContent = `🧭 Pasillo: ${Math.round(rumboTramo)}° ${cardinal}`;
+    }
+
+    kpiNodesCount.textContent = String(estado.ruta.length);
+    kpiDistanceMeters.textContent = `${Math.round(estado.distanciaTotal)} m totales`;
+
+    // Lista de paradas
+    stepsList.innerHTML = "";
+    estado.ruta.forEach((nodo, idx) => {
+      const li = document.createElement("li");
+      li.className = `itinerary-item ${idx === estado.indiceActual ? "is-current" : ""}`;
+      let detalle = "Origen";
+      if (idx === estado.ruta.length - 1) detalle = "🎯 Destino";
+      else if (idx > 0) {
+        const d = Math.round(distanciaMetros(estado.ruta[idx - 1], nodo));
+        detalle = `+${d} m`;
+      }
+      li.innerHTML = `
+        <div><span class="itinerary-code">${nodo.id}</span><span>${nodo.name}</span></div>
+        <span>${detalle}</span>
+      `;
+      li.addEventListener("click", () => {
+        estado.indiceActual = idx;
+        estado.progresoTramo = 0;
+        estado.desfaseMiradaGrados = 0;
+        sincronizarCoordenadasUsuarioConProgreso();
+        actualizarHUD();
+        dibujarMapa2D();
+        dibujarMinimapa();
+        actualizarGeometriaFlechas3D();
+      });
+      stepsList.appendChild(li);
+    });
+  }
+
+  // ============================================================================
+  // 7. SIMULACIÓN DE CAMINATA EN VIVO ("▶️ CAMINAR") + PODÓMETRO + GPS REAL
+  // ============================================================================
+  let idIntervaloCaminata = null;
+
+  function iniciarSimulacionCaminata() {
+    if (estado.caminandoSim) return;
+    if (estado.indiceActual >= estado.ruta.length - 1) {
+      estado.indiceActual = 0;
+      estado.progresoTramo = 0;
+      sincronizarCoordenadasUsuarioConProgreso();
+    }
+    estado.caminandoSim = true;
+    btnWalkSim.classList.add("is-walking");
+    btnWalkSimText.textContent = "⏸️ Pausar";
+    locationModeBadge.textContent = "🏃 Caminando en vivo (Simulación)";
+
+    // Avanza suavemente cada 80ms (~7.5 metros por segundo para demostración ágil)
+    idIntervaloCaminata = setInterval(() => {
+      avanzarMetrosEnRuta(0.6);
+    }, 80);
+  }
+
+  function detenerSimulacionCaminata() {
+    estado.caminandoSim = false;
+    if (idIntervaloCaminata) {
+      clearInterval(idIntervaloCaminata);
+      idIntervaloCaminata = null;
+    }
+    btnWalkSim.classList.remove("is-walking");
+    btnWalkSimText.textContent = "▶️ Caminar";
+    locationModeBadge.textContent = estado.gpsActivo
+      ? "🛰️ Ubicación: GPS Activo"
+      : `📍 En ${estado.origenId} (QR + Pasos)`;
+  }
+
+  btnWalkSim.addEventListener("click", () => {
+    if (estado.caminandoSim) {
+      detenerSimulacionCaminata();
+    } else {
+      iniciarSimulacionCaminata();
+    }
+  });
+
+  // Podómetro con acelerómetro del celular (avanza 0.85 m por cada paso real detectado)
+  let ultimoPasoMs = 0;
+  window.addEventListener("devicemotion", (e) => {
+    const acc = e.accelerationIncludingGravity;
+    if (!acc) return;
+    const magnitud = Math.hypot(acc.x || 0, acc.y || 0, acc.z || 0);
+    const ahora = performance.now();
+    if (magnitud > 13.2 && ahora - ultimoPasoMs > 420) {
+      ultimoPasoMs = ahora;
+      estado.pasosDetectados += 1;
+      if (!estado.caminandoSim) {
+        locationModeBadge.textContent = `👣 Paso #${estado.pasosDetectados} detectado`;
+        avanzarMetrosEnRuta(0.85);
+      }
+    }
+  });
+
+  // Brújula / Giroscopio relativo
+  window.addEventListener(
+    "deviceorientation",
+    (e) => {
+      let rumbo = null;
+      if (typeof e.webkitCompassHeading === "number") {
+        rumbo = e.webkitCompassHeading;
+      } else if (typeof e.alpha === "number") {
+        rumbo = (360 - e.alpha) % 360;
+      }
+      if (rumbo !== null) {
+        if (estado.brjSensorBase === null) {
+          estado.brjSensorBase = rumbo;
+        }
+        estado.brjSensorActual = rumbo;
+      }
+    },
+    true
+  );
+
+  // Botón "🎯 Centrar flechas frente a mí"
+  btnAlignArrows.addEventListener("click", () => {
+    estado.desfaseMiradaGrados = 0;
+    estado.brjSensorBase = estado.brjSensorActual;
+    if (arTurnHint) arTurnHint.hidden = true;
+  });
+
+  // GPS Real opcional para cuando el usuario está físicamente dentro del campus IBERO Santa Fe
+  // Coordenadas centrales aproximadas de la IBERO CDMX: Lat 19.3705, Lon -99.2636
+  const IBERO_LAT0 = 19.3705;
+  const IBERO_LON0 = -99.2636;
+  btnToggleGps.addEventListener("click", () => {
+    if (!("geolocation" in navigator)) {
+      alert("Tu navegador no soporta geolocalización GPS.");
+      return;
+    }
+    if (estado.gpsActivo) {
+      navigator.geolocation.clearWatch(estado.gpsWatchId);
+      estado.gpsActivo = false;
+      btnToggleGps.textContent = "🛰️ Activar GPS Real";
+      locationModeBadge.textContent = "📍 Modo: QR + Pasos";
+      return;
+    }
+
+    estado.gpsActivo = true;
+    btnToggleGps.textContent = "🛰️ GPS Activo (Toca para apagar)";
+    locationModeBadge.textContent = "🛰️ Buscando señal GPS...";
+
+    estado.gpsWatchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        // Convertir diferencia de lat/lon a metros respecto al centro de la IBERO
+        const dxMetros = (longitude - IBERO_LON0) * 111320 * Math.cos((IBERO_LAT0 * Math.PI) / 180);
+        const dzMetros = (latitude - IBERO_LAT0) * 110540;
+
+        // Verificar si está dentro de un radio razonable (600 m) del campus IBERO
+        if (Math.hypot(dxMetros, dzMetros) < 600) {
+          estado.usuarioX = dxMetros;
+          estado.usuarioZ = dzMetros;
+          locationModeBadge.textContent = `🛰️ GPS IBERO (±${Math.round(pos.coords.accuracy)}m)`;
+          dibujarMapa2D();
+          dibujarMinimapa();
+        } else {
+          locationModeBadge.textContent = "📍 Fuera de IBERO (Usa QR o ▶️ Caminar)";
+        }
+      },
+      () => {
+        locationModeBadge.textContent = "📍 Sin GPS (Usa QR o ▶️ Caminar)";
+      },
+      { enableHighAccuracy: true, maximumAge: 2000 }
+    );
+  });
+
+  // ============================================================================
+  // 8. CÁMARA WEB Y ESCÁNER DE CÓDIGOS QR EN VIVO
+  // ============================================================================
+  let streamCamara = null;
+  let detectorQR = null;
+  if ("BarcodeDetector" in window) {
+    try {
+      detectorQR = new window.BarcodeDetector({ formats: ["qr_code"] });
+    } catch (_) {
+      detectorQR = null;
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // 5. Control de Cámara y Cambio de Pestañas (Mapa 2D / Cámara AR)
-  // ---------------------------------------------------------------------------
-  async function activarModoAR() {
-    estado.modoVista = 'ar';
-    document.body.className = 'mode-ar';
-    tabMap.classList.remove('is-active');
-    tabMap.setAttribute('aria-selected', 'false');
-    tabAR.classList.add('is-active');
-    tabAR.setAttribute('aria-selected', 'true');
-
-    viewMap.classList.remove('is-visible');
-    viewAR.classList.add('is-visible');
-
-    initThreeAR();
-
-    // Encender la cámara trasera del celular
+  async function activarCamara(videoEl) {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
     try {
-      if (!estado.cameraStream) {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: 'environment' } },
+      if (!streamCamara) {
+        streamCamara = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: "environment" } },
           audio: false
         });
-        estado.cameraStream = stream;
-        arVideo.srcObject = stream;
       }
+      videoEl.srcObject = streamCamara;
+      await videoEl.play();
     } catch (err) {
-      console.warn('Cámara trasera no disponible:', err);
-      arHeadingText.textContent = 'Modo Simulación AR (Cámara apagada)';
+      console.warn("Cámara en modo simulado (sin permiso o en PC sin webcam):", err);
     }
-
-    actualizarOrientacionAR();
-    actualizarFlechas3DAR();
   }
 
-  function activarModoMapa() {
-    estado.modoVista = 'mapa';
-    document.body.className = 'mode-map';
-    tabAR.classList.remove('is-active');
-    tabAR.setAttribute('aria-selected', 'false');
-    tabMap.classList.add('is-active');
-    tabMap.setAttribute('aria-selected', 'true');
-
-    viewAR.classList.remove('is-visible');
-    viewMap.classList.add('is-visible');
-
-    // Apagar cámara para ahorrar batería
-    if (estado.cameraStream) {
-      estado.cameraStream.getTracks().forEach((t) => t.stop());
-      estado.cameraStream = null;
+  function fijarUbicacionPorNodo(idNodo, fuente = "QR") {
+    if (!nodosPorId.has(idNodo)) return;
+    detenerSimulacionCaminata();
+    estado.origenId = idNodo;
+    selectOrigen.value = idNodo;
+    if (estado.destinoId === idNodo) {
+      estado.destinoId = idNodo === "N10" ? "N07" : "N10";
+      selectDestino.value = estado.destinoId;
     }
+    const nodo = nodosPorId.get(idNodo);
+    locationModeBadge.textContent = `📍 ${fuente}: ${nodo.id} ${nodo.name}`;
+    recalcularRutaCompleta();
+    centrarMapaEnUsuario();
 
-    requestAnimationFrame(dibujarMapa2D);
-    centrarMapaEnRuta();
+    const dlg = document.getElementById("dialogQrScanner");
+    if (dlg && dlg.open) dlg.close();
   }
 
-  function centrarMapaEnRuta() {
-    const orig = nodosPorId.get(estado.origenId);
-    const dest = nodosPorId.get(estado.destinoId);
-    if (!orig || !dest) return;
-    const [x1, y1] = mundoACanvas(orig.x, orig.z);
-    const [x2, y2] = mundoACanvas(dest.x, dest.z);
-    mapViewport.scrollTo({
-      left: Math.max(0, (x1 + x2) / 2 - mapViewport.clientWidth / 2),
-      top: Math.max(0, (y1 + y2) / 2 - mapViewport.clientHeight / 2),
-      behavior: 'smooth'
-    });
-  }
-
-  // ---------------------------------------------------------------------------
-  // 6. Códigos QR (Lectura en Vivo y Tarjetas)
-  // ---------------------------------------------------------------------------
-  function procesarLecturaQr(texto) {
-    if (!texto) return;
-    let nodoId = texto.trim().toUpperCase();
+  // Escaneo automático periódico sobre el video activo si el navegador soporta BarcodeDetector
+  setInterval(async () => {
+    if (!detectorQR || !streamCamara) return;
+    const videoActivo = document.getElementById("dialogQrScanner")?.open
+      ? document.getElementById("qrScannerVideo")
+      : document.getElementById("arVideo");
+    if (!videoActivo || videoActivo.readyState < 2) return;
     try {
-      const u = new URL(texto, window.location.origin);
-      const param = u.searchParams.get('nodo') || u.searchParams.get('origen');
-      if (param) nodoId = param.toUpperCase();
-    } catch (_) {
-      const match = nodoId.match(/N\d{2}/);
-      if (match) nodoId = match[0];
-    }
-
-    if (nodosPorId.has(nodoId)) {
-      estado.origenId = nodoId;
-      actualizarRuta();
-      cerrarDialogoScanner();
-      return true;
-    }
-    return false;
-  }
-
-  async function abrirDialogoScanner() {
-    dialogQrScanner.showModal();
-    generarChipsSimulacion();
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: 'environment' } }
-      });
-      estado.scannerStream = stream;
-      qrScannerVideo.srcObject = stream;
-      scannerStatusText.textContent = 'Buscando código QR...';
-
-      if ('BarcodeDetector' in window) {
-        const detector = new window.BarcodeDetector({ formats: ['qr_code'] });
-        estado.scannerTimer = setInterval(async () => {
-          try {
-            const codes = await detector.detect(qrScannerVideo);
-            if (codes.length > 0 && codes[0].rawValue) {
-              procesarLecturaQr(codes[0].rawValue);
-            }
-          } catch (_) {}
-        }, 300);
+      const codigos = await detectorQR.detect(videoActivo);
+      if (codigos && codigos.length > 0) {
+        const texto = (codigos[0].rawValue || "").trim();
+        const match = texto.match(/N\d{2}/i);
+        if (match) {
+          const idDetectado = match[0].toUpperCase();
+          if (nodosPorId.has(idDetectado) && idDetectado !== estado.origenId) {
+            fijarUbicacionPorNodo(idDetectado, "QR Escaneado");
+          }
+        }
       }
-    } catch (_) {
-      scannerStatusText.textContent = 'Cámara no disponible. Usa los botones rápidos abajo:';
-    }
-  }
-
-  function cerrarDialogoScanner() {
-    if (estado.scannerTimer) clearInterval(estado.scannerTimer);
-    if (estado.scannerStream) {
-      estado.scannerStream.getTracks().forEach((t) => t.stop());
-      estado.scannerStream = null;
-    }
-    dialogQrScanner.close();
-  }
-
-  function generarChipsSimulacion() {
-    simulatedQrChips.innerHTML = '';
-    DATA.nodos.forEach((n) => {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'preset-pill';
-      btn.textContent = `${n.id} · ${n.nombre}`;
-      btn.addEventListener('click', () => procesarLecturaQr(n.id));
-      simulatedQrChips.appendChild(btn);
-    });
-  }
-
-  function generarTarjetasImprimibles() {
-    qrCardsGrid.innerHTML = '';
-    const base = window.location.href.split('?')[0];
-
-    DATA.nodos.forEach((n) => {
-      const card = document.createElement('div');
-      card.className = 'qr-card-item';
-      const box = document.createElement('div');
-      const url = `${base}?nodo=${n.id}`;
-
-      card.innerHTML = `
-        <strong style="color:var(--accent);font-size:0.85rem;">${n.id}</strong>
-        <span style="font-size:0.75rem;font-weight:700;">${n.nombre}</span>
-      `;
-      card.appendChild(box);
-
-      const btnTest = document.createElement('button');
-      btnTest.className = 'chip-sm';
-      btnTest.style.color = 'var(--text-primary)';
-      btnTest.style.borderColor = 'var(--border)';
-      btnTest.textContent = 'Probar';
-      btnTest.addEventListener('click', () => {
-        procesarLecturaQr(n.id);
-        dialogQrCards.close();
-      });
-      card.appendChild(btnTest);
-      qrCardsGrid.appendChild(card);
-
-      if (window.QRCode) {
-        new window.QRCode(box, { text: url, width: 100, height: 100, colorDark: '#000', colorLight: '#fff' });
-      }
-    });
-  }
-
-  // ---------------------------------------------------------------------------
-  // 7. Sincronización MQTT con Meta Quest 3S (Opcional)
-  // ---------------------------------------------------------------------------
-  function publicarMqtt() {
-    if (!estado.mqttClient) return;
-    const actual = nodosPorId.get(estado.origenId);
-    const destino = nodosPorId.get(estado.destinoId);
-    const payload = {
-      timestamp: Date.now(),
-      estoyEn: actual.nombre,
-      destino: destino.nombre,
-      ruta: estado.ruta
-    };
-    try {
-      estado.mqttClient.publish('argos/campus/navegacion', JSON.stringify(payload));
     } catch (_) {}
-  }
+  }, 900);
 
-  // ---------------------------------------------------------------------------
-  // 8. Inicialización
-  // ---------------------------------------------------------------------------
-  function init() {
-    // Poblar desplegables
-    DATA.nodos.forEach((n) => {
-      selectOrigen.add(new Option(`${n.id} — ${n.nombre}`, n.id));
-      selectDestino.add(new Option(`${n.id} — ${n.nombre}`, n.id));
+  // ============================================================================
+  // 9. POBLAR SELECTORES, TARJETAS QR Y EVENTOS DE INTERFAZ
+  // ============================================================================
+  function inicializarControles() {
+    datos.nodes.forEach((nodo) => {
+      const optO = document.createElement("option");
+      optO.value = nodo.id;
+      optO.textContent = `${nodo.id} — ${nodo.name}`;
+      selectOrigen.appendChild(optO);
+
+      const optD = document.createElement("option");
+      optD.value = nodo.id;
+      optD.textContent = `${nodo.id} — ${nodo.name}`;
+      selectDestino.appendChild(optD);
     });
 
-    // Parámetros por URL
-    const params = new URLSearchParams(window.location.search);
-    const pNodo = (params.get('nodo') || params.get('origen') || '').toUpperCase();
-    if (nodosPorId.has(pNodo)) estado.origenId = pNodo;
+    selectOrigen.value = estado.origenId;
+    selectDestino.value = estado.destinoId;
 
-    // Listeners de interfaz
-    tabMap.addEventListener('click', activarModoMapa);
-    tabAR.addEventListener('click', activarModoAR);
-    arMinimap.addEventListener('click', activarModoMapa);
-
-    selectOrigen.addEventListener('change', () => {
-      estado.origenId = selectOrigen.value;
-      actualizarRuta();
+    selectOrigen.addEventListener("change", () => {
+      fijarUbicacionPorNodo(selectOrigen.value, "Selector");
     });
 
-    selectDestino.addEventListener('change', () => {
+    selectDestino.addEventListener("change", () => {
       estado.destinoId = selectDestino.value;
-      actualizarRuta();
+      recalcularRutaCompleta();
     });
 
-    document.querySelectorAll('[data-preset]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const [orig, dest] = btn.getAttribute('data-preset').split(',');
-        estado.origenId = orig;
-        estado.destinoId = dest;
-        actualizarRuta();
+    btnInvert.addEventListener("click", () => {
+      const temp = estado.origenId;
+      estado.origenId = estado.destinoId;
+      estado.destinoId = temp;
+      selectOrigen.value = estado.origenId;
+      selectDestino.value = estado.destinoId;
+      recalcularRutaCompleta();
+    });
+
+    btnNextNode.addEventListener("click", () => {
+      if (estado.indiceActual < estado.ruta.length - 1) {
+        estado.indiceActual += 1;
+        estado.progresoTramo = 0;
+        estado.desfaseMiradaGrados = 0;
+      } else {
+        estado.indiceActual = 0;
+        estado.progresoTramo = 0;
+      }
+      sincronizarCoordenadasUsuarioConProgreso();
+      actualizarHUD();
+      dibujarMapa2D();
+      dibujarMinimapa();
+      actualizarGeometriaFlechas3D();
+    });
+
+    document.querySelectorAll("[data-preset]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const [o, d] = btn.dataset.preset.split(",");
+        estado.origenId = o;
+        estado.destinoId = d;
+        selectOrigen.value = o;
+        selectDestino.value = d;
+        recalcularRutaCompleta();
       });
     });
 
-    btnNextNode.addEventListener('click', () => {
-      if (estado.ruta.length > 1) {
-        estado.origenId = estado.ruta[1];
-        actualizarRuta();
+    // Cambiar entre pestaña Cámara AR y Mapa 2D
+    function cambiarVista(modo) {
+      estado.modoVista = modo;
+      const esAR = modo === "ar";
+      tabAR.classList.toggle("is-active", esAR);
+      tabMap.classList.toggle("is-active", !esAR);
+      tabAR.setAttribute("aria-selected", String(esAR));
+      tabMap.setAttribute("aria-selected", String(!esAR));
+      viewAR.classList.toggle("is-visible", esAR);
+      viewMap.classList.toggle("is-visible", !esAR);
+
+      if (esAR) {
+        activarCamara(document.getElementById("arVideo"));
+        estado.desfaseMiradaGrados = 0;
+      } else {
+        setTimeout(centrarMapaEnUsuario, 80);
       }
-    });
+    }
 
-    btnInvert.addEventListener('click', () => {
-      const t = estado.origenId;
-      estado.origenId = estado.destinoId;
-      estado.destinoId = t;
-      actualizarRuta();
-    });
+    tabAR.addEventListener("click", () => cambiarVista("ar"));
+    tabMap.addEventListener("click", () => cambiarVista("map"));
+    document.getElementById("arMinimap").addEventListener("click", () => cambiarVista("map"));
 
-    btnCenterRoute.addEventListener('click', centrarMapaEnRuta);
-    btnToggleLabels.addEventListener('click', () => {
-      estado.mostrarNombres = !estado.mostrarNombres;
+    btnCenterRoute.addEventListener("click", centrarMapaEnUsuario);
+    btnToggleLabels.addEventListener("click", () => {
+      estado.mostrarEtiquetas = !estado.mostrarEtiquetas;
       dibujarMapa2D();
     });
 
-    btnOpenQrModal.addEventListener('click', abrirDialogoScanner);
-    btnScanOrigin.addEventListener('click', abrirDialogoScanner);
-    btnCloseQrDialog.addEventListener('click', cerrarDialogoScanner);
-
-    btnOpenPrintModal.addEventListener('click', () => {
-      generarTarjetasImprimibles();
-      dialogQrCards.showModal();
-    });
-    btnClosePrintDialog.addEventListener('click', () => dialogQrCards.close());
-    btnPrintCards.addEventListener('click', () => window.print());
-
-    btnCalibrateHeading.addEventListener('click', () => {
-      estado.rumboManualDeg = (estado.rumboManualDeg + 45) % 360;
-      actualizarOrientacionAR();
+    // Poblar los 20 chips de simulación QR ("Estoy aquí")
+    const chipsContainer = document.getElementById("simulatedQrChips");
+    datos.nodes.forEach((nodo) => {
+      const chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = "preset-pill";
+      chip.textContent = `${nodo.id} · ${nodo.name}`;
+      chip.addEventListener("click", () => fijarUbicacionPorNodo(nodo.id, "QR"));
+      chipsContainer.appendChild(chip);
     });
 
-    // Toque sobre el mapa 2D para cambiar nodo
-    canvasMap.addEventListener('click', (e) => {
-      const rect = canvasMap.getBoundingClientRect();
-      const clickX = ((e.clientX - rect.left) / rect.width) * canvasMap.width;
-      const clickY = ((e.clientY - rect.top) / rect.height) * canvasMap.height;
+    // Poblar las 20 tarjetas QR imprimibles
+    const qrGrid = document.getElementById("qrCardsGrid");
+    datos.nodes.forEach((nodo) => {
+      const card = document.createElement("div");
+      card.className = "qr-card-item";
+      const qrBox = document.createElement("div");
+      card.innerHTML = `
+        <strong style="font-size:0.8rem;color:var(--accent);">${nodo.id}</strong>
+        <span style="font-size:0.75rem;font-weight:600;">${nodo.name}</span>
+      `;
+      card.appendChild(qrBox);
 
-      let mejor = null;
-      let dMin = 22;
-      DATA.nodos.forEach((n) => {
-        const [cx, cy] = mundoACanvas(n.x, n.z);
-        const d = Math.hypot(clickX - cx, clickY - cy);
-        if (d < dMin) {
-          dMin = d;
-          mejor = n;
-        }
+      const btnAqui = document.createElement("button");
+      btnAqui.type = "button";
+      btnAqui.className = "preset-pill";
+      btnAqui.style.fontSize = "0.7rem";
+      btnAqui.textContent = "📍 Ubicarse aquí";
+      btnAqui.addEventListener("click", () => {
+        fijarUbicacionPorNodo(nodo.id, "Tarjeta QR");
+        document.getElementById("dialogQrCards")?.close();
       });
+      card.appendChild(btnAqui);
+      qrGrid.appendChild(card);
 
-      if (mejor) {
-        if (e.shiftKey) estado.destinoId = mejor.id;
-        else estado.origenId = mejor.id;
-        actualizarRuta();
+      if (typeof QRCode !== "undefined") {
+        new QRCode(qrBox, {
+          text: `ARGOS:${nodo.id}`,
+          width: 100,
+          height: 100,
+          colorDark: "#1c1c1e",
+          colorLight: "#ffffff"
+        });
       }
     });
 
-    // Conectar MQTT silencioso si hay broker local
-    try {
-      if (window.mqtt) {
-        estado.mqttClient = window.mqtt.connect('ws://localhost:9001', { reconnectPeriod: 5000 });
-      }
-    } catch (_) {}
+    document.getElementById("btnPrintCards")?.addEventListener("click", () => window.print());
 
-    actualizarRuta();
-    requestAnimationFrame(dibujarMapa2D);
-    setTimeout(centrarMapaEnRuta, 200);
+    // Colapsar/expandir detalles de la tarjeta inferior tocando la barra superior
+    const sheetDetails = document.getElementById("sheetDetails");
+    document.getElementById("sheetHandle")?.addEventListener("click", () => {
+      const oculto = sheetDetails.style.display === "none";
+      sheetDetails.style.display = oculto ? "flex" : "none";
+    });
   }
 
-  window.addEventListener('DOMContentLoaded', init);
+  // ============================================================================
+  // 10. FALLBACKS WEB MODERNOS (DECLARATIVE DIALOG, LIGHT DISMISS, 2D PANNING)
+  // ============================================================================
+  function configurarFallbacksWebModernos() {
+    // 1. Fallback para commandfor / command en navegadores sin Invoker Commands nativo
+    if (!("commandForElement" in HTMLButtonElement.prototype)) {
+      document.querySelectorAll("[commandfor]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const target = document.getElementById(btn.getAttribute("commandfor"));
+          const cmd = btn.getAttribute("command");
+          if (!target) return;
+          if (cmd === "show-modal" && typeof target.showModal === "function") {
+            target.showModal();
+            if (target.id === "dialogQrScanner") {
+              activarCamara(document.getElementById("qrScannerVideo"));
+            }
+          } else if (cmd === "close" && typeof target.close === "function") {
+            target.close();
+          }
+        });
+      });
+    } else {
+      document.getElementById("btnOpenQrModal")?.addEventListener("click", () => {
+        activarCamara(document.getElementById("qrScannerVideo"));
+      });
+      document.getElementById("btnScanOrigin")?.addEventListener("click", () => {
+        activarCamara(document.getElementById("qrScannerVideo"));
+      });
+    }
+
+    // 2. Fallback para closedby="any" (light-dismiss-a-dialog)
+    if (!("closedBy" in HTMLDialogElement.prototype)) {
+      document.querySelectorAll('dialog[closedby="any"]').forEach((dlg) => {
+        dlg.addEventListener("click", (e) => {
+          if (e.target === dlg) dlg.close();
+        });
+      });
+    }
+
+    // 3. Arrastre 2D (2d-panning) con puntero sobre el contenedor del mapa
+    let arrastrandoMapa = false;
+    let inicioX = 0;
+    let inicioY = 0;
+    let scrollIzq = 0;
+    let scrollArr = 0;
+
+    mapViewport.addEventListener("pointerdown", (e) => {
+      arrastrandoMapa = true;
+      inicioX = e.clientX;
+      inicioY = e.clientY;
+      scrollIzq = mapViewport.scrollLeft;
+      scrollArr = mapViewport.scrollTop;
+    });
+
+    window.addEventListener("pointermove", (e) => {
+      if (!arrastrandoMapa) return;
+      mapViewport.scrollLeft = scrollIzq - (e.clientX - inicioX);
+      mapViewport.scrollTop = scrollArr - (e.clientY - inicioY);
+    });
+
+    window.addEventListener("pointerup", () => {
+      arrastrandoMapa = false;
+    });
+  }
+
+  // ============================================================================
+  // 11. TELEMETRÍA MQTT OPCIONAL (SINCRONIZACIÓN CON META QUEST 3S / PRÁCTICA 6)
+  // ============================================================================
+  let clienteMqtt = null;
+  function publicarEventoMQTT() {
+    if (typeof mqtt === "undefined") return;
+    try {
+      if (!clienteMqtt) {
+        clienteMqtt = mqtt.connect("wss://broker.emqx.io:8084/mqtt");
+      }
+      if (clienteMqtt && clienteMqtt.connected) {
+        clienteMqtt.publish(
+          "ibero/argos/navegacion",
+          JSON.stringify({
+            origen: estado.origenId,
+            destino: estado.destinoId,
+            usuarioX: Math.round(estado.usuarioX * 10) / 10,
+            usuarioZ: Math.round(estado.usuarioZ * 10) / 10,
+            distanciaRestante: Math.round(calcularDistanciaTotalRestante()),
+            timestamp: Date.now()
+          })
+        );
+      }
+    } catch (_) {}
+  }
+
+  // ============================================================================
+  // 12. ARRANQUE INMEDIATO EN MODO CÁMARA AR CON FLECHAS 3D VISIBLES
+  // ============================================================================
+  inicializarControles();
+  configurarFallbacksWebModernos();
+  inicializarEscena3DAR();
+  recalcularRutaCompleta();
+  activarCamara(document.getElementById("arVideo"));
 })();
