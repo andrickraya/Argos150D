@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="es">
   <head>
     <meta charset="utf-8" />
@@ -45,7 +45,7 @@
         top: max(10px, env(safe-area-inset-top));
         left: 10px;
         right: 10px;
-        z-index: 50;
+        z-index: 100;
         display: flex;
         align-items: center;
         justify-content: space-between;
@@ -149,7 +149,7 @@
       }
 
       /* CONTENEDOR DE VISTAS */
-      .main-viewport {
+      .main-viewport { z-index: 1;
         position: fixed;
         inset: 0;
         width: 100%;
@@ -335,7 +335,7 @@
         bottom: 0;
         left: 0;
         right: 0;
-        z-index: 45;
+        z-index: 100;
         background: var(--surface);
         backdrop-filter: blur(20px);
         -webkit-backdrop-filter: blur(20px);
@@ -786,7 +786,1392 @@
     </dialog>
 
     <!-- DATOS Y LÓGICA INTEGRADOS (SIN CACHÉ DESINCRONIZADO NI SCRIPTS BLOQUEANTES) -->
-    <script src="campus_data.js?v=5"></script>
-    <script src="app.js?v=5"></script>
+    <script>
+// Datos espaciales del Campus IBERO CDMX generados a partir de map.osm y lugares_propios.csv
+// Convención: 1 unidad = 1 metro | X = Este | Z = Norte | Origen (0,0) = (19.37024335, -99.26414455)
+
+window.ARGOS_CAMPUS_DATA = {
+  origen: { lat: 19.37024335, lon: -99.26414455 },
+  nodos: [
+    { id: "N01", nombre: "Puerta 3", categoria: "Acceso", x: -22.29, z: 20.04, lat: 19.370423, lon: -99.264357, piso: "PB", desc: "Acceso peatonal poniente junto a la Biblioteca" },
+    { id: "N02", nombre: "Biblioteca FXC", categoria: "Académico", x: -19.00, z: 42.00, lat: 19.370621, lon: -99.264325, piso: "PB", desc: "Entrada principal de la Biblioteca Francisco Xavier Clavigero" },
+    { id: "N03", nombre: "Escultura de Lobos", categoria: "Referencia", x: -32.00, z: 18.00, lat: 19.370405, lon: -99.264449, piso: "PB", desc: "Explanada de la Escultura de Lobos en Puerta 3" },
+    { id: "N04", nombre: "Centro de Meditación", categoria: "Referencia", x: -20.00, z: -28.00, lat: 19.369992, lon: -99.264335, piso: "PB", desc: "Jardín y acceso al Centro de Meditación" },
+    { id: "N05", nombre: "Pasillo Poniente Norte", categoria: "Pasillo QR", x: -22.00, z: 95.00, lat: 19.371097, lon: -99.264354, piso: "PB", desc: "Corredor poniente que conecta Biblioteca con el Ala Norte" },
+    { id: "N06", nombre: "Acceso Ala Norte (Edif. C)", categoria: "Pasillo QR", x: 38.00, z: 160.00, lat: 19.371681, lon: -99.263783, piso: "PB", desc: "Esquina noroeste de entrada al corredor del Salón C" },
+    { id: "N07", nombre: "Salón C", categoria: "Académico", x: 81.55, z: 154.00, lat: 19.371627, lon: -99.263368, piso: "PB", desc: "Puerta exterior del Salón C en el corredor norte" },
+    { id: "N08", nombre: "Paso Noreste (Hacia El Cubo)", categoria: "Pasillo QR", x: 165.00, z: 130.00, lat: 19.371411, lon: -99.262573, piso: "PB", desc: "Paso abierto al oriente que conecta el corredor del Salón C con El Cubo" },
+    { id: "N09", nombre: "Patio El Cubo", categoria: "Pasillo QR", x: 115.00, z: 132.00, lat: 19.371429, lon: -99.263050, piso: "PB", desc: "Explanada exterior de acceso a la Cafetería El Cubo" },
+    { id: "N10", nombre: "Cafetería El Cubo", categoria: "Cafetería", x: 77.67, z: 115.84, lat: 19.371284, lon: -99.263405, piso: "PB", desc: "Zona de mesas y barra de la Cafetería El Cubo" },
+    { id: "N11", nombre: "Pasillo Central Norte (Edif. A-B)", categoria: "Pasillo QR", x: 124.00, z: 80.00, lat: 19.370962, lon: -99.262964, piso: "PB", desc: "Tramo norte del corredor diagonal entre los edificios centrales" },
+    { id: "N12", nombre: "Pasillo Central Sur (Edif. A-B)", categoria: "Pasillo QR", x: 81.00, z: 35.00, lat: 19.370558, lon: -99.263373, piso: "PB", desc: "Tramo sur del corredor diagonal entre edificios centrales" },
+    { id: "N13", nombre: "Cruce Central / Auditorio", categoria: "Pasillo QR", x: 22.00, z: -32.00, lat: 19.369956, lon: -99.263935, piso: "PB", desc: "Intersección central junto al edificio circular" },
+    { id: "N14", nombre: "Explanada Central", categoria: "Pasillo QR", x: 20.00, z: -98.00, lat: 19.369363, lon: -99.263954, piso: "PB", desc: "Andador principal hacia la explanada de La Karpa" },
+    { id: "N15", nombre: "La Karpa", categoria: "Cafetería", x: 35.29, z: -161.52, lat: 19.368792, lon: -99.263809, piso: "PB", desc: "Centro de la rotonda y zona de comida La Karpa" },
+    { id: "N16", nombre: "Comedores / Moshi Moshi", categoria: "Cafetería", x: 20.00, z: -147.15, lat: 19.368922, lon: -99.263954, piso: "PB", desc: "Área de restaurantes al norte de La Karpa" },
+    { id: "N17", nombre: "Entrada Sur Ibero (Lumen T018)", categoria: "Acceso", x: 43.80, z: -233.89, lat: 19.368142, lon: -99.263728, piso: "PB", desc: "Acceso peatonal sur sobre Prolongación Vasco de Quiroga" },
+    { id: "N18", nombre: "Starbucks", categoria: "Cafetería", x: 135.06, z: -229.13, lat: 19.368185, lon: -99.262859, piso: "PB", desc: "Cafetería Starbucks en la esquina suroriente" },
+    { id: "N19", nombre: "Paso a Gimnasio", categoria: "Deportes", x: -43.00, z: -55.70, lat: 19.369743, lon: -99.264554, piso: "PB", desc: "Andador hacia la zona deportiva y gimnasio" },
+    { id: "N20", nombre: "Canchas Deportivas", categoria: "Deportes", x: -85.00, z: -175.00, lat: 19.368671, lon: -99.264954, piso: "PB", desc: "Zona de canchas deportivas del campus" }
+  ],
+  aristas: [
+    ["N01", "N02"], ["N01", "N03"], ["N01", "N04"], ["N01", "N05"],
+    ["N02", "N05"], ["N02", "N03"],
+    ["N03", "N04"], ["N03", "N19"],
+    ["N04", "N13"], ["N04", "N19"],
+    ["N05", "N06"],
+    ["N06", "N07"],
+    ["N07", "N08"],
+    ["N08", "N09"], ["N08", "N11"],
+    ["N09", "N10"], ["N09", "N11"],
+    ["N11", "N12"],
+    ["N12", "N13"],
+    ["N13", "N14"],
+    ["N14", "N16"], ["N14", "N15"], ["N14", "N19"],
+    ["N15", "N16"], ["N15", "N17"], ["N15", "N18"],
+    ["N17", "N18"], ["N17", "N20"],
+    ["N19", "N20"]
+  ],
+  poligonos: [{"tipo":"ibero","nombre":"ibero","pts":[[215.9,153.7],[29.1,198.9],[-31.2,138.6],[-58.4,111.4],[-58.7,64.7],[37.7,167.5],[194.2,129.7],[215.9,153.7]]},{"tipo":"ibero","nombre":"ibero","pts":[[-54.2,-100.9],[-10.4,-53.4],[-12.4,93.2],[18.2,124.9],[71.2,75.5],[126.6,133.2],[158,124.9],[20.7,-17.7],[20.6,21.2],[50.2,52.3],[20.5,82.8],[10,71.8],[13.2,-72.2],[-33.8,-121],[-54.2,-100.9]]},{"tipo":"ibero","nombre":"ibero","pts":[[175.1,122.7],[45,-13.5],[53.9,-21.8],[53.2,-22.6],[49.7,-20.5],[45.9,-19.6],[41.9,-19.8],[38.1,-21.1],[34.9,-23.4],[32.3,-26.8],[30.9,-30.9],[30.8,-35.2],[32.1,-39.3],[34.6,-42.8],[38.2,-45.5],[42.5,-46.9],[47,-46.8],[51.3,-45.3],[54.7,-42.5],[57.1,-38.8],[58.2,-34.5],[57.9,-30.1],[56.2,-26],[62.4,-19.2],[65.6,-22.4],[197.9,117.8],[175.1,122.7]]},{"tipo":"ibero","nombre":"","pts":[[23.5,-113.3],[69.6,-157.7],[35.2,-195.4],[24.3,-183],[31.2,-180.1],[36.4,-176],[40.2,-170.8],[42.8,-163.7],[43.2,-158],[41.9,-151.2],[39.4,-145.8],[35.2,-140.8],[29.9,-137.1],[23.7,-134.9],[23.5,-113.3]]},{"tipo":"ibero","nombre":"","pts":[[16.7,-107],[-35.4,-162],[19.1,-211.9],[18.6,-183.6],[13.9,-183.2],[9.4,-181.9],[2.4,-177.6],[-2.6,-171.7],[-4.6,-167.6],[-5.7,-163.2],[-6.1,-158.8],[-5.7,-154.4],[-4.4,-150.1],[-2.4,-146],[2.1,-140.6],[9.1,-136.2],[13.3,-134.9],[17.6,-134.3],[16.7,-107]]},{"tipo":"edificio","nombre":"Edificio Calakmul","pts":[[240.1,-147.8],[224,-147.9],[224.1,-164.9],[221.3,-164.9],[221.1,-151.9],[217,-149.1],[217.3,-185.6],[221.4,-180.5],[221.3,-169.2],[224.2,-169.1],[224.3,-185.5],[240,-185.3],[240,-188.1],[228,-188.3],[224.8,-192.4],[260.7,-192.4],[257.2,-187.9],[244.2,-188.1],[244.2,-185.3],[260.1,-185.1],[260,-168],[262.6,-168],[262.8,-180.8],[267.1,-183.8],[266.3,-147.4],[262.4,-149.9],[262.6,-163.9],[259.9,-163.9],[259.8,-147.6],[244.2,-147.7],[244.2,-144.8],[257.8,-144.6],[260.7,-140.4],[222.9,-141.2],[226.4,-145],[240.1,-144.9],[240.1,-147.8]]},{"tipo":"ibero","nombre":"Library","pts":[[-52.5,48],[-50.6,51.1],[-48.1,53.8],[-44.8,55.9],[-41.1,57.2],[-41.7,62.6],[-32.8,62.5],[-33.4,57.1],[-30.2,55.9],[-27.5,54],[-24.9,51.6],[-23,48.8],[-21.7,45.4],[-21.1,41.7],[-21.5,37.5],[-23,33.6],[-24.7,31],[-26.9,28.7],[-31.4,25.9],[-35.7,24.8],[-45.7,26.9],[-48.3,28.7],[-50.7,31.4],[-51.1,31.9],[-53.3,36.3],[-54,41.4],[-53.6,44.8],[-52.5,48]]},{"tipo":"cancha","nombre":"","pts":[[-80.8,-171.5],[-88,-241.7],[-69.7,-243.6],[-62.6,-173.4],[-80.8,-171.5]]},{"tipo":"estacionamiento","nombre":"","pts":[[-36.8,-49.3],[-141.3,-163],[-178.5,-138],[-167,-89.6],[-158.8,-73.8],[-147.7,-60.2],[-103.8,-16.8],[-103.2,-16.1],[-77.3,-13.8],[-36.8,-49.3]]},{"tipo":"edificio","nombre":"","pts":[[42.5,-66.1],[49.5,-72.4],[82,-101.8],[90.6,-109.5],[232.2,39.8],[278.5,88.7],[283.4,93.9],[279.9,97.8],[282.3,99.4],[284.2,101.6],[285.4,104.1],[286,107.9],[285.2,111.6],[283.3,114.8],[281,116.8],[278.2,118.1],[275.1,118.6],[272.6,118.3],[270.1,117.5],[268,116.1],[266.3,114.3],[265,112.2],[255.1,120.9],[258.4,126],[259.8,128.5],[260.4,131.4],[260.1,134.2],[259.1,136.9],[257.3,139.2],[255,140.8],[252.4,141.8],[249.6,142],[246.8,141.4],[244.3,140],[242,137.5],[240.6,134.4],[235.9,138.6],[42.5,-66.1]]},{"tipo":"estacionamiento","nombre":"","pts":[[29.1,202.1],[185.1,163.2],[137.8,207.7],[107.4,217.8],[80.9,223.5],[29.1,202.1]]},{"tipo":"cancha","nombre":"","pts":[[-184,-222.4],[-164.7,-224.4],[-160.9,-188.6],[-180.3,-186.9],[-184,-222.4]]},{"tipo":"cancha","nombre":"","pts":[[-161.1,-225.1],[-137.6,-227],[-136.9,-220.3],[-133.8,-190.9],[-157.4,-188.8],[-161.1,-225.1]]},{"tipo":"cancha","nombre":"","pts":[[-164.9,-262.1],[-141.5,-264.1],[-138.5,-236.1],[-137.7,-228.6],[-161.2,-226.6],[-164.9,-262.1]]},{"tipo":"cancha","nombre":"","pts":[[-188,-260.8],[-168.2,-262.3],[-164.4,-226.4],[-184.3,-224.8],[-188,-260.8]]},{"tipo":"cancha","nombre":"","pts":[[-100.5,-171.6],[-83.3,-173.4],[-87.2,-211.5],[-104.3,-209.7],[-104.2,-208.7],[-100.5,-171.6]]},{"tipo":"cancha","nombre":"","pts":[[-104.3,-209.7],[-87.2,-211.5],[-91.1,-249.2],[-108.3,-247.4],[-106.9,-234.8],[-104.3,-209.7]]},{"tipo":"ibero","nombre":"","pts":[[-128.9,-178.9],[-108.6,-180.6],[-110.8,-208.3],[-113,-234.1],[-114.8,-256],[-135.1,-254.4],[-133.7,-237.2],[-132.3,-220.5],[-128.9,-178.9]]},{"tipo":"ibero","nombre":"","pts":[[-110.8,-208.3],[-113,-234.1],[-106.9,-234.8],[-104.2,-208.7],[-110.8,-208.3]]},{"tipo":"ibero","nombre":"","pts":[[-132.3,-220.5],[-136.9,-220.3],[-137.6,-227],[-137.7,-228.6],[-138.5,-236.1],[-133.7,-237.2],[-132.3,-220.5]]},{"tipo":"ibero","nombre":"","pts":[[-65.2,-229.7],[-53.2,-241.1],[-66.2,-242.6],[-65.2,-229.7]]},{"tipo":"ibero","nombre":"","pts":[[-196.3,-221],[-201.2,-286],[-215.9,-284.9],[-211,-219.8],[-196.3,-221]]},{"tipo":"ibero","nombre":"","pts":[[47.5,-231],[43.1,-227.4],[40.5,-230.2],[43.8,-233.9],[47.5,-231]]},{"tipo":"ibero","nombre":"","pts":[[20,-249.1],[19.6,-226.8],[-40.4,-169.9],[-42,-190.6],[20,-249.1]]},{"tipo":"estacionamiento","nombre":"","pts":[[283.4,93.9],[297.1,108.4],[307.5,98.5],[310.7,94.4],[313,89],[313.2,82.4],[312,75.8],[118.8,-163.4],[26.8,-81.4],[42.5,-66.1],[49.5,-72.4],[82,-101.8],[90.6,-109.5],[232.2,39.8],[278.5,88.7],[283.4,93.9]]},{"tipo":"ibero","nombre":"","pts":[[-69.5,-116.5],[-48.5,-137.1],[-69,-158],[-89.9,-137.4],[-69.5,-116.5]]},{"tipo":"ibero","nombre":"","pts":[[22.5,-273.2],[12.2,-263.1],[-4,-279.7],[6.3,-289.8],[22.5,-273.2]]},{"tipo":"estacionamiento","nombre":"","pts":[[-9.9,-273.6],[11.7,-251.4],[-58.2,-187.7],[-60.3,-227.8],[-9.9,-273.6]]},{"tipo":"edificio","nombre":"","pts":[[115.5,-295.9],[103.3,-304.7],[102.7,-303.7],[95.8,-310],[88.5,-301.9],[91.3,-299.3],[82.3,-290],[134.3,-236.7],[143.2,-246],[146.9,-242.6],[153.9,-250.5],[150.2,-254.4],[143.4,-261.6],[133.2,-272.5],[139,-278.1],[123.2,-290.6],[117.3,-290.6],[114.2,-293.9],[115.5,-295.9]]},{"tipo":"edificio","nombre":"","pts":[[178.2,-193.8],[185.8,-185.9],[192.3,-192],[206.7,-205.5],[190.5,-222.8],[186.8,-226.9],[183,-229.1],[178.9,-229.5],[174.7,-228.8],[172.7,-223.5],[170.1,-232],[155.3,-218.3],[170.8,-201.7],[172.4,-198.8],[174.6,-196.1],[178.2,-193.8]]},{"tipo":"edificio","nombre":"","pts":[[189.4,-255.6],[213.5,-229.7],[258.2,-270.6],[233.3,-297.7],[189.4,-255.6]]},{"tipo":"edificio","nombre":"","pts":[[-193.1,223.2],[-194.9,227.6],[-201.2,224.9],[-204.2,231.1],[-183.6,239.6],[-179.5,230.4],[-182.1,228.6],[-179,222.6],[-186.4,219.9],[-188.4,223.6],[-190.3,222.7],[-188.5,219.5],[-194.7,216.5],[-197,221.5],[-193.1,223.2]]},{"tipo":"edificio","nombre":"","pts":[[-207.1,210.6],[-204.9,199.5],[-197.7,200.1],[-197.1,197.6],[-198,197.5],[-194.9,181.7],[-187.5,183],[-188.2,186.8],[-183.2,188.2],[-184.2,193.2],[-182.8,194],[-184,198.6],[-179.6,199.5],[-180.4,204.7],[-185.2,203.8],[-185.5,205.5],[-183.1,205.9],[-184.5,211.7],[-173.9,213.7],[-175.7,220.5],[-189.6,218.5],[-189,212.6],[-192.8,211.7],[-193.4,214.7],[-197.5,213.9],[-203.7,213.6],[-203.6,210.9],[-207.1,210.6]]},{"tipo":"edificio","nombre":"","pts":[[-172.3,214.3],[-175.4,227.6],[-171.1,227.7],[-170.9,225],[-159.5,226.8],[-158.3,217.5],[-172.3,214.3]]},{"tipo":"pasto","nombre":"Huerto IBERO José de Acosta, S. J.","pts":[[68,235.6],[35.7,221.9],[32.2,226.3],[57.8,246.4],[68,235.6]]},{"tipo":"ibero","nombre":"centro de meditación","pts":[[-39.4,-29.7],[-36.1,-26],[-32,-24.1],[-27.8,-25.2],[-24.9,-27.5],[-24.3,-32.5],[-26.1,-36.2],[-29.9,-39.5],[-39.4,-29.7]]},{"tipo":"edificio","nombre":"centro de exposición","pts":[[-46.2,15.3],[-17,14.9],[-16.4,2.8],[-46.2,2.4],[-46.2,15.3]]},{"tipo":"edificio","nombre":"","pts":[[-73,59.8],[-84.8,65.4],[-80.8,28.5],[-70.9,33.5],[-73,59.8]]},{"tipo":"pasto","nombre":"","pts":[[-16.7,20],[-22.3,20],[-52.1,20.3],[-87.2,20.1],[-103.8,-16.8],[-77.3,-13.8],[-36.8,-49.3],[-24.5,-58.2],[-15.1,-50.9],[-16.7,20]]},{"tipo":"pasto","nombre":"","pts":[[-86.6,20.5],[-70.9,33.5],[-73,59.8],[-84.8,65.4],[-86.4,83.1],[-90,111],[-83,122.9],[-52.7,159.4],[-31.2,138.6],[-72.3,99.5],[-75.8,80.9],[-66.7,61.1],[-52.5,48],[-53.6,44.8],[-54,41.4],[-53.3,36.3],[-50.7,31.4],[-48.3,28.7],[-45.7,26.9],[-35.7,24.8],[-35.7,24.8],[-22.3,20],[-86.6,20.5]]},{"tipo":"edificio","nombre":"","pts":[[-178.2,157.3],[-173.7,155.8],[-169.6,162.5],[-154.9,157.1],[-171.3,115.5],[-190.6,124.7],[-178.2,157.3]]},{"tipo":"edificio","nombre":"","pts":[[-121.7,-275.5],[-121.1,-266.8],[-126.5,-266.5],[-126.7,-269.2],[-131.1,-268.9],[-130.9,-266.1],[-136.1,-265.7],[-136.7,-274.3],[-131.8,-274.7],[-131.7,-272.5],[-127.2,-272.8],[-127.4,-275.1],[-121.7,-275.5]]}]
+
+};
+
+</script>
+<script>
+(() => {
+  const datos = window.CAMPUS_DATA;
+  if (!datos) {
+    console.error("No se encontró window.CAMPUS_DATA.");
+    return;
+  }
+
+  // ============================================================================
+  // 1. GRAFO DE LOS 20 NODOS CAMINABLES DEL CAMPUS IBERO (DIJKSTRA)
+  // ============================================================================
+  const nodosPorId = new Map(datos.nodes.map((n) => [n.id, n]));
+  const adyacencia = new Map();
+  datos.nodes.forEach((n) => adyacencia.set(n.id, []));
+
+  function distanciaMetros(a, b) {
+    return Math.hypot(b.x - a.x, b.z - a.z);
+  }
+
+  datos.edges.forEach(([u, v]) => {
+    const na = nodosPorId.get(u);
+    const nb = nodosPorId.get(v);
+    if (!na || !nb) return;
+    const peso = distanciaMetros(na, nb);
+    adyacencia.get(u).push({ Vecino: v, Peso: peso });
+    adyacencia.get(v).push({ Vecino: u, Peso: peso });
+  });
+
+  function calcularRutaDijkstra(origenId, destinoId) {
+    const dist = new Map();
+    const previo = new Map();
+    const visitados = new Set();
+
+    datos.nodes.forEach((n) => dist.set(n.id, Infinity));
+    dist.set(origenId, 0);
+
+    while (visitados.size < datos.nodes.length) {
+      let actual = null;
+      let mejor = Infinity;
+      for (const [id, d] of dist.entries()) {
+        if (!visitados.has(id) && d < mejor) {
+          mejor = d;
+          actual = id;
+        }
+      }
+      if (actual === null || actual === destinoId) break;
+      visitados.add(actual);
+
+      for (const arista of adyacencia.get(actual) || []) {
+        if (visitados.has(arista.Vecino)) continue;
+        const nuevo = dist.get(actual) + arista.Peso;
+        if (nuevo < dist.get(arista.Vecino)) {
+          dist.set(arista.Vecino, nuevo);
+          previo.set(arista.Vecino, actual);
+        }
+      }
+    }
+
+    const ruta = [];
+    let cursor = destinoId;
+    if (previo.has(cursor) || cursor === origenId) {
+      while (cursor) {
+        ruta.unshift(nodosPorId.get(cursor));
+        cursor = previo.get(cursor);
+      }
+    }
+    return {
+      ruta,
+      distanciaTotal: dist.get(destinoId) || 0
+    };
+  }
+
+  function calcularRumboGrados(ax, az, bx, bz) {
+    const dx = bx - ax;
+    const dz = bz - az;
+    const rad = Math.atan2(dx, dz);
+    return (rad * (180 / Math.PI) + 360) % 360;
+  }
+
+  function nombrePuntoCardinal(grados) {
+    const dirs = ["Norte", "Noreste", "Este", "Sureste", "Sur", "Suroeste", "Oeste", "Noroeste"];
+    return dirs[Math.round(grados / 45) % 8];
+  }
+
+  function diferenciaAngularGrados(a, b) {
+    return ((a - b + 540) % 360) - 180;
+  }
+
+  // ============================================================================
+  // 2. ESTADO REACTIVO DE NAVEGACIÓN Y UBICACIÓN CONTINUA
+  // ============================================================================
+  const estado = {
+    origenId: "N07",     // Salón C (Aulas B/C)
+    destinoId: "N10",    // Cafetería El Cubo
+    indiceActual: 0,
+    progresoTramo: 0,
+    usuarioX: -88.24,
+    usuarioZ: -9.85,
+    ruta: [],
+    distanciaTotal: 0,
+    mostrarEtiquetas: true,
+    modoVista: "ar",
+    caminandoSim: false,
+    gpsActivo: false,
+    gpsWatchId: null,
+    pasosDetectados: 0,
+    desfaseMiradaGrados: 0,
+    brjSensorBase: null,
+    brjSensorActual: null,
+    menuColapsado: true  // Inicia colapsado para que las flechas 3D se vean completas en el celular
+  };
+
+  // Referencias DOM
+  const tabAR = document.getElementById("tabAR");
+  const tabMap = document.getElementById("tabMap");
+  const viewAR = document.getElementById("viewAR");
+  const viewMap = document.getElementById("viewMap");
+  const locationModeBadge = document.getElementById("locationModeBadge");
+
+  const bottomSheet = document.getElementById("bottomSheet");
+  const btnToggleSheet = document.getElementById("btnToggleSheet");
+  const sheetToggleLabel = document.getElementById("sheetToggleLabel");
+
+  const selectOrigen = document.getElementById("selectOrigen");
+  const selectDestino = document.getElementById("selectDestino");
+  const btnInvert = document.getElementById("btnInvert");
+  const btnNextNode = document.getElementById("btnNextNode");
+  const btnWalkSim = document.getElementById("btnWalkSim");
+  const btnWalkSimText = document.getElementById("btnWalkSimText");
+  const btnToggleGps = document.getElementById("btnToggleGps");
+  const btnCenterRoute = document.getElementById("btnCenterRoute");
+  const btnToggleLabels = document.getElementById("btnToggleLabels");
+  const btnAlignArrows = document.getElementById("btnAlignArrows");
+
+  const hudStepBadge = document.getElementById("hudStepBadge");
+  const hudInstruction = document.getElementById("hudInstruction");
+  const hudSub = document.getElementById("hudSub");
+  const hudCompass = document.getElementById("hudCompass");
+  const arHeadingText = document.getElementById("arHeadingText");
+  const arSignTurnIcon = document.getElementById("arSignTurnIcon");
+  const arSignTitle = document.getElementById("arSignTitle");
+  const arSignDist = document.getElementById("arSignDist");
+  const arTurnHint = document.getElementById("arTurnHint");
+  const arTurnHintText = document.getElementById("arTurnHintText");
+
+  const kpiNodesCount = document.getElementById("kpiNodesCount");
+  const kpiDistanceMeters = document.getElementById("kpiDistanceMeters");
+  const stepsList = document.getElementById("stepsList");
+
+  const arFloorCanvas = document.getElementById("arFloorCanvas");
+  const arCtx = arFloorCanvas.getContext("2d");
+  const campusCanvas = document.getElementById("campusCanvas");
+  const ctx = campusCanvas.getContext("2d");
+  const minimapCanvas = document.getElementById("minimapCanvas");
+  const miniCtx = minimapCanvas.getContext("2d");
+  const mapViewport = document.getElementById("mapViewport");
+
+  const imgMapa = new Image();
+  let mapaCargado = false;
+  imgMapa.onload = () => {
+    mapaCargado = true;
+    dibujarMapa2D();
+  };
+  imgMapa.src = "campus_map.png";
+
+  // ============================================================================
+  // 3. CONTROL DEL MENÚ INFERIOR (ABRIR / BAJAR CON BOTÓN O DESLIZANDO EL DEDO)
+  // ============================================================================
+  function fijarEstadoMenu(colapsado) {
+    estado.menuColapsado = colapsado;
+    bottomSheet.classList.toggle("is-collapsed", colapsado);
+    btnToggleSheet.setAttribute("aria-expanded", String(!colapsado));
+    sheetToggleLabel.textContent = colapsado
+      ? "🔼 Cambiar Origen / Destino (20 Nodos)"
+      : "🔽 Bajar Menú (Ver Piso AR)";
+  }
+
+  btnToggleSheet.addEventListener("click", () => {
+    fijarEstadoMenu(!estado.menuColapsado);
+  });
+
+  // Soporte táctil para deslizar el menú hacia abajo o hacia arriba con el dedo
+  let touchInicioY = null;
+  bottomSheet.addEventListener(
+    "touchstart",
+    (e) => {
+      if (e.touches && e.touches.length === 1) {
+        touchInicioY = e.touches[0].clientY;
+      }
+    },
+    { passive: true }
+  );
+
+  bottomSheet.addEventListener(
+    "touchend",
+    (e) => {
+      if (touchInicioY === null || !e.changedTouches || e.changedTouches.length === 0) return;
+      const dy = e.changedTouches[0].clientY - touchInicioY;
+      if (dy > 35 && !estado.menuColapsado) {
+        fijarEstadoMenu(true); // Deslizó hacia abajo -> ocultar detalles
+      } else if (dy < -35 && estado.menuColapsado) {
+        fijarEstadoMenu(false); // Deslizó hacia arriba -> abrir detalles
+      }
+      touchInicioY = null;
+    },
+    { passive: true }
+  );
+
+  // ============================================================================
+  // 4. CÁLCULO DE POSICIÓN CONTINUA Y AVANCE EN LA RUTA
+  // ============================================================================
+  function obtenerTramoActivo() {
+    if (estado.ruta.length === 0) {
+      const n = nodosPorId.get(estado.origenId) || datos.nodes[0];
+      return { actual: n, siguiente: n, distTramo: 0, distRestanteTramo: 0, rumboTramo: 0 };
+    }
+    const idx = Math.min(estado.indiceActual, estado.ruta.length - 1);
+    const actual = estado.ruta[idx];
+    const siguiente = estado.ruta[Math.min(idx + 1, estado.ruta.length - 1)];
+    const distTramo = distanciaMetros(actual, siguiente);
+    const distRestanteTramo = Math.max(0, distTramo * (1 - estado.progresoTramo));
+    const rumboTramo = distTramo > 0.01
+      ? calcularRumboGrados(estado.usuarioX, estado.usuarioZ, siguiente.x, siguiente.z)
+      : 0;
+    return { actual, siguiente, distTramo, distRestanteTramo, rumboTramo };
+  }
+
+  function calcularDistanciaTotalRestante() {
+    if (estado.ruta.length < 2 || estado.indiceActual >= estado.ruta.length - 1) return 0;
+    const { distRestanteTramo } = obtenerTramoActivo();
+    let total = distRestanteTramo;
+    for (let i = estado.indiceActual + 1; i < estado.ruta.length - 1; i++) {
+      total += distanciaMetros(estado.ruta[i], estado.ruta[i + 1]);
+    }
+    return total;
+  }
+
+  function sincronizarCoordenadasUsuarioConProgreso() {
+    if (estado.ruta.length === 0) return;
+    const actual = estado.ruta[Math.min(estado.indiceActual, estado.ruta.length - 1)];
+    const siguiente = estado.ruta[Math.min(estado.indiceActual + 1, estado.ruta.length - 1)];
+    const t = Math.max(0, Math.min(1, estado.progresoTramo));
+    estado.usuarioX = actual.x + (siguiente.x - actual.x) * t;
+    estado.usuarioZ = actual.z + (siguiente.z - actual.z) * t;
+  }
+
+  function avanzarMetrosEnRuta(metros) {
+    if (estado.ruta.length < 2) return;
+    if (estado.indiceActual >= estado.ruta.length - 1) {
+      estado.indiceActual = 0;
+      estado.progresoTramo = 0;
+    }
+
+    let restantePorAvanzar = metros;
+    while (restantePorAvanzar > 0 && estado.indiceActual < estado.ruta.length - 1) {
+      const a = estado.ruta[estado.indiceActual];
+      const b = estado.ruta[estado.indiceActual + 1];
+      const longTramo = Math.max(0.1, distanciaMetros(a, b));
+      const metrosEnTramo = (1 - estado.progresoTramo) * longTramo;
+
+      if (restantePorAvanzar < metrosEnTramo) {
+        estado.progresoTramo += restantePorAvanzar / longTramo;
+        restantePorAvanzar = 0;
+      } else {
+        restantePorAvanzar -= metrosEnTramo;
+        estado.indiceActual += 1;
+        estado.progresoTramo = 0;
+        estado.desfaseMiradaGrados = 0;
+        estado.brjSensorBase = estado.brjSensorActual;
+      }
+    }
+
+    sincronizarCoordenadasUsuarioConProgreso();
+    actualizarHUD();
+    dibujarMapa2D();
+    dibujarMinimapa();
+
+    if (estado.indiceActual >= estado.ruta.length - 1 && estado.caminandoSim) {
+      detenerSimulacionCaminata();
+    }
+  }
+
+  // ============================================================================
+  // 5. MOTOR 3D NATIVO DE ALTA VISIBILIDAD EN EL PISO (#arFloorCanvas)
+  //    Funciona al 100% en cualquier navegador móvil o PC sin depender de CDNs externos
+  // ============================================================================
+  function ajustarTamanoCanvasAR() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    arFloorCanvas.width = Math.round(w * dpr);
+    arFloorCanvas.height = Math.round(h * dpr);
+    arCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  window.addEventListener("resize", ajustarTamanoCanvasAR);
+  ajustarTamanoCanvasAR();
+
+  // Permitir girar la cámara 3D arrastrando horizontalmente sobre la vista AR
+  let arrastrandoAR = false;
+  let ultimoXAR = 0;
+  arFloorCanvas.addEventListener("pointerdown", (e) => {
+    arrastrandoAR = true;
+    ultimoXAR = e.clientX;
+  });
+  window.addEventListener("pointermove", (e) => {
+    if (!arrastrandoAR) return;
+    const dx = e.clientX - ultimoXAR;
+    ultimoXAR = e.clientX;
+    estado.desfaseMiradaGrados = ((estado.desfaseMiradaGrados - dx * 0.35 + 540) % 360) - 180;
+    dibujarMinimapa();
+  });
+  window.addEventListener("pointerup", () => {
+    arrastrandoAR = false;
+  });
+
+  // Proyecta un punto 3D del piso (xMetros lateral, yMetros altura, zMetros distancia hacia adelante)
+  // a coordenadas de pantalla (sx, sy) ubicadas entre el 40% y el 82% de la altura (arriba del menú compacto)
+  function proyectarPuntoPiso3D(xMetros, yMetros, zMetros, w, h, yawRad) {
+    // Rotar según el giro de la cámara (yawRad)
+    const cosY = Math.cos(yawRad);
+    const sinY = Math.sin(yawRad);
+    const rx = xMetros * cosY - zMetros * sinY;
+    const rz = xMetros * sinY + zMetros * cosY;
+
+    if (rz <= 0.45) return null; // Detrás de la cámara
+
+    const horizonteY = h * 0.39;
+    const alturaCamara = 1.55;
+    const fovEscala = Math.min(w, h) * 0.78;
+
+    const sx = w * 0.5 + (rx / rz) * fovEscala;
+    const sy = horizonteY + ((alturaCamara - yMetros) / rz) * (h * 0.46);
+    const escala = fovEscala / rz;
+
+    return { sx, sy, rz, escala };
+  }
+
+  function renderizarBucleAR(tiempoMs) {
+    requestAnimationFrame(renderizarBucleAR);
+    if (estado.modoVista !== "ar") return;
+
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    arCtx.clearRect(0, 0, w, h);
+
+    // Sincronizar giroscopio/brújula si está disponible
+    if (estado.brjSensorActual !== null && estado.brjSensorBase !== null && !arrastrandoAR) {
+      estado.desfaseMiradaGrados = diferenciaAngularGrados(
+        estado.brjSensorActual,
+        estado.brjSensorBase
+      );
+    }
+
+    const yawRad = (-estado.desfaseMiradaGrados * Math.PI) / 180;
+
+    // Aviso si el usuario giró más de 38° lejos del pasillo
+    if (arTurnHint && arTurnHintText) {
+      if (Math.abs(estado.desfaseMiradaGrados) > 38) {
+        arTurnHint.hidden = false;
+        arTurnHintText.textContent =
+          estado.desfaseMiradaGrados > 0
+            ? "⬅️ Gira a la izquierda o toca '🎯 Centrar flechas'"
+            : "➡️ Gira a la derecha o toca '🎯 Centrar flechas'";
+      } else {
+        arTurnHint.hidden = true;
+      }
+    }
+
+    const { actual, siguiente, distRestanteTramo } = obtenerTramoActivo();
+    const enDestino = actual.id === siguiente.id || distRestanteTramo < 0.8;
+
+    // 1. Dibujar la alfombra 3D perspectiva del pasillo (de z = 1.1m a z = 12.5m)
+    const zCerca = 1.1;
+    const zLejos = 12.5;
+    const anchoMedio = 0.62;
+
+    const pIzqCerca = proyectarPuntoPiso3D(-anchoMedio, 0, zCerca, w, h, yawRad);
+    const pDerCerca = proyectarPuntoPiso3D(anchoMedio, 0, zCerca, w, h, yawRad);
+    const pDerLejos = proyectarPuntoPiso3D(anchoMedio, 0, zLejos, w, h, yawRad);
+    const pIzqLejos = proyectarPuntoPiso3D(-anchoMedio, 0, zLejos, w, h, yawRad);
+
+    if (pIzqCerca && pDerCerca && pDerLejos && pIzqLejos) {
+      const gradCinta = arCtx.createLinearGradient(0, pIzqCerca.sy, 0, pIzqLejos.sy);
+      if (enDestino) {
+        gradCinta.addColorStop(0, "rgba(52, 199, 89, 0.55)");
+        gradCinta.addColorStop(1, "rgba(52, 199, 89, 0.08)");
+      } else {
+        gradCinta.addColorStop(0, "rgba(0, 113, 227, 0.62)");
+        gradCinta.addColorStop(0.7, "rgba(0, 198, 255, 0.35)");
+        gradCinta.addColorStop(1, "rgba(0, 198, 255, 0.05)");
+      }
+
+      arCtx.beginPath();
+      arCtx.moveTo(pIzqCerca.sx, pIzqCerca.sy);
+      arCtx.lineTo(pDerCerca.sx, pDerCerca.sy);
+      arCtx.lineTo(pDerLejos.sx, pDerLejos.sy);
+      arCtx.lineTo(pIzqLejos.sx, pIzqLejos.sy);
+      arCtx.closePath();
+      arCtx.fillStyle = gradCinta;
+      arCtx.fill();
+
+      // Rieles laterales luminosos
+      arCtx.strokeStyle = enDestino ? "#4ade80" : "#38bdf8";
+      arCtx.lineWidth = 3.5;
+      arCtx.beginPath();
+      arCtx.moveTo(pIzqCerca.sx, pIzqCerca.sy);
+      arCtx.lineTo(pIzqLejos.sx, pIzqLejos.sy);
+      arCtx.moveTo(pDerCerca.sx, pDerCerca.sy);
+      arCtx.lineTo(pDerLejos.sx, pDerLejos.sy);
+      arCtx.stroke();
+    }
+
+    // 2. Dibujar 7 Flechas Chevron 3D grandes y extruidas que avanzan por el piso
+    const t = tiempoMs * 0.001;
+    const velocidad = estado.caminandoSim ? 2.6 : 1.25;
+    const numFlechas = 7;
+
+    // Dibujar de atrás hacia adelante para superposición 3D correcta
+    for (let i = numFlechas - 1; i >= 0; i--) {
+      const avanceCiclo = ((t * velocidad + (numFlechas - 1 - i) * 0.16) % 1);
+      const zCentro = 1.35 + i * 1.45 + avanceCiclo * 1.45;
+      if (zCentro > 11.8) continue;
+
+      // Vértices 3D del Chevron sobre el piso (y = 0) y su cara superior extruida (y = 0.06)
+      const punta = proyectarPuntoPiso3D(0, 0.05, zCentro + 0.45, w, h, yawRad);
+      const alaDer = proyectarPuntoPiso3D(0.46, 0.05, zCentro - 0.16, w, h, yawRad);
+      const intDer = proyectarPuntoPiso3D(0.28, 0.05, zCentro - 0.34, w, h, yawRad);
+      const centroInt = proyectarPuntoPiso3D(0, 0.05, zCentro + 0.08, w, h, yawRad);
+      const intIzq = proyectarPuntoPiso3D(-0.28, 0.05, zCentro - 0.34, w, h, yawRad);
+      const alaIzq = proyectarPuntoPiso3D(-0.46, 0.05, zCentro - 0.16, w, h, yawRad);
+
+      if (!punta || !alaDer || !intDer || !centroInt || !intIzq || !alaIzq) continue;
+
+      const pulso = (Math.sin(t * 4.5 - i * 0.7) + 1) * 0.5;
+      const alpha = Math.min(1, Math.max(0.35, 1.15 - zCentro / 12.5));
+
+      // Sombra 3D bajo la flecha para darle volumen sobre el piso real
+      arCtx.save();
+      arCtx.translate(0, 5);
+      arCtx.beginPath();
+      arCtx.moveTo(punta.sx, punta.sy);
+      arCtx.lineTo(alaDer.sx, alaDer.sy);
+      arCtx.lineTo(intDer.sx, intDer.sy);
+      arCtx.lineTo(centroInt.sx, centroInt.sy);
+      arCtx.lineTo(intIzq.sx, intIzq.sy);
+      arCtx.lineTo(alaIzq.sx, alaIzq.sy);
+      arCtx.closePath();
+      arCtx.fillStyle = `rgba(0, 20, 60, ${0.45 * alpha})`;
+      arCtx.fill();
+      arCtx.restore();
+
+      // Cara superior brillante de la flecha 3D
+      arCtx.beginPath();
+      arCtx.moveTo(punta.sx, punta.sy);
+      arCtx.lineTo(alaDer.sx, alaDer.sy);
+      arCtx.lineTo(intDer.sx, intDer.sy);
+      arCtx.lineTo(centroInt.sx, centroInt.sy);
+      arCtx.lineTo(intIzq.sx, intIzq.sy);
+      arCtx.lineTo(alaIzq.sx, alaIzq.sy);
+      arCtx.closePath();
+
+      if (enDestino) {
+        arCtx.fillStyle = `rgba(74, 222, 128, ${alpha})`;
+        arCtx.strokeStyle = "#ffffff";
+      } else {
+        const r = Math.round(0 + pulso * 90);
+        const g = Math.round(205 + pulso * 50);
+        arCtx.fillStyle = `rgba(${r}, ${g}, 255, ${alpha})`;
+        arCtx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
+      }
+      arCtx.lineWidth = Math.max(1.5, 3.2 - zCentro * 0.2);
+      arCtx.fill();
+      arCtx.stroke();
+    }
+
+    // 3. Pin 3D de Destino/Parada al final del corredor
+    const zPin = Math.max(2.6, Math.min(10.8, distRestanteTramo));
+    const reboteY = Math.sin(t * 3.5) * 0.12;
+    const pPinBase = proyectarPuntoPiso3D(0, 0, zPin, w, h, yawRad);
+    const pPinAlto = proyectarPuntoPiso3D(0, 1.15 + reboteY, zPin, w, h, yawRad);
+
+    if (pPinBase && pPinAlto) {
+      // Anillo pulsante en el suelo
+      const radioAnillo = Math.max(14, 46 / (zPin * 0.25));
+      arCtx.beginPath();
+      arCtx.ellipse(
+        pPinBase.sx,
+        pPinBase.sy,
+        radioAnillo,
+        radioAnillo * 0.38,
+        0,
+        0,
+        Math.PI * 2
+      );
+      arCtx.strokeStyle = enDestino ? "#4ade80" : "#38bdf8";
+      arCtx.lineWidth = 3;
+      arCtx.stroke();
+
+      // Poste de luz vertical
+      arCtx.beginPath();
+      arCtx.moveTo(pPinBase.sx, pPinBase.sy);
+      arCtx.lineTo(pPinAlto.sx, pPinAlto.sy);
+      arCtx.strokeStyle = "rgba(255, 255, 255, 0.75)";
+      arCtx.lineWidth = 2.5;
+      arCtx.stroke();
+
+      // Rombo 3D flotante
+      const tamRombo = Math.max(12, 26 / (zPin * 0.28));
+      arCtx.beginPath();
+      arCtx.moveTo(pPinAlto.sx, pPinAlto.sy - tamRombo);
+      arCtx.lineTo(pPinAlto.sx + tamRombo * 0.8, pPinAlto.sy);
+      arCtx.lineTo(pPinAlto.sx, pPinAlto.sy + tamRombo);
+      arCtx.lineTo(pPinAlto.sx - tamRombo * 0.8, pPinAlto.sy);
+      arCtx.closePath();
+      arCtx.fillStyle = estado.indiceActual >= estado.ruta.length - 2 ? "#ef4444" : "#34c759";
+      arCtx.fill();
+      arCtx.lineWidth = 2.5;
+      arCtx.strokeStyle = "#ffffff";
+      arCtx.stroke();
+
+      // Etiqueta flotante sobre el pin 3D
+      const textoPin = `${siguiente.id} · ${siguiente.name} (${Math.round(distRestanteTramo)} m)`;
+      arCtx.font = "800 12px Inter, -apple-system, sans-serif";
+      const tw = arCtx.measureText(textoPin).width;
+      const bx = pPinAlto.sx - tw / 2 - 10;
+      const by = pPinAlto.sy - tamRombo - 30;
+      arCtx.fillStyle = "rgba(15, 23, 42, 0.88)";
+      arCtx.beginPath();
+      if (arCtx.roundRect) {
+        arCtx.roundRect(bx, by, tw + 20, 24, 12);
+      } else {
+        arCtx.rect(bx, by, tw + 20, 24);
+      }
+      arCtx.fill();
+      arCtx.strokeStyle = "#38bdf8";
+      arCtx.lineWidth = 1.5;
+      arCtx.stroke();
+
+      arCtx.fillStyle = "#ffffff";
+      arCtx.textAlign = "center";
+      arCtx.fillText(textoPin, pPinAlto.sx, by + 16);
+    }
+  }
+
+  // ============================================================================
+  // 6. MAPA 2D INTERACTIVO Y MINIMAPA EN VIVO
+  // ============================================================================
+  function mundoACanvas(x, z) {
+    const b = datos.bounds;
+    const pad = 70;
+    const w = campusCanvas.width - pad * 2;
+    const h = campusCanvas.height - pad * 2;
+    const nx = (x - b.minX) / (b.maxX - b.minX);
+    const nz = (b.maxZ - z) / (b.maxZ - b.minZ);
+    return {
+      cx: pad + nx * w,
+      cy: pad + nz * h
+    };
+  }
+
+  function dibujarMapa2D() {
+    ctx.clearRect(0, 0, campusCanvas.width, campusCanvas.height);
+
+    ctx.fillStyle = "#f4f3ee";
+    ctx.fillRect(0, 0, campusCanvas.width, campusCanvas.height);
+
+    if (mapaCargado) {
+      ctx.save();
+      ctx.globalAlpha = 0.25;
+      ctx.drawImage(imgMapa, 0, 0, campusCanvas.width, campusCanvas.height);
+      ctx.restore();
+    }
+
+    ctx.strokeStyle = "rgba(0, 0, 0, 0.04)";
+    ctx.lineWidth = 1;
+    for (let x = 0; x < campusCanvas.width; x += 50) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, campusCanvas.height);
+      ctx.stroke();
+    }
+    for (let y = 0; y < campusCanvas.height; y += 50) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(campusCanvas.width, y);
+      ctx.stroke();
+    }
+
+    // Pasillos base
+    ctx.strokeStyle = "rgba(100, 116, 139, 0.28)";
+    ctx.lineWidth = 5;
+    ctx.lineCap = "round";
+    datos.edges.forEach(([u, v]) => {
+      const a = nodosPorId.get(u);
+      const b = nodosPorId.get(v);
+      if (!a || !b) return;
+      const pa = mundoACanvas(a.x, a.z);
+      const pb = mundoACanvas(b.x, b.z);
+      ctx.beginPath();
+      ctx.moveTo(pa.cx, pa.cy);
+      ctx.lineTo(pb.cx, pb.cy);
+      ctx.stroke();
+    });
+
+    // Ruta activa desde (usuarioX, usuarioZ)
+    if (estado.ruta.length >= 2) {
+      const posUsuario = mundoACanvas(estado.usuarioX, estado.usuarioZ);
+
+      ctx.strokeStyle = "rgba(0, 113, 227, 0.2)";
+      ctx.lineWidth = 14;
+      ctx.lineJoin = "round";
+      ctx.beginPath();
+      ctx.moveTo(posUsuario.cx, posUsuario.cy);
+      for (let i = estado.indiceActual + 1; i < estado.ruta.length; i++) {
+        const p = mundoACanvas(estado.ruta[i].x, estado.ruta[i].z);
+        ctx.lineTo(p.cx, p.cy);
+      }
+      ctx.stroke();
+
+      ctx.strokeStyle = "#0071e3";
+      ctx.lineWidth = 6;
+      ctx.beginPath();
+      ctx.moveTo(posUsuario.cx, posUsuario.cy);
+      for (let i = estado.indiceActual + 1; i < estado.ruta.length; i++) {
+        const p = mundoACanvas(estado.ruta[i].x, estado.ruta[i].z);
+        ctx.lineTo(p.cx, p.cy);
+      }
+      ctx.stroke();
+    }
+
+    // Nodos
+    const idsEnRuta = new Set(estado.ruta.map((n) => n.id));
+    datos.nodes.forEach((nodo) => {
+      const { cx, cy } = mundoACanvas(nodo.x, nodo.z);
+      const esOrigen = nodo.id === estado.origenId;
+      const esDestino = nodo.id === estado.destinoId;
+      const enRuta = idsEnRuta.has(nodo.id);
+
+      let radio = 7;
+      let fill = "#ffffff";
+      let stroke = "#94a3b8";
+
+      if (esDestino) {
+        radio = 11;
+        fill = "#c8102e";
+        stroke = "#ffffff";
+      } else if (esOrigen) {
+        radio = 9;
+        fill = "#34c759";
+        stroke = "#ffffff";
+      } else if (enRuta) {
+        radio = 8;
+        fill = "#0071e3";
+        stroke = "#ffffff";
+      }
+
+      ctx.beginPath();
+      ctx.arc(cx, cy, radio, 0, Math.PI * 2);
+      ctx.fillStyle = fill;
+      ctx.fill();
+      ctx.lineWidth = 2.5;
+      ctx.strokeStyle = stroke;
+      ctx.stroke();
+
+      if (estado.mostrarEtiquetas || enRuta) {
+        const texto = `${nodo.id} · ${nodo.name}`;
+        ctx.font = enRuta ? "700 12px Inter, sans-serif" : "600 11px Inter, sans-serif";
+        const tw = ctx.measureText(texto).width;
+        ctx.fillStyle = "rgba(255, 255, 255, 0.92)";
+        ctx.fillRect(cx - tw / 2 - 6, cy - radio - 24, tw + 12, 18);
+        ctx.fillStyle = esDestino ? "#c8102e" : enRuta ? "#0071e3" : "#1c1c1e";
+        ctx.textAlign = "center";
+        ctx.fillText(texto, cx, cy - radio - 11);
+      }
+    });
+
+    // Marcador en vivo del USUARIO ("TÚ")
+    const posU = mundoACanvas(estado.usuarioX, estado.usuarioZ);
+    const { rumboTramo } = obtenerTramoActivo();
+    const rumboMirada = (rumboTramo + estado.desfaseMiradaGrados + 360) % 360;
+    const radCanvas = ((rumboMirada - 90) * Math.PI) / 180;
+
+    ctx.save();
+    ctx.translate(posU.cx, posU.cy);
+    ctx.rotate(radCanvas);
+    ctx.fillStyle = "rgba(52, 199, 89, 0.28)";
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.arc(0, 0, 38, -0.45, 0.45);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+
+    ctx.beginPath();
+    ctx.arc(posU.cx, posU.cy, 16, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(52, 199, 89, 0.28)";
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(posU.cx, posU.cy, 9, 0, Math.PI * 2);
+    ctx.fillStyle = "#34c759";
+    ctx.fill();
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = "#ffffff";
+    ctx.stroke();
+
+    ctx.font = "800 11px Inter, sans-serif";
+    ctx.fillStyle = "#065f46";
+    ctx.textAlign = "center";
+    ctx.fillText("TÚ", posU.cx, posU.cy + 24);
+  }
+
+  function dibujarMinimapa() {
+    if (!miniCtx) return;
+    const w = minimapCanvas.width;
+    const h = minimapCanvas.height;
+    miniCtx.clearRect(0, 0, w, h);
+
+    miniCtx.fillStyle = "#0f172a";
+    miniCtx.fillRect(0, 0, w, h);
+
+    miniCtx.strokeStyle = "rgba(148, 163, 184, 0.18)";
+    miniCtx.lineWidth = 1;
+    [28, 56, 82].forEach((r) => {
+      miniCtx.beginPath();
+      miniCtx.arc(w / 2, h / 2, r, 0, Math.PI * 2);
+      miniCtx.stroke();
+    });
+
+    const escala = 0.65;
+    const aMini = (x, z) => ({
+      mx: w / 2 + (x - estado.usuarioX) * escala,
+      my: h / 2 - (z - estado.usuarioZ) * escala
+    });
+
+    miniCtx.strokeStyle = "rgba(148, 163, 184, 0.35)";
+    miniCtx.lineWidth = 2.5;
+    datos.edges.forEach(([u, v]) => {
+      const na = nodosPorId.get(u);
+      const nb = nodosPorId.get(v);
+      if (!na || !nb) return;
+      const pa = aMini(na.x, na.z);
+      const pb = aMini(nb.x, nb.z);
+      miniCtx.beginPath();
+      miniCtx.moveTo(pa.mx, pa.my);
+      miniCtx.lineTo(pb.mx, pb.my);
+      miniCtx.stroke();
+    });
+
+    if (estado.ruta.length >= 2) {
+      miniCtx.strokeStyle = "#38bdf8";
+      miniCtx.lineWidth = 4.5;
+      miniCtx.lineCap = "round";
+      miniCtx.beginPath();
+      miniCtx.moveTo(w / 2, h / 2);
+      for (let i = estado.indiceActual + 1; i < estado.ruta.length; i++) {
+        const p = aMini(estado.ruta[i].x, estado.ruta[i].z);
+        miniCtx.lineTo(p.mx, p.my);
+      }
+      miniCtx.stroke();
+    }
+
+    datos.nodes.forEach((n) => {
+      const p = aMini(n.x, n.z);
+      if (p.mx < -10 || p.mx > w + 10 || p.my < -10 || p.my > h + 10) return;
+      miniCtx.beginPath();
+      miniCtx.arc(p.mx, p.my, n.id === estado.destinoId ? 5.5 : 3.5, 0, Math.PI * 2);
+      miniCtx.fillStyle = n.id === estado.destinoId ? "#ef4444" : "#cbd5e1";
+      miniCtx.fill();
+    });
+
+    const { rumboTramo } = obtenerTramoActivo();
+    const rumboMirada = (rumboTramo + estado.desfaseMiradaGrados + 360) % 360;
+    const radMini = ((rumboMirada - 90) * Math.PI) / 180;
+
+    miniCtx.save();
+    miniCtx.translate(w / 2, h / 2);
+    miniCtx.rotate(radMini);
+    miniCtx.fillStyle = "rgba(56, 189, 248, 0.34)";
+    miniCtx.beginPath();
+    miniCtx.moveTo(0, 0);
+    miniCtx.arc(0, 0, 34, -0.5, 0.5);
+    miniCtx.closePath();
+    miniCtx.fill();
+    miniCtx.restore();
+
+    miniCtx.beginPath();
+    miniCtx.arc(w / 2, h / 2, 6.5, 0, Math.PI * 2);
+    miniCtx.fillStyle = "#34c759";
+    miniCtx.fill();
+    miniCtx.lineWidth = 2;
+    miniCtx.strokeStyle = "#ffffff";
+    miniCtx.stroke();
+  }
+
+  function centrarMapaEnUsuario() {
+    const { cx, cy } = mundoACanvas(estado.usuarioX, estado.usuarioZ);
+    mapViewport.scrollTo({
+      left: Math.max(0, cx - mapViewport.clientWidth / 2),
+      top: Math.max(0, cy - mapViewport.clientHeight / 2),
+      behavior: "smooth"
+    });
+  }
+
+  campusCanvas.addEventListener("click", (e) => {
+    const rect = campusCanvas.getBoundingClientRect();
+    const scaleX = campusCanvas.width / rect.width;
+    const scaleY = campusCanvas.height / rect.height;
+    const clickX = (e.clientX - rect.left) * scaleX;
+    const clickY = (e.clientY - rect.top) * scaleY;
+
+    let mejorNodo = null;
+    let mejorDist = 26;
+    datos.nodes.forEach((nodo) => {
+      const { cx, cy } = mundoACanvas(nodo.x, nodo.z);
+      const d = Math.hypot(cx - clickX, cy - clickY);
+      if (d < mejorDist) {
+        mejorDist = d;
+        mejorNodo = nodo;
+      }
+    });
+
+    if (mejorNodo) {
+      fijarUbicacionPorNodo(mejorNodo.id, "Mapa 2D");
+    }
+  });
+
+  // ============================================================================
+  // 7. ACTUALIZACIÓN DE INTERFAZ Y RECÁLCULO DE RUTA
+  // ============================================================================
+  function recalcularRutaCompleta() {
+    const res = calcularRutaDijkstra(estado.origenId, estado.destinoId);
+    estado.ruta = res.ruta;
+    estado.distanciaTotal = res.distanciaTotal;
+    estado.indiceActual = 0;
+    estado.progresoTramo = 0;
+    estado.desfaseMiradaGrados = 0;
+    estado.brjSensorBase = estado.brjSensorActual;
+
+    sincronizarCoordenadasUsuarioConProgreso();
+    actualizarHUD();
+    dibujarMapa2D();
+    dibujarMinimapa();
+  }
+
+  function actualizarHUD() {
+    const { actual, siguiente, distRestanteTramo, rumboTramo } = obtenerTramoActivo();
+    const distTotalRestante = calcularDistanciaTotalRestante();
+    const minutos = Math.max(0.2, distTotalRestante / 80).toFixed(1);
+    const cardinal = nombrePuntoCardinal(rumboTramo);
+
+    const nodoDestinoFinal = nodosPorId.get(estado.destinoId);
+    hudStepBadge.textContent = `${actual.id} ${actual.name} ➔ ${nodoDestinoFinal ? nodoDestinoFinal.name : estado.destinoId}`;
+
+    if (actual.id === siguiente.id || distTotalRestante < 0.8) {
+      hudInstruction.textContent = `🎉 ¡Llegaste a ${actual.name}!`;
+      hudSub.textContent = `Destino alcanzado · 0 m restantes`;
+      if (arSignTurnIcon) arSignTurnIcon.textContent = "🏁";
+      if (arSignTitle) arSignTitle.textContent = `¡Llegaste a ${actual.name}!`;
+      if (arSignDist) arSignDist.textContent = `Has completado el recorrido`;
+    } else {
+      const mTramo = Math.round(distRestanteTramo);
+      hudInstruction.textContent = `Camina ${mTramo} m hacia ${siguiente.name}`;
+      hudSub.textContent = `${Math.round(distTotalRestante)} m restantes · ~${minutos} min`;
+      if (arSignTurnIcon) arSignTurnIcon.textContent = "⬆️";
+      if (arSignTitle) arSignTitle.textContent = `Sigue hacia ${siguiente.name}`;
+      if (arSignDist) {
+        arSignDist.textContent = `${mTramo} m al ${cardinal} (${Math.round(rumboTramo)}°) · Sigue las flechas en el piso`;
+      }
+    }
+
+    if (hudCompass) {
+      hudCompass.style.transform = `rotate(${rumboTramo}deg)`;
+    }
+    if (arHeadingText) {
+      arHeadingText.textContent = `🧭 Pasillo: ${Math.round(rumboTramo)}° ${cardinal}`;
+    }
+
+    kpiNodesCount.textContent = String(estado.ruta.length);
+    kpiDistanceMeters.textContent = `${Math.round(estado.distanciaTotal)} m totales`;
+
+    stepsList.innerHTML = "";
+    estado.ruta.forEach((nodo, idx) => {
+      const li = document.createElement("li");
+      li.className = `itinerary-item ${idx === estado.indiceActual ? "is-current" : ""}`;
+      let detalle = "Origen";
+      if (idx === estado.ruta.length - 1) detalle = "🎯 Destino";
+      else if (idx > 0) {
+        const d = Math.round(distanciaMetros(estado.ruta[idx - 1], nodo));
+        detalle = `+${d} m`;
+      }
+      li.innerHTML = `
+        <div><span class="itinerary-code">${nodo.id}</span><span>${nodo.name}</span></div>
+        <span>${detalle}</span>
+      `;
+      li.addEventListener("click", () => {
+        estado.indiceActual = idx;
+        estado.progresoTramo = 0;
+        estado.desfaseMiradaGrados = 0;
+        sincronizarCoordenadasUsuarioConProgreso();
+        actualizarHUD();
+        dibujarMapa2D();
+        dibujarMinimapa();
+        fijarEstadoMenu(true);
+      });
+      stepsList.appendChild(li);
+    });
+  }
+
+  // ============================================================================
+  // 8. SIMULACIÓN DE CAMINATA EN VIVO ("▶️ CAMINAR") + PODÓMETRO + GPS
+  // ============================================================================
+  let idIntervaloCaminata = null;
+
+  function iniciarSimulacionCaminata() {
+    if (estado.caminandoSim) return;
+    if (estado.indiceActual >= estado.ruta.length - 1) {
+      estado.indiceActual = 0;
+      estado.progresoTramo = 0;
+      sincronizarCoordenadasUsuarioConProgreso();
+    }
+    // Bajar automáticamente el menú al caminar para que se vea todo el piso AR
+    fijarEstadoMenu(true);
+    estado.caminandoSim = true;
+    btnWalkSim.classList.add("is-walking");
+    btnWalkSimText.textContent = "⏸️ Pausar";
+    locationModeBadge.textContent = "🏃 Caminando en vivo";
+
+    idIntervaloCaminata = setInterval(() => {
+      avanzarMetrosEnRuta(0.65);
+    }, 80);
+  }
+
+  function detenerSimulacionCaminata() {
+    estado.caminandoSim = false;
+    if (idIntervaloCaminata) {
+      clearInterval(idIntervaloCaminata);
+      idIntervaloCaminata = null;
+    }
+    btnWalkSim.classList.remove("is-walking");
+    btnWalkSimText.textContent = "▶️ Caminar";
+    locationModeBadge.textContent = estado.gpsActivo
+      ? "🛰️ Ubicación: GPS Activo"
+      : `📍 ${estado.origenId} (QR + Pasos)`;
+  }
+
+  btnWalkSim.addEventListener("click", () => {
+    if (estado.caminandoSim) {
+      detenerSimulacionCaminata();
+    } else {
+      iniciarSimulacionCaminata();
+    }
+  });
+
+  // Podómetro con acelerómetro del celular
+  let ultimoPasoMs = 0;
+  window.addEventListener("devicemotion", (e) => {
+    const acc = e.accelerationIncludingGravity;
+    if (!acc) return;
+    const magnitud = Math.hypot(acc.x || 0, acc.y || 0, acc.z || 0);
+    const ahora = performance.now();
+    if (magnitud > 13.2 && ahora - ultimoPasoMs > 420) {
+      ultimoPasoMs = ahora;
+      estado.pasosDetectados += 1;
+      if (!estado.caminandoSim) {
+        locationModeBadge.textContent = `👣 Paso #${estado.pasosDetectados}`;
+        avanzarMetrosEnRuta(0.85);
+      }
+    }
+  });
+
+  window.addEventListener(
+    "deviceorientation",
+    (e) => {
+      let rumbo = null;
+      if (typeof e.webkitCompassHeading === "number") {
+        rumbo = e.webkitCompassHeading;
+      } else if (typeof e.alpha === "number") {
+        rumbo = (360 - e.alpha) % 360;
+      }
+      if (rumbo !== null) {
+        if (estado.brjSensorBase === null) {
+          estado.brjSensorBase = rumbo;
+        }
+        estado.brjSensorActual = rumbo;
+      }
+    },
+    true
+  );
+
+  btnAlignArrows.addEventListener("click", () => {
+    estado.desfaseMiradaGrados = 0;
+    estado.brjSensorBase = estado.brjSensorActual;
+    if (arTurnHint) arTurnHint.hidden = true;
+    dibujarMinimapa();
+  });
+
+  const IBERO_LAT0 = 19.3705;
+  const IBERO_LON0 = -99.2636;
+  btnToggleGps.addEventListener("click", () => {
+    if (!("geolocation" in navigator)) {
+      alert("Tu navegador no soporta geolocalización GPS.");
+      return;
+    }
+    if (estado.gpsActivo) {
+      navigator.geolocation.clearWatch(estado.gpsWatchId);
+      estado.gpsActivo = false;
+      btnToggleGps.textContent = "🛰️ Activar GPS Real";
+      locationModeBadge.textContent = "📍 Modo: QR + Pasos";
+      return;
+    }
+
+    estado.gpsActivo = true;
+    btnToggleGps.textContent = "🛰️ GPS Activo (Apagar)";
+    locationModeBadge.textContent = "🛰️ Buscando GPS...";
+
+    estado.gpsWatchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        const dxMetros = (longitude - IBERO_LON0) * 111320 * Math.cos((IBERO_LAT0 * Math.PI) / 180);
+        const dzMetros = (latitude - IBERO_LAT0) * 110540;
+
+        if (Math.hypot(dxMetros, dzMetros) < 600) {
+          estado.usuarioX = dxMetros;
+          estado.usuarioZ = dzMetros;
+          locationModeBadge.textContent = `🛰️ GPS IBERO (±${Math.round(pos.coords.accuracy)}m)`;
+          dibujarMapa2D();
+          dibujarMinimapa();
+        } else {
+          locationModeBadge.textContent = "📍 Fuera de IBERO (Usa QR o ▶️ Caminar)";
+        }
+      },
+      () => {
+        locationModeBadge.textContent = "📍 Sin GPS (Usa QR o ▶️ Caminar)";
+      },
+      { enableHighAccuracy: true, maximumAge: 2000 }
+    );
+  });
+
+  // ============================================================================
+  // 9. CÁMARA WEB Y ESCÁNER DE CÓDIGOS QR
+  // ============================================================================
+  let streamCamara = null;
+  let detectorQR = null;
+  if ("BarcodeDetector" in window) {
+    try {
+      detectorQR = new window.BarcodeDetector({ formats: ["qr_code"] });
+    } catch (_) {
+      detectorQR = null;
+    }
+  }
+
+  async function activarCamara(videoEl) {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
+    try {
+      if (!streamCamara) {
+        streamCamara = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: "environment" } },
+          audio: false
+        });
+      }
+      videoEl.srcObject = streamCamara;
+      await videoEl.play();
+    } catch (_) {}
+  }
+
+  function fijarUbicacionPorNodo(idNodo, fuente = "QR") {
+    if (!nodosPorId.has(idNodo)) return;
+    detenerSimulacionCaminata();
+    estado.origenId = idNodo;
+    selectOrigen.value = idNodo;
+    if (estado.destinoId === idNodo) {
+      estado.destinoId = idNodo === "N10" ? "N07" : "N10";
+      selectDestino.value = estado.destinoId;
+    }
+    const nodo = nodosPorId.get(idNodo);
+    locationModeBadge.textContent = `📍 ${fuente}: ${nodo.id} ${nodo.name}`;
+    recalcularRutaCompleta();
+    centrarMapaEnUsuario();
+    fijarEstadoMenu(true);
+
+    const dlg = document.getElementById("dialogQrScanner");
+    if (dlg && dlg.open) dlg.close();
+  }
+
+  setInterval(async () => {
+    if (!detectorQR || !streamCamara) return;
+    const videoActivo = document.getElementById("dialogQrScanner")?.open
+      ? document.getElementById("qrScannerVideo")
+      : document.getElementById("arVideo");
+    if (!videoActivo || videoActivo.readyState < 2) return;
+    try {
+      const codigos = await detectorQR.detect(videoActivo);
+      if (codigos && codigos.length > 0) {
+        const texto = (codigos[0].rawValue || "").trim();
+        const match = texto.match(/N\d{2}/i);
+        if (match) {
+          const idDetectado = match[0].toUpperCase();
+          if (nodosPorId.has(idDetectado) && idDetectado !== estado.origenId) {
+            fijarUbicacionPorNodo(idDetectado, "QR Escaneado");
+          }
+        }
+      }
+    } catch (_) {}
+  }, 900);
+
+  // ============================================================================
+  // 10. SELECTORES, TARJETAS QR Y EVENTOS
+  // ============================================================================
+  function inicializarControles() {
+    datos.nodes.forEach((nodo) => {
+      const optO = document.createElement("option");
+      optO.value = nodo.id;
+      optO.textContent = `${nodo.id} — ${nodo.name}`;
+      selectOrigen.appendChild(optO);
+
+      const optD = document.createElement("option");
+      optD.value = nodo.id;
+      optD.textContent = `${nodo.id} — ${nodo.name}`;
+      selectDestino.appendChild(optD);
+    });
+
+    selectOrigen.value = estado.origenId;
+    selectDestino.value = estado.destinoId;
+
+    selectOrigen.addEventListener("change", () => {
+      fijarUbicacionPorNodo(selectOrigen.value, "Origen");
+    });
+
+    selectDestino.addEventListener("change", () => {
+      estado.destinoId = selectDestino.value;
+      recalcularRutaCompleta();
+      fijarEstadoMenu(true);
+    });
+
+    btnInvert.addEventListener("click", () => {
+      const temp = estado.origenId;
+      estado.origenId = estado.destinoId;
+      estado.destinoId = temp;
+      selectOrigen.value = estado.origenId;
+      selectDestino.value = estado.destinoId;
+      recalcularRutaCompleta();
+      fijarEstadoMenu(true);
+    });
+
+    btnNextNode.addEventListener("click", () => {
+      if (estado.indiceActual < estado.ruta.length - 1) {
+        estado.indiceActual += 1;
+        estado.progresoTramo = 0;
+        estado.desfaseMiradaGrados = 0;
+      } else {
+        estado.indiceActual = 0;
+        estado.progresoTramo = 0;
+      }
+      sincronizarCoordenadasUsuarioConProgreso();
+      actualizarHUD();
+      dibujarMapa2D();
+      dibujarMinimapa();
+    });
+
+    document.querySelectorAll("[data-preset]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const [o, d] = btn.dataset.preset.split(",");
+        estado.origenId = o;
+        estado.destinoId = d;
+        selectOrigen.value = o;
+        selectDestino.value = d;
+        recalcularRutaCompleta();
+        fijarEstadoMenu(true);
+      });
+    });
+
+    function cambiarVista(modo) {
+      estado.modoVista = modo;
+      const esAR = modo === "ar";
+      tabAR.classList.toggle("is-active", esAR);
+      tabMap.classList.toggle("is-active", !esAR);
+      tabAR.setAttribute("aria-selected", String(esAR));
+      tabMap.setAttribute("aria-selected", String(!esAR));
+      viewAR.classList.toggle("is-visible", esAR);
+      viewMap.classList.toggle("is-visible", !esAR);
+
+      if (esAR) {
+        activarCamara(document.getElementById("arVideo"));
+        estado.desfaseMiradaGrados = 0;
+      } else {
+        setTimeout(centrarMapaEnUsuario, 80);
+      }
+    }
+
+    tabAR.addEventListener("click", () => cambiarVista("ar"));
+    tabMap.addEventListener("click", () => cambiarVista("map"));
+    document.getElementById("arMinimap").addEventListener("click", () => cambiarVista("map"));
+
+    btnCenterRoute.addEventListener("click", centrarMapaEnUsuario);
+    btnToggleLabels.addEventListener("click", () => {
+      estado.mostrarEtiquetas = !estado.mostrarEtiquetas;
+      dibujarMapa2D();
+    });
+
+    const chipsContainer = document.getElementById("simulatedQrChips");
+    datos.nodes.forEach((nodo) => {
+      const chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = "preset-pill";
+      chip.textContent = `${nodo.id} · ${nodo.name}`;
+      chip.addEventListener("click", () => fijarUbicacionPorNodo(nodo.id, "QR"));
+      chipsContainer.appendChild(chip);
+    });
+
+    const qrGrid = document.getElementById("qrCardsGrid");
+    datos.nodes.forEach((nodo) => {
+      const card = document.createElement("div");
+      card.className = "qr-card-item";
+      const qrBox = document.createElement("div");
+      qrBox.style.minHeight = "100px";
+      qrBox.style.display = "flex";
+      qrBox.style.alignItems = "center";
+      qrBox.style.justifyContent = "center";
+      qrBox.innerHTML = `<code style="font-size:0.75rem;padding:8px;background:#fff;border-radius:8px;border:1px solid #cbd5e1;">ARGOS:${nodo.id}</code>`;
+
+      card.innerHTML = `
+        <strong style="font-size:0.8rem;color:var(--accent);">${nodo.id}</strong>
+        <span style="font-size:0.75rem;font-weight:600;">${nodo.name}</span>
+      `;
+      card.appendChild(qrBox);
+
+      const btnAqui = document.createElement("button");
+      btnAqui.type = "button";
+      btnAqui.className = "preset-pill";
+      btnAqui.style.fontSize = "0.7rem";
+      btnAqui.textContent = "📍 Ubicarse aquí";
+      btnAqui.addEventListener("click", () => {
+        fijarUbicacionPorNodo(nodo.id, "Tarjeta QR");
+        document.getElementById("dialogQrCards")?.close();
+      });
+      card.appendChild(btnAqui);
+      qrGrid.appendChild(card);
+
+      // Si la librería opcional QRCode ya cargó o cuando cargue, dibuja el QR gráfico
+      const intentarDibujarQR = () => {
+        if (typeof window.QRCode !== "undefined") {
+          qrBox.innerHTML = "";
+          new window.QRCode(qrBox, {
+            text: `ARGOS:${nodo.id}`,
+            width: 100,
+            height: 100,
+            colorDark: "#1c1c1e",
+            colorLight: "#ffffff"
+          });
+          return true;
+        }
+        return false;
+      };
+      if (!intentarDibujarQR()) {
+        window.addEventListener("load", intentarDibujarQR, { once: true });
+      }
+    });
+
+    document.getElementById("btnPrintCards")?.addEventListener("click", () => window.print());
+  }
+
+  // ============================================================================
+  // 11. FALLBACKS WEB MODERNOS (DECLARATIVE DIALOG, LIGHT DISMISS, 2D PANNING)
+  // ============================================================================
+  function configurarFallbacksWebModernos() {
+    // Garantizar que commandfor / command funcione en el 100% de navegadores móviles y WebViews
+    if (!("commandForElement" in HTMLButtonElement.prototype)) {
+      // Polyfill / fallback obligatorio cuando commandForElement no existe
+    }
+    document.querySelectorAll("[commandfor]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const target = document.getElementById(btn.getAttribute("commandfor"));
+        const cmd = btn.getAttribute("command");
+        if (!target) return;
+        if (cmd === "show-modal") {
+          if (!target.open && typeof target.showModal === "function") {
+            target.showModal();
+          }
+          if (target.id === "dialogQrScanner") {
+            activarCamara(document.getElementById("qrScannerVideo"));
+          }
+        } else if (cmd === "close") {
+          if (target.open && typeof target.close === "function") {
+            target.close();
+          }
+        }
+      });
+    });
+
+    if (!("closedBy" in HTMLDialogElement.prototype)) {
+      document.querySelectorAll('dialog[closedby="any"]').forEach((dlg) => {
+        dlg.addEventListener("click", (e) => {
+          if (e.target === dlg) dlg.close();
+        });
+      });
+    }
+
+    let arrastrandoMapa = false;
+    let inicioX = 0;
+    let inicioY = 0;
+    let scrollIzq = 0;
+    let scrollArr = 0;
+
+    mapViewport.addEventListener("pointerdown", (e) => {
+      arrastrandoMapa = true;
+      inicioX = e.clientX;
+      inicioY = e.clientY;
+      scrollIzq = mapViewport.scrollLeft;
+      scrollArr = mapViewport.scrollTop;
+    });
+
+    window.addEventListener("pointermove", (e) => {
+      if (!arrastrandoMapa) return;
+      mapViewport.scrollLeft = scrollIzq - (e.clientX - inicioX);
+      mapViewport.scrollTop = scrollArr - (e.clientY - inicioY);
+    });
+
+    window.addEventListener("pointerup", () => {
+      arrastrandoMapa = false;
+    });
+  }
+
+  // ============================================================================
+  // 12. ARRANQUE INMEDIATO
+  // ============================================================================
+  inicializarControles();
+  configurarFallbacksWebModernos();
+  recalcularRutaCompleta();
+  activarCamara(document.getElementById("arVideo"));
+  requestAnimationFrame(renderizarBucleAR);
+})();
+
+</script>
   </body>
 </html>
+

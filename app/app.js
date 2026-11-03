@@ -1264,30 +1264,29 @@
   // 11. FALLBACKS WEB MODERNOS (DECLARATIVE DIALOG, LIGHT DISMISS, 2D PANNING)
   // ============================================================================
   function configurarFallbacksWebModernos() {
+    // Garantizar que commandfor / command funcione en el 100% de navegadores móviles y WebViews
     if (!("commandForElement" in HTMLButtonElement.prototype)) {
-      document.querySelectorAll("[commandfor]").forEach((btn) => {
-        btn.addEventListener("click", () => {
-          const target = document.getElementById(btn.getAttribute("commandfor"));
-          const cmd = btn.getAttribute("command");
-          if (!target) return;
-          if (cmd === "show-modal" && typeof target.showModal === "function") {
+      // Polyfill / fallback obligatorio cuando commandForElement no existe
+    }
+    document.querySelectorAll("[commandfor]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const target = document.getElementById(btn.getAttribute("commandfor"));
+        const cmd = btn.getAttribute("command");
+        if (!target) return;
+        if (cmd === "show-modal") {
+          if (!target.open && typeof target.showModal === "function") {
             target.showModal();
-            if (target.id === "dialogQrScanner") {
-              activarCamara(document.getElementById("qrScannerVideo"));
-            }
-          } else if (cmd === "close" && typeof target.close === "function") {
+          }
+          if (target.id === "dialogQrScanner") {
+            activarCamara(document.getElementById("qrScannerVideo"));
+          }
+        } else if (cmd === "close") {
+          if (target.open && typeof target.close === "function") {
             target.close();
           }
-        });
+        }
       });
-    } else {
-      document.getElementById("btnOpenQrModal")?.addEventListener("click", () => {
-        activarCamara(document.getElementById("qrScannerVideo"));
-      });
-      document.getElementById("btnScanOrigin")?.addEventListener("click", () => {
-        activarCamara(document.getElementById("qrScannerVideo"));
-      });
-    }
+    });
 
     if (!("closedBy" in HTMLDialogElement.prototype)) {
       document.querySelectorAll('dialog[closedby="any"]').forEach((dlg) => {
