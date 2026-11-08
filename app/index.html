@@ -1215,16 +1215,19 @@ window.ARGOS_CAMPUS_DATA = {
     // desfaseMiradaGrados = (hacia dónde mira la cámara) − (rumbo del pasillo).
     // Positivo = el usuario mira a la DERECHA del pasillo, así que el pasillo se dibuja a la izquierda.
     // Sin brújula se asume que mira al pasillo y solo cuenta la calibración (arrastre / Centrar).
-    const { rumboTramo: rumboPasillo } = obtenerTramoActivo();
+    const tramoVista = obtenerTramoActivo();
+    const rumboPasillo = tramoVista.rumboTramo;
+    const llegoAlFinal = tramoVista.actual.id === tramoVista.siguiente.id;
     const rumboMirada = (estado.brjSensorActual !== null ? estado.brjSensorActual : rumboPasillo)
       + estado.calibracionGrados;
-    estado.desfaseMiradaGrados = diferenciaAngularGrados(rumboMirada, rumboPasillo);
+    // Al llegar al destino no hay pasillo que seguir: flechas al frente y sin avisos de giro
+    estado.desfaseMiradaGrados = llegoAlFinal ? 0 : diferenciaAngularGrados(rumboMirada, rumboPasillo);
 
     const yawRad = (estado.desfaseMiradaGrados * Math.PI) / 180;
 
     // Aviso si el usuario giró más de 38° lejos del pasillo
     if (arTurnHint && arTurnHintText) {
-      if (estado.brjSensorActual !== null && !estado.brujulaAbsoluta && !estado.calibrado) {
+      if (!llegoAlFinal && estado.brjSensorActual !== null && !estado.brujulaAbsoluta && !estado.calibrado) {
         arTurnHint.hidden = false;
         arTurnHintText.textContent = "🧭 Apunta el celular hacia el pasillo y toca '🎯 Centrar flechas'";
       } else if (Math.abs(estado.desfaseMiradaGrados) > 38) {
