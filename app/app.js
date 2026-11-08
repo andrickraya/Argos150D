@@ -134,7 +134,6 @@
     gpsWatchId: null,
     pasosDetectados: 0,
     desfaseMiradaGrados: 0,
-    brjSensorBase: null,
     brjSensorActual: null,
     menuColapsado: true  // Inicia colapsado para que las flechas 3D se vean completas en el celular
   };
@@ -295,7 +294,6 @@
         estado.indiceActual += 1;
         estado.progresoTramo = 0;
         estado.desfaseMiradaGrados = 0;
-        estado.brjSensorBase = estado.brjSensorActual;
       }
     }
 
@@ -336,7 +334,9 @@
     if (!arrastrandoAR) return;
     const dx = e.clientX - ultimoXAR;
     ultimoXAR = e.clientX;
-    estado.desfaseMiradaGrados = ((estado.desfaseMiradaGrados - dx * 0.35 + 540) % 360) - 180;
+    // Arrastrar ajusta la calibración (sirve con o sin brújula)
+    estado.calibracionGrados = ((estado.calibracionGrados - dx * 0.35 + 540) % 360) - 180;
+    estado.calibrado = true;
     dibujarMinimapa();
   });
   window.addEventListener("pointerup", () => {
@@ -373,19 +373,22 @@
     const h = window.innerHeight;
     arCtx.clearRect(0, 0, w, h);
 
-    // Sincronizar giroscopio/brújula si está disponible
-    if (estado.brjSensorActual !== null && estado.brjSensorBase !== null && !arrastrandoAR) {
-      estado.desfaseMiradaGrados = diferenciaAngularGrados(
-        estado.brjSensorActual,
-        estado.brjSensorBase
-      );
-    }
+    // desfaseMiradaGrados = (hacia dónde mira la cámara) − (rumbo del pasillo).
+    // Positivo = el usuario mira a la DERECHA del pasillo, así que el pasillo se dibuja a la izquierda.
+    // Sin brújula se asume que mira al pasillo y solo cuenta la calibración (arrastre / Centrar).
+    const { rumboTramo: rumboPasillo } = obtenerTramoActivo();
+    const rumboMirada = (estado.brjSensorActual !== null ? estado.brjSensorActual : rumboPasillo)
+      + estado.calibracionGrados;
+    estado.desfaseMiradaGrados = diferenciaAngularGrados(rumboMirada, rumboPasillo);
 
-    const yawRad = (-estado.desfaseMiradaGrados * Math.PI) / 180;
+    const yawRad = (estado.desfaseMiradaGrados * Math.PI) / 180;
 
     // Aviso si el usuario giró más de 38° lejos del pasillo
     if (arTurnHint && arTurnHintText) {
-      if (Math.abs(estado.desfaseMiradaGrados) > 38) {
+      if (estado.brjSensorActual !== null && !estado.brujulaAbsoluta && !estado.calibrado) {
+        arTurnHint.hidden = false;
+        arTurnHintText.textContent = "🧭 Apunta el celular hacia el pasillo y toca '🎯 Centrar flechas'";
+      } else if (Math.abs(estado.desfaseMiradaGrados) > 38) {
         arTurnHint.hidden = false;
         arTurnHintText.textContent =
           estado.desfaseMiradaGrados > 0
@@ -865,7 +868,6 @@
     estado.indiceActual = 0;
     estado.progresoTramo = 0;
     estado.desfaseMiradaGrados = 0;
-    estado.brjSensorBase = estado.brjSensorActual;
 
     sincronizarCoordenadasUsuarioConProgreso();
     actualizarHUD();
@@ -999,28 +1001,59 @@
     }
   });
 
-  window.addEventListener(
-    "deviceorientation",
-    (e) => {
-      let rumbo = null;
-      if (typeof e.webkitCompassHeading === "number") {
-        rumbo = e.webkitCompassHeading;
-      } else if (typeof e.alpha === "number") {
-        rumbo = (360 - e.alpha) % 360;
-      }
-      if (rumbo !== null) {
-        if (estado.brjSensorBase === null) {
-          estado.brjSensorBase = rumbo;
-        }
-        estado.brjSensorActual = rumbo;
-      }
-    },
-    true
-  );
+  // ---- Brújula: rumbo (0° = Norte, sentido horario) hacia donde apunta la cámara trasera ----
+  // Mapa: X = Este, Z = Norte, así que rumboTramo y la brújula usan la misma convención.
+  // estado.brjSensorActual = rumbo filtrado del sensor; estado.calibracionGrados = corrección manual.
+  estado.calibracionGrados = 0;
+  estado.brujulaAbsoluta = false;   // true si el sensor da Norte real (iOS o deviceorientationabsolute)
+  estado.calibrado = false;
 
+  function rumboCamaraDesdeEuler(alpha, beta, gamma) {
+    // Fórmula de la especificación W3C DeviceOrientation (rumbo del eje -Z, la cámara trasera)
+    const r = Math.PI / 180;
+    const cB = Math.cos(beta * r), sB = Math.sin(beta * r);
+    const cG = Math.cos(gamma * r), sG = Math.sin(gamma * r);
+    const cA = Math.cos(alpha * r), sA = Math.sin(alpha * r);
+    const vx = -cA * sG - sA * sB * cG;
+    const vy = -sA * sG + cA * sB * cG;
+    return ((Math.atan2(vx, vy) * 180) / Math.PI + 360) % 360;
+  }
+
+  function registrarRumboSensor(rumbo, absoluto) {
+    if (!Number.isFinite(rumbo)) return;
+    // Si ya tenemos fuente absoluta, ignorar lecturas relativas
+    if (estado.brujulaAbsoluta && !absoluto) return;
+    if (absoluto) estado.brujulaAbsoluta = true;
+    if (estado.brjSensorActual === null) {
+      estado.brjSensorActual = rumbo;
+    } else {
+      // Filtro paso-bajo circular para quitar temblor de la brújula
+      estado.brjSensorActual = (estado.brjSensorActual + 0.25 * diferenciaAngularGrados(rumbo, estado.brjSensorActual) + 360) % 360;
+    }
+  }
+
+  function manejarOrientacion(e, esEventoAbsoluto) {
+    if (typeof e.webkitCompassHeading === "number" && e.webkitCompassHeading >= 0) {
+      registrarRumboSensor(e.webkitCompassHeading, true); // iPhone: ya viene referido al Norte
+      return;
+    }
+    if (typeof e.alpha !== "number" || e.alpha === null) return;
+    const rumbo = rumboCamaraDesdeEuler(e.alpha, e.beta || 0, e.gamma || 0);
+    registrarRumboSensor(rumbo, esEventoAbsoluto || e.absolute === true);
+  }
+
+  window.addEventListener("deviceorientationabsolute", (e) => manejarOrientacion(e, true), true);
+  window.addEventListener("deviceorientation", (e) => manejarOrientacion(e, false), true);
+
+  // "Centrar flechas": el usuario apunta el celular a lo largo del pasillo correcto y toca el botón.
+  // Corrige errores de la brújula (interferencia magnética, sensores sin Norte real).
   btnAlignArrows.addEventListener("click", () => {
+    const { rumboTramo } = obtenerTramoActivo();
+    estado.calibracionGrados = estado.brjSensorActual !== null
+      ? diferenciaAngularGrados(rumboTramo, estado.brjSensorActual)
+      : 0;
+    estado.calibrado = true;
     estado.desfaseMiradaGrados = 0;
-    estado.brjSensorBase = estado.brjSensorActual;
     if (arTurnHint) arTurnHint.hidden = true;
     dibujarMinimapa();
   });
