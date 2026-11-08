@@ -1911,7 +1911,11 @@ window.ARGOS_CAMPUS_DATA = {
   // 9. CÁMARA WEB Y ESCÁNER DE CÓDIGOS QR
   // ============================================================================
   let streamCamara = null;
-  let detectorQR = null;
+  let detectorQR = null;          // BarcodeDetector nativo (Chrome Android)
+  let jsQRCargando = false;       // Respaldo jsQR (iPhone/Safari y navegadores sin BarcodeDetector)
+  const lienzoQR = document.createElement("canvas");
+  const ctxQR = lienzoQR.getContext("2d", { willReadFrequently: true });
+
   if ("BarcodeDetector" in window) {
     try {
       detectorQR = new window.BarcodeDetector({ formats: ["qr_code"] });
@@ -1920,8 +1924,41 @@ window.ARGOS_CAMPUS_DATA = {
     }
   }
 
+  function cargarJsQRSiHaceFalta() {
+    if (detectorQR || typeof window.jsQR === "function" || jsQRCargando) return;
+    jsQRCargando = true;
+    const s = document.createElement("script");
+    s.src = "vendor/jsQR.js";
+    s.async = true;
+    s.onerror = () => {
+      jsQRCargando = false;
+      locationModeBadge.textContent = "⚠️ Lector QR no disponible: usa los botones de nodo";
+    };
+    document.head.appendChild(s);
+  }
+
+  async function leerQRDeVideo(video) {
+    if (detectorQR) {
+      const codigos = await detectorQR.detect(video);
+      return codigos && codigos.length > 0 ? codigos[0].rawValue || "" : null;
+    }
+    if (typeof window.jsQR !== "function" || !video.videoWidth) return null;
+    const escala = Math.min(1, 640 / video.videoWidth);
+    lienzoQR.width = Math.round(video.videoWidth * escala);
+    lienzoQR.height = Math.round(video.videoHeight * escala);
+    ctxQR.drawImage(video, 0, 0, lienzoQR.width, lienzoQR.height);
+    const img = ctxQR.getImageData(0, 0, lienzoQR.width, lienzoQR.height);
+    const codigo = window.jsQR(img.data, img.width, img.height, { inversionAttempts: "dontInvert" });
+    return codigo ? codigo.data : null;
+  }
+
   async function activarCamara(videoEl) {
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      locationModeBadge.textContent = window.isSecureContext
+        ? "⚠️ Este navegador no permite usar la cámara"
+        : "⚠️ La cámara requiere abrir la página con https://";
+      return;
+    }
     try {
       if (!streamCamara) {
         streamCamara = await navigator.mediaDevices.getUserMedia({
@@ -1931,8 +1968,36 @@ window.ARGOS_CAMPUS_DATA = {
       }
       videoEl.srcObject = streamCamara;
       await videoEl.play();
-    } catch (_) {}
+      cargarJsQRSiHaceFalta();
+    } catch (err) {
+      console.warn("ARGOS cámara:", err);
+      locationModeBadge.textContent =
+        err && err.name === "NotAllowedError"
+          ? "📷 Permite la cámara en el navegador y recarga"
+          : "📷 Toca la pantalla para activar la cámara";
+    }
   }
+
+  // iPhone/iPad (iOS 13+): la brújula y el podómetro requieren permiso pedido dentro de un toque
+  let permisosSensoresPedidos = false;
+  async function solicitarPermisosSensores() {
+    if (permisosSensoresPedidos) return;
+    permisosSensoresPedidos = true;
+    try {
+      if (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === "function") {
+        await DeviceOrientationEvent.requestPermission();
+      }
+      if (window.DeviceMotionEvent && typeof DeviceMotionEvent.requestPermission === "function") {
+        await DeviceMotionEvent.requestPermission();
+      }
+    } catch (err) {
+      console.warn("ARGOS sensores:", err);
+    }
+    // Reintentar la cámara si el navegador exigía un gesto del usuario para reproducir el video
+    const v = document.getElementById("arVideo");
+    if (v && (!v.srcObject || v.paused)) activarCamara(v);
+  }
+  document.addEventListener("click", solicitarPermisosSensores, { once: true, capture: true });
 
   function fijarUbicacionPorNodo(idNodo, fuente = "QR") {
     if (!nodosPorId.has(idNodo)) return;
@@ -1953,16 +2018,18 @@ window.ARGOS_CAMPUS_DATA = {
     if (dlg && dlg.open) dlg.close();
   }
 
+  let leyendoQR = false;
   setInterval(async () => {
-    if (!detectorQR || !streamCamara) return;
+    if (!streamCamara || leyendoQR) return;
     const videoActivo = document.getElementById("dialogQrScanner")?.open
       ? document.getElementById("qrScannerVideo")
       : document.getElementById("arVideo");
     if (!videoActivo || videoActivo.readyState < 2) return;
+    leyendoQR = true;
     try {
-      const codigos = await detectorQR.detect(videoActivo);
-      if (codigos && codigos.length > 0) {
-        const texto = (codigos[0].rawValue || "").trim();
+      const leido = await leerQRDeVideo(videoActivo);
+      if (leido) {
+        const texto = leido.trim();
         const match = texto.match(/N\d{2}/i);
         if (match) {
           const idDetectado = match[0].toUpperCase();
@@ -1971,8 +2038,11 @@ window.ARGOS_CAMPUS_DATA = {
           }
         }
       }
-    } catch (_) {}
-  }, 900);
+    } catch (_) {
+    } finally {
+      leyendoQR = false;
+    }
+  }, 700);
 
   // ============================================================================
   // 10. SELECTORES, TARJETAS QR Y EVENTOS
