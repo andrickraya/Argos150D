@@ -1,7 +1,37 @@
 (() => {
-  const datos = window.CAMPUS_DATA;
+  // Adaptador: campus_data.js (generado por osm_a_unity.py) publica window.ARGOS_CAMPUS_DATA
+  // con nombres en español (nodos/nombre/aristas). La app usa nodes/name/edges/bounds.
+  function adaptarDatosCampus(fuente) {
+    if (!fuente) return null;
+    if (Array.isArray(fuente.nodes) && Array.isArray(fuente.edges) && fuente.bounds) return fuente;
+    const nodes = (fuente.nodes || fuente.nodos || []).map((n) => ({
+      ...n,
+      name: n.name || n.nombre || n.id,
+      category: n.category || n.categoria || ""
+    }));
+    if (nodes.length === 0) return null;
+    const margen = 25;
+    const xs = nodes.map((n) => n.x);
+    const zs = nodes.map((n) => n.z);
+    return {
+      ...fuente,
+      nodes,
+      edges: fuente.edges || fuente.aristas || [],
+      origen: fuente.origen || null,
+      bounds: fuente.bounds || {
+        minX: Math.min(...xs) - margen,
+        maxX: Math.max(...xs) + margen,
+        minZ: Math.min(...zs) - margen,
+        maxZ: Math.max(...zs) + margen
+      }
+    };
+  }
+
+  const datos = adaptarDatosCampus(window.CAMPUS_DATA || window.ARGOS_CAMPUS_DATA);
   if (!datos) {
-    console.error("No se encontró window.CAMPUS_DATA.");
+    console.error("ARGOS: no se encontraron datos del campus (window.ARGOS_CAMPUS_DATA).");
+    const aviso = document.getElementById("locationModeBadge");
+    if (aviso) aviso.textContent = "⚠️ Error: no cargaron los datos del campus";
     return;
   }
 
@@ -995,8 +1025,9 @@
     dibujarMinimapa();
   });
 
-  const IBERO_LAT0 = 19.3705;
-  const IBERO_LON0 = -99.2636;
+  // Origen (0,0) del sistema de coordenadas del mapa: debe ser el MISMO que usó osm_a_unity.py
+  const IBERO_LAT0 = datos.origen ? datos.origen.lat : 19.37024335;
+  const IBERO_LON0 = datos.origen ? datos.origen.lon : -99.26414455;
   btnToggleGps.addEventListener("click", () => {
     if (!("geolocation" in navigator)) {
       alert("Tu navegador no soporta geolocalización GPS.");
