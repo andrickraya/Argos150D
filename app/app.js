@@ -40,20 +40,71 @@
   // ============================================================================
   const nodosPorId = new Map(datos.nodes.map((n) => [n.id, n]));
   const adyacencia = new Map();
-  datos.nodes.forEach((n) => adyacencia.set(n.id, []));
 
   function distanciaMetros(a, b) {
     return Math.hypot(b.x - a.x, b.z - a.z);
   }
 
-  datos.edges.forEach(([u, v]) => {
-    const na = nodosPorId.get(u);
-    const nb = nodosPorId.get(v);
-    if (!na || !nb) return;
-    const peso = distanciaMetros(na, nb);
-    adyacencia.get(u).push({ Vecino: v, Peso: peso });
-    adyacencia.get(v).push({ Vecino: u, Peso: peso });
-  });
+  // lat/lon -> metros (X = Este, Z = Norte). MISMA fórmula que proyecto/tools/osm_a_unity.py,
+  // así un punto GPS cae igual en la app y en Unity.
+  const LAT0 = datos.origen ? datos.origen.lat : 19.37024335;
+  const LON0 = datos.origen ? datos.origen.lon : -99.26414455;
+  const RADIO_TIERRA = 6378137.0;
+  function latLonAMetros(lat, lon) {
+    const r = Math.PI / 180;
+    return {
+      x: RADIO_TIERRA * (lon - LON0) * r * Math.cos(LAT0 * r),
+      z: RADIO_TIERRA * (lat - LAT0) * r
+    };
+  }
+
+  // Pines puestos en campo con GPS (ver "📍 Poner pines con GPS"): reemplazan la posición del nodo
+  const CLAVE_PINES = "argos_pines_v1";
+  function leerPines() {
+    try { return JSON.parse(localStorage.getItem(CLAVE_PINES) || "{}") || {}; } catch (_) { return {}; }
+  }
+  function guardarPinesLocal(pines) {
+    try { localStorage.setItem(CLAVE_PINES, JSON.stringify(pines)); } catch (_) {}
+  }
+  const posicionOriginal = new Map(datos.nodes.map((n) => [n.id, { x: n.x, z: n.z, lat: n.lat, lon: n.lon }]));
+  function aplicarPines() {
+    const pines = leerPines();
+    datos.nodes.forEach((n) => {
+      const p = pines[n.id];
+      const o = posicionOriginal.get(n.id);
+      if (p && Number.isFinite(p.lat) && Number.isFinite(p.lon)) {
+        const m = latLonAMetros(p.lat, p.lon);
+        Object.assign(n, { x: m.x, z: m.z, lat: p.lat, lon: p.lon });
+      } else {
+        Object.assign(n, o);
+      }
+    });
+  }
+
+  function reconstruirGrafo() {
+    adyacencia.clear();
+    datos.nodes.forEach((n) => adyacencia.set(n.id, []));
+    datos.edges.forEach(([u, v]) => {
+      const na = nodosPorId.get(u);
+      const nb = nodosPorId.get(v);
+      if (!na || !nb) return;
+      const peso = distanciaMetros(na, nb);
+      adyacencia.get(u).push({ Vecino: v, Peso: peso });
+      adyacencia.get(v).push({ Vecino: u, Peso: peso });
+    });
+    const margen = 25;
+    const xs = datos.nodes.map((n) => n.x);
+    const zs = datos.nodes.map((n) => n.z);
+    datos.bounds = {
+      minX: Math.min(...xs) - margen,
+      maxX: Math.max(...xs) + margen,
+      minZ: Math.min(...zs) - margen,
+      maxZ: Math.max(...zs) + margen
+    };
+  }
+
+  aplicarPines();
+  reconstruirGrafo();
 
   function calcularRutaDijkstra(origenId, destinoId) {
     const dist = new Map();
@@ -1201,9 +1252,7 @@
     dibujarMinimapa();
   });
 
-  // Origen (0,0) del sistema de coordenadas del mapa: debe ser el MISMO que usó osm_a_unity.py
-  const IBERO_LAT0 = datos.origen ? datos.origen.lat : 19.37024335;
-  const IBERO_LON0 = datos.origen ? datos.origen.lon : -99.26414455;
+  // El GPS usa latLonAMetros (sección 1), igual que osm_a_unity.py
   btnToggleGps.addEventListener("click", () => {
     if (!("geolocation" in navigator)) {
       alert("Tu navegador no soporta geolocalización GPS.");
@@ -1224,8 +1273,7 @@
     estado.gpsWatchId = navigator.geolocation.watchPosition(
       (pos) => {
         const { latitude, longitude } = pos.coords;
-        const dxMetros = (longitude - IBERO_LON0) * 111320 * Math.cos((IBERO_LAT0 * Math.PI) / 180);
-        const dzMetros = (latitude - IBERO_LAT0) * 110540;
+        const { x: dxMetros, z: dzMetros } = latLonAMetros(latitude, longitude);
 
         if (Math.hypot(dxMetros, dzMetros) < 600) {
           estado.usuarioX = dxMetros;
@@ -1538,6 +1586,186 @@
   }
 
   // ============================================================================
+  // 10b. PONER PINES CON GPS: corregir en campo la posición real de cada nodo
+  //      Se promedian ~20 s de lecturas GPS (pesadas por precisión) y se guardan en el celular.
+  //      "Enviar resultados" genera el CSV con el formato de proyecto/tools/lugares_propios.csv.
+  // ============================================================================
+  function configurarPines() {
+    const dlg = document.getElementById("dialogPines");
+    if (!dlg) return;
+    const selectPin = document.getElementById("selectPin");
+    const btnGuardar = document.getElementById("btnGuardarPin");
+    const txtEstado = document.getElementById("pinEstado");
+    const lista = document.getElementById("listaPines");
+    const btnEnviar = document.getElementById("btnEnviarPines");
+    const btnBorrar = document.getElementById("btnBorrarPines");
+    const SEGUNDOS = 20;
+
+    datos.nodes.forEach((n) => {
+      const o = document.createElement("option");
+      o.value = n.id;
+      o.textContent = `${n.id} — ${n.name}`;
+      selectPin.appendChild(o);
+    });
+
+    const movidoMetros = (id) => {
+      const n = nodosPorId.get(id);
+      const o = posicionOriginal.get(id);
+      return Math.hypot(n.x - o.x, n.z - o.z);
+    };
+
+    function pintarLista() {
+      const pines = leerPines();
+      lista.innerHTML = "";
+      let cuantos = 0;
+      datos.nodes.forEach((n) => {
+        const p = pines[n.id];
+        if (!p) return;
+        cuantos++;
+        const li = document.createElement("li");
+        li.style.padding = "3px 0";
+        li.textContent = `✅ ${n.id} ${n.name} · ±${p.acc} m · se movió ${Math.round(movidoMetros(n.id))} m`;
+        lista.appendChild(li);
+      });
+      btnEnviar.textContent = `📤 Enviar resultados (${cuantos}/${datos.nodes.length})`;
+    }
+
+    let idWatch = null;
+    let temporizador = null;
+    let reloj = null;
+    let muestras = [];
+    let idMidiendo = null;
+    let t0 = 0;
+
+    function detenerCaptura() {
+      if (idWatch !== null) navigator.geolocation.clearWatch(idWatch);
+      idWatch = null;
+      clearTimeout(temporizador);
+      clearInterval(reloj);
+      btnGuardar.textContent = "📍 Guardar mi posición aquí";
+    }
+
+    function mostrarProgreso() {
+      const seg = Math.round((Date.now() - t0) / 1000);
+      const mejor = muestras.length ? Math.round(Math.min(...muestras.map((m) => m.acc))) : null;
+      txtEstado.textContent = muestras.length
+        ? `⏳ Midiendo ${idMidiendo}… ${seg}/${SEGUNDOS} s · ${muestras.length} lecturas · mejor ±${mejor} m. No te muevas.`
+        : `⏳ Buscando señal GPS… ${seg} s`;
+    }
+
+    function terminarCaptura() {
+      detenerCaptura();
+      if (!muestras.length) {
+        txtEstado.textContent = "❌ No llegó ninguna lectura buena. Sal a un lugar sin techo y vuelve a intentar.";
+        return;
+      }
+      // Solo las lecturas cercanas a la mejor precisión, promediadas con peso 1/precisión²
+      const mejor = Math.min(...muestras.map((m) => m.acc));
+      const usar = muestras.filter((m) => m.acc <= Math.max(mejor * 1.5, mejor + 3));
+      let sw = 0, slat = 0, slon = 0;
+      usar.forEach((m) => {
+        const wgt = 1 / (m.acc * m.acc);
+        sw += wgt; slat += m.lat * wgt; slon += m.lon * wgt;
+      });
+      const pines = leerPines();
+      pines[idMidiendo] = {
+        lat: Number((slat / sw).toFixed(7)),
+        lon: Number((slon / sw).toFixed(7)),
+        acc: Math.round(mejor),
+        n: usar.length,
+        t: new Date().toISOString()
+      };
+      guardarPinesLocal(pines);
+      aplicarPines();
+      reconstruirGrafo();
+      recalcularRutaCompleta();
+      const n = nodosPorId.get(idMidiendo);
+      txtEstado.textContent = `✅ ${n.id} ${n.name} guardado (±${Math.round(mejor)} m). Se movió ${Math.round(movidoMetros(n.id))} m respecto al mapa anterior.`;
+      if (navigator.vibrate) navigator.vibrate(150);
+      pintarLista();
+    }
+
+    btnGuardar.addEventListener("click", () => {
+      if (idWatch !== null) { terminarCaptura(); return; } // tocar otra vez = terminar antes
+      if (!("geolocation" in navigator)) {
+        txtEstado.textContent = "❌ Este navegador no da ubicación GPS.";
+        return;
+      }
+      muestras = [];
+      idMidiendo = selectPin.value;
+      t0 = Date.now();
+      btnGuardar.textContent = "⏹️ Terminar ya";
+      mostrarProgreso();
+      reloj = setInterval(mostrarProgreso, 1000);
+      idWatch = navigator.geolocation.watchPosition(
+        (pos) => {
+          const { latitude, longitude, accuracy } = pos.coords;
+          if (!Number.isFinite(accuracy) || accuracy > 60) return; // lectura muy mala: ignorar
+          muestras.push({ lat: latitude, lon: longitude, acc: Math.max(1, accuracy) });
+          mostrarProgreso();
+        },
+        (err) => {
+          txtEstado.textContent = err && err.code === 1
+            ? "❌ Permite la ubicación: Ajustes › Privacidad › Localización › Safari → Mientras se usa."
+            : "⚠️ Sin señal GPS todavía… sigue quieto, de preferencia sin techo.";
+        },
+        { enableHighAccuracy: true, maximumAge: 0, timeout: 30000 }
+      );
+      temporizador = setTimeout(terminarCaptura, SEGUNDOS * 1000);
+    });
+
+    dlg.addEventListener("close", () => { if (idWatch !== null) terminarCaptura(); });
+    const abrir = document.querySelector('[commandfor="dialogPines"][command="show-modal"]');
+    if (abrir) abrir.addEventListener("click", () => {
+      if (idWatch === null) selectPin.value = estado.origenId;
+      pintarLista();
+    });
+
+    function textoCSV() {
+      const pines = leerPines();
+      const filas = ["nombre,lat,lon,tipo,id,precision_m,fuente"];
+      datos.nodes.forEach((n) => {
+        const p = pines[n.id];
+        const o = posicionOriginal.get(n.id);
+        const lat = p ? p.lat : o.lat;
+        const lon = p ? p.lon : o.lon;
+        filas.push(`${n.name},${lat},${lon},destino,${n.id},${p ? p.acc : ""},${p ? "gps" : "mapa"}`);
+      });
+      return filas.join("\n");
+    }
+
+    btnEnviar.addEventListener("click", async () => {
+      const texto = textoCSV();
+      try {
+        if (navigator.share) {
+          await navigator.share({ title: "ARGOS pines GPS", text: texto });
+          return;
+        }
+      } catch (err) {
+        if (err && err.name === "AbortError") return; // el usuario cerró el menú de compartir
+      }
+      try {
+        await navigator.clipboard.writeText(texto);
+        txtEstado.textContent = "📋 Copiado. Pégalo en WhatsApp/Notas y mándamelo.";
+      } catch (_) {
+        window.prompt("Copia este texto y mándamelo:", texto);
+      }
+    });
+
+    btnBorrar.addEventListener("click", () => {
+      if (!window.confirm("¿Borrar TODOS los pines guardados en este celular?")) return;
+      guardarPinesLocal({});
+      aplicarPines();
+      reconstruirGrafo();
+      recalcularRutaCompleta();
+      txtEstado.textContent = "🗑️ Pines borrados: se usan las posiciones del mapa original.";
+      pintarLista();
+    });
+
+    pintarLista();
+  }
+
+  // ============================================================================
   // 11. FALLBACKS WEB MODERNOS (DECLARATIVE DIALOG, LIGHT DISMISS, 2D PANNING)
   // ============================================================================
   function configurarFallbacksWebModernos() {
@@ -1603,6 +1831,7 @@
   // ============================================================================
   inicializarControles();
   configurarFallbacksWebModernos();
+  configurarPines();
   recalcularRutaCompleta();
   activarCamara(document.getElementById("arVideo"));
   requestAnimationFrame(renderizarBucleAR);
