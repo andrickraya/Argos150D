@@ -731,6 +731,7 @@
           <button type="button" class="preset-pill" data-preset="N01,N15">Puerta 3 → La Karpa</button>
           <button type="button" class="preset-pill" data-preset="N02,N07">Biblioteca → Salón C</button>
           <button type="button" id="btnToggleGps" class="preset-pill">🛰️ Activar GPS Real</button>
+          <button type="button" id="btnDemo" class="preset-pill">🎬 Demo (avanza sola)</button>
         </div>
 
         <div class="itinerary-block">
@@ -969,6 +970,7 @@ window.ARGOS_CAMPUS_DATA = {
     mostrarEtiquetas: true,
     modoVista: "ar",
     caminandoSim: false,
+    navegando: false,    // true = "Caminar" activo: tus pasos reales te mueven en la ruta
     gpsActivo: false,
     gpsWatchId: null,
     pasosDetectados: 0,
@@ -1112,11 +1114,9 @@ window.ARGOS_CAMPUS_DATA = {
   }
 
   function avanzarMetrosEnRuta(metros) {
-    if (estado.ruta.length < 2) return;
-    if (estado.indiceActual >= estado.ruta.length - 1) {
-      estado.indiceActual = 0;
-      estado.progresoTramo = 0;
-    }
+    // Ya en el destino: un paso de más NO debe regresarte al origen
+    if (estado.ruta.length < 2 || estado.indiceActual >= estado.ruta.length - 1) return;
+    const indiceAntes = estado.indiceActual;
 
     let restantePorAvanzar = metros;
     while (restantePorAvanzar > 0 && estado.indiceActual < estado.ruta.length - 1) {
@@ -1141,8 +1141,10 @@ window.ARGOS_CAMPUS_DATA = {
     dibujarMapa2D();
     dibujarMinimapa();
 
-    if (estado.indiceActual >= estado.ruta.length - 1 && estado.caminandoSim) {
-      detenerSimulacionCaminata();
+    if (estado.indiceActual !== indiceAntes && navigator.vibrate) navigator.vibrate(120);
+    if (estado.indiceActual >= estado.ruta.length - 1) {
+      if (estado.caminandoSim) detenerSimulacionCaminata();
+      if (estado.navegando) detenerNavegacion("🏁 Llegaste a tu destino");
     }
   }
 
@@ -1182,26 +1184,125 @@ window.ARGOS_CAMPUS_DATA = {
     arrastrandoAR = false;
   });
 
-  // Proyecta un punto 3D del piso (xMetros lateral, yMetros altura, zMetros distancia hacia adelante)
-  // a coordenadas de pantalla (sx, sy) ubicadas entre el 40% y el 82% de la altura (arriba del menú compacto)
-  function proyectarPuntoPiso3D(xMetros, yMetros, zMetros, w, h, yawRad) {
-    // Rotar según el giro de la cámara (yawRad)
-    const cosY = Math.cos(yawRad);
-    const sinY = Math.sin(yawRad);
-    const rx = xMetros * cosY - zMetros * sinY;
-    const rz = xMetros * sinY + zMetros * cosY;
+  // ---- Cámara virtual = cámara real del celular ----
+  // Ajustables desde la URL sin volver a publicar:  ?fov=67&h=1.4
+  //   fov = campo de visión (grados) del lado LARGO de la cámara trasera (iPhone principal ≈ 67°)
+  //   h   = altura del celular sobre el piso en metros (en la mano ≈ 1.4)
+  const parametrosURL = new URLSearchParams(location.search);
+  const limitar = (v, a, b) => Math.min(b, Math.max(a, v));
+  const FOV_LARGO_GRADOS = limitar(Number(parametrosURL.get("fov")) || 67, 30, 120);
+  const ALTURA_CAMARA = limitar(Number(parametrosURL.get("h")) || 1.4, 0.5, 2.5);
+  const videoAR = document.getElementById("arVideo");
 
-    if (rz <= 0.45) return null; // Detrás de la cámara
+  // "Arriba del mundo" medido en ejes del celular (x = derecha de la pantalla, y = arriba, z = hacia ti).
+  // Sale de beta/gamma del sensor y se filtra como vector: así no hay saltos de gamma cerca de ±90°.
+  // Sin sensor (PC): celular inclinado 30° hacia el piso.
+  estado.arribaDispositivo = [0, Math.sin((60 * Math.PI) / 180), Math.cos((60 * Math.PI) / 180)];
 
-    const horizonteY = h * 0.39;
-    const alturaCamara = 1.55;
-    const fovEscala = Math.min(w, h) * 0.78;
+  function registrarInclinacion(beta, gamma) {
+    if (!Number.isFinite(beta) || !Number.isFinite(gamma)) return;
+    const r = Math.PI / 180;
+    const cB = Math.cos(beta * r), sB = Math.sin(beta * r);
+    const cG = Math.cos(gamma * r), sG = Math.sin(gamma * r);
+    const nuevo = [-cB * sG, sB, cB * cG]; // fila "arriba" de R = Rx(beta)·Ry(gamma) (W3C)
+    const a = estado.arribaDispositivo;
+    const k = 0.2; // filtro paso-bajo: quita temblor de la mano
+    const m = [a[0] + k * (nuevo[0] - a[0]), a[1] + k * (nuevo[1] - a[1]), a[2] + k * (nuevo[2] - a[2])];
+    const n = Math.hypot(m[0], m[1], m[2]) || 1;
+    estado.arribaDispositivo = [m[0] / n, m[1] / n, m[2] / n];
+  }
 
-    const sx = w * 0.5 + (rx / rz) * fovEscala;
-    const sy = horizonteY + ((alturaCamara - yMetros) / rz) * (h * 0.46);
-    const escala = fovEscala / rz;
+  // Ejes del mundo (Este, Norte, Arriba) expresados en ejes del celular.
+  // "Norte" aquí = hacia donde mira el usuario (dirección de la cámara + parte de arriba del celular).
+  function ejesMundoEnDispositivo() {
+    const u = estado.arribaDispositivo;
+    let f = [0, 1, -1];
+    const pu = f[0] * u[0] + f[1] * u[1] + f[2] * u[2];
+    f = [f[0] - pu * u[0], f[1] - pu * u[1], f[2] - pu * u[2]];
+    let nf = Math.hypot(f[0], f[1], f[2]);
+    if (nf < 1e-3) { f = [0, 1, 0]; nf = 1; }
+    f = [f[0] / nf, f[1] / nf, f[2] / nf];
+    const e = [f[1] * u[2] - f[2] * u[1], f[2] * u[0] - f[0] * u[2], f[0] * u[1] - f[1] * u[0]]; // f × u
+    return { e, f, u };
+  }
 
-    return { sx, sy, rz, escala };
+  // Distancia focal en píxeles CSS: el video usa object-fit: cover, así que se escala y se recorta.
+  function distanciaFocalPx(w, h) {
+    const vw = videoAR && videoAR.videoWidth;
+    const vh = videoAR && videoAR.videoHeight;
+    const tanMedio = Math.tan((FOV_LARGO_GRADOS * Math.PI) / 360);
+    if (vw && vh) {
+      const escala = Math.max(w / vw, h / vh);
+      return (escala * Math.max(vw, vh)) / 2 / tanMedio;
+    }
+    return Math.max(w, h) / 2 / tanMedio;
+  }
+
+  // Prepara la cámara de este cuadro. yawRad = desfase (la cámara mira yawRad a la derecha del pasillo).
+  function crearCamara(w, h, yawRad) {
+    const ang = ((screen.orientation && screen.orientation.angle) || window.orientation || 0) * (Math.PI / 180);
+    return {
+      w, h,
+      ejes: ejesMundoEnDispositivo(),
+      foco: distanciaFocalPx(w, h),
+      cosY: Math.cos(yawRad), sinY: Math.sin(yawRad),
+      cosP: Math.cos(ang), sinP: Math.sin(ang)
+    };
+  }
+
+  // Proyecta un punto del marco del pasillo (x = metros a la derecha, z = metros hacia adelante,
+  // y = altura sobre el piso) a pantalla. Devuelve null si queda detrás o demasiado cerca de la cámara.
+  function proyectarPuntoPiso3D(xMetros, yMetros, zMetros, cam) {
+    const lat = xMetros * cam.cosY - zMetros * cam.sinY;
+    const fwd = xMetros * cam.sinY + zMetros * cam.cosY;
+    const alt = yMetros - ALTURA_CAMARA;
+    const { e, f, u } = cam.ejes;
+    const dx = lat * e[0] + fwd * f[0] + alt * u[0];
+    const dy = lat * e[1] + fwd * f[1] + alt * u[1];
+    const dz = lat * e[2] + fwd * f[2] + alt * u[2];
+    const prof = -dz; // la cámara trasera mira hacia -z
+    if (prof < 0.25) return null;
+    const px = dx * cam.cosP - dy * cam.sinP;
+    const py = dx * cam.sinP + dy * cam.cosP;
+    const sx = cam.w / 2 + (cam.foco * px) / prof;
+    const sy = cam.h / 2 - (cam.foco * py) / prof;
+    if (Math.abs(sx) > cam.w * 6 || Math.abs(sy) > cam.h * 6) return null;
+    return { sx, sy, rz: prof, escala: cam.foco / prof };
+  }
+
+  // Camino que falta por recorrer, en el marco del pasillo actual (usuario en 0,0; pasillo hacia +z).
+  function caminoLocal(maxMetros) {
+    const { rumboTramo } = obtenerTramoActivo();
+    const th = (rumboTramo * Math.PI) / 180;
+    const s = Math.sin(th), c = Math.cos(th);
+    const pts = [{ x: 0, z: 0 }];
+    let largo = 0;
+    for (let i = estado.indiceActual + 1; i < estado.ruta.length && largo < maxMetros; i++) {
+      const dE = estado.ruta[i].x - estado.usuarioX;
+      const dN = estado.ruta[i].z - estado.usuarioZ;
+      const p = { x: dE * c - dN * s, z: dE * s + dN * c };
+      const ant = pts[pts.length - 1];
+      const seg = Math.hypot(p.x - ant.x, p.z - ant.z);
+      if (seg < 0.05) continue;
+      largo += seg;
+      pts.push(p);
+    }
+    return { pts, largo };
+  }
+
+  // Punto y dirección a "s" metros sobre el camino
+  function puntoEnCamino(pts, s) {
+    let resto = s;
+    for (let i = 1; i < pts.length; i++) {
+      const a = pts[i - 1], b = pts[i];
+      const seg = Math.hypot(b.x - a.x, b.z - a.z);
+      if (resto <= seg || i === pts.length - 1) {
+        const t = seg > 0 ? Math.min(1, resto / seg) : 0;
+        return { x: a.x + (b.x - a.x) * t, z: a.z + (b.z - a.z) * t, dx: (b.x - a.x) / seg, dz: (b.z - a.z) / seg };
+      }
+      resto -= seg;
+    }
+    return { x: 0, z: 0, dx: 0, dz: 1 };
   }
 
   function renderizarBucleAR(tiempoMs) {
@@ -1223,11 +1324,14 @@ window.ARGOS_CAMPUS_DATA = {
     // Al llegar al destino no hay pasillo que seguir: flechas al frente y sin avisos de giro
     estado.desfaseMiradaGrados = llegoAlFinal ? 0 : diferenciaAngularGrados(rumboMirada, rumboPasillo);
 
-    const yawRad = (estado.desfaseMiradaGrados * Math.PI) / 180;
+    const cam = crearCamara(w, h, (estado.desfaseMiradaGrados * Math.PI) / 180);
+    const miraArriba = -estado.arribaDispositivo[2] > 0.05; // la cámara apunta arriba del horizonte
 
-    // Aviso si el usuario giró más de 38° lejos del pasillo
     if (arTurnHint && arTurnHintText) {
-      if (!llegoAlFinal && estado.brjSensorActual !== null && !estado.brujulaAbsoluta && !estado.calibrado) {
+      if (miraArriba) {
+        arTurnHint.hidden = false;
+        arTurnHintText.textContent = "📱 Inclina el celular hacia el piso para ver las flechas";
+      } else if (!llegoAlFinal && estado.brjSensorActual !== null && !estado.brujulaAbsoluta && !estado.calibrado) {
         arTurnHint.hidden = false;
         arTurnHintText.textContent = "🧭 Apunta el celular hacia el pasillo y toca '🎯 Centrar flechas'";
       } else if (Math.abs(estado.desfaseMiradaGrados) > 38) {
@@ -1241,137 +1345,102 @@ window.ARGOS_CAMPUS_DATA = {
       }
     }
 
-    const { actual, siguiente, distRestanteTramo } = obtenerTramoActivo();
-    const enDestino = actual.id === siguiente.id || distRestanteTramo < 0.8;
+    const { siguiente, distRestanteTramo } = tramoVista;
+    const enDestino = llegoAlFinal || distRestanteTramo < 0.8;
+    const P = (x, y, z) => proyectarPuntoPiso3D(x, y, z, cam);
 
-    // 1. Dibujar la alfombra 3D perspectiva del pasillo (de z = 1.1m a z = 12.5m)
-    const zCerca = 1.1;
-    const zLejos = 12.5;
-    const anchoMedio = 0.62;
-
-    const pIzqCerca = proyectarPuntoPiso3D(-anchoMedio, 0, zCerca, w, h, yawRad);
-    const pDerCerca = proyectarPuntoPiso3D(anchoMedio, 0, zCerca, w, h, yawRad);
-    const pDerLejos = proyectarPuntoPiso3D(anchoMedio, 0, zLejos, w, h, yawRad);
-    const pIzqLejos = proyectarPuntoPiso3D(-anchoMedio, 0, zLejos, w, h, yawRad);
-
-    if (pIzqCerca && pDerCerca && pDerLejos && pIzqLejos) {
-      const gradCinta = arCtx.createLinearGradient(0, pIzqCerca.sy, 0, pIzqLejos.sy);
-      if (enDestino) {
-        gradCinta.addColorStop(0, "rgba(52, 199, 89, 0.55)");
-        gradCinta.addColorStop(1, "rgba(52, 199, 89, 0.08)");
-      } else {
-        gradCinta.addColorStop(0, "rgba(0, 113, 227, 0.62)");
-        gradCinta.addColorStop(0.7, "rgba(0, 198, 255, 0.35)");
-        gradCinta.addColorStop(1, "rgba(0, 198, 255, 0.05)");
-      }
-
+    // 1. Alfombra sobre el piso que sigue la ruta real (incluye la vuelta en el siguiente nodo)
+    const camino = enDestino ? { pts: [{ x: 0, z: 0 }, { x: 0, z: 3 }], largo: 3 } : caminoLocal(18);
+    const largoVisible = Math.min(18, camino.largo);
+    const anchoMedio = 0.6;
+    const paso = 0.6;
+    const bordeIzq = [];
+    const bordeDer = [];
+    for (let s = 0.4; s < largoVisible - 0.01; s += paso) {
+      const s2 = Math.min(largoVisible, s + paso);
+      const a = puntoEnCamino(camino.pts, s);
+      const b = puntoEnCamino(camino.pts, s2);
+      // vector a la derecha de la dirección de avance: (dz, -dx)
+      const aI = P(a.x - anchoMedio * a.dz, 0, a.z + anchoMedio * a.dx);
+      const aD = P(a.x + anchoMedio * a.dz, 0, a.z - anchoMedio * a.dx);
+      const bD = P(b.x + anchoMedio * a.dz, 0, b.z - anchoMedio * a.dx);
+      const bI = P(b.x - anchoMedio * a.dz, 0, b.z + anchoMedio * a.dx);
+      bordeIzq.push(aI); bordeDer.push(aD);
+      if (!aI || !aD || !bD || !bI) continue;
+      const alfa = Math.max(0.06, 0.6 * (1 - s / 18));
       arCtx.beginPath();
-      arCtx.moveTo(pIzqCerca.sx, pIzqCerca.sy);
-      arCtx.lineTo(pDerCerca.sx, pDerCerca.sy);
-      arCtx.lineTo(pDerLejos.sx, pDerLejos.sy);
-      arCtx.lineTo(pIzqLejos.sx, pIzqLejos.sy);
+      arCtx.moveTo(aI.sx, aI.sy);
+      arCtx.lineTo(aD.sx, aD.sy);
+      arCtx.lineTo(bD.sx, bD.sy);
+      arCtx.lineTo(bI.sx, bI.sy);
       arCtx.closePath();
-      arCtx.fillStyle = gradCinta;
+      arCtx.fillStyle = enDestino ? `rgba(52, 199, 89, ${alfa})` : `rgba(0, 150, 255, ${alfa})`;
       arCtx.fill();
-
-      // Rieles laterales luminosos
-      arCtx.strokeStyle = enDestino ? "#4ade80" : "#38bdf8";
-      arCtx.lineWidth = 3.5;
-      arCtx.beginPath();
-      arCtx.moveTo(pIzqCerca.sx, pIzqCerca.sy);
-      arCtx.lineTo(pIzqLejos.sx, pIzqLejos.sy);
-      arCtx.moveTo(pDerCerca.sx, pDerCerca.sy);
-      arCtx.lineTo(pDerLejos.sx, pDerLejos.sy);
-      arCtx.stroke();
     }
+    // Rieles laterales luminosos (se cortan donde un punto no es visible)
+    arCtx.strokeStyle = enDestino ? "#4ade80" : "#38bdf8";
+    arCtx.lineWidth = 3;
+    [bordeIzq, bordeDer].forEach((borde) => {
+      arCtx.beginPath();
+      let abierto = false;
+      borde.forEach((p) => {
+        if (!p) { abierto = false; return; }
+        if (abierto) arCtx.lineTo(p.sx, p.sy); else arCtx.moveTo(p.sx, p.sy);
+        abierto = true;
+      });
+      arCtx.stroke();
+    });
 
-    // 2. Dibujar 7 Flechas Chevron 3D grandes y extruidas que avanzan por el piso
+    // 2. Flechas chevron pegadas al piso que avanzan sobre la ruta
     const t = tiempoMs * 0.001;
-    const velocidad = estado.caminandoSim ? 2.6 : 1.25;
-    const numFlechas = 7;
-
-    // Dibujar de atrás hacia adelante para superposición 3D correcta
+    const velocidad = estado.caminandoSim || estado.navegando ? 0.9 : 0.55;
+    const separacion = 1.5;
+    const numFlechas = Math.max(1, Math.floor((largoVisible - 0.8) / separacion));
+    const chevron = [[0, 0.45], [0.46, -0.16], [0.28, -0.34], [0, 0.08], [-0.28, -0.34], [-0.46, -0.16]];
+    // De lejos a cerca para que las cercanas queden encima
     for (let i = numFlechas - 1; i >= 0; i--) {
-      const avanceCiclo = ((t * velocidad + (numFlechas - 1 - i) * 0.16) % 1);
-      const zCentro = 1.35 + i * 1.45 + avanceCiclo * 1.45;
-      if (zCentro > 11.8) continue;
-
-      // Vértices 3D del Chevron sobre el piso (y = 0) y su cara superior extruida (y = 0.06)
-      const punta = proyectarPuntoPiso3D(0, 0.05, zCentro + 0.45, w, h, yawRad);
-      const alaDer = proyectarPuntoPiso3D(0.46, 0.05, zCentro - 0.16, w, h, yawRad);
-      const intDer = proyectarPuntoPiso3D(0.28, 0.05, zCentro - 0.34, w, h, yawRad);
-      const centroInt = proyectarPuntoPiso3D(0, 0.05, zCentro + 0.08, w, h, yawRad);
-      const intIzq = proyectarPuntoPiso3D(-0.28, 0.05, zCentro - 0.34, w, h, yawRad);
-      const alaIzq = proyectarPuntoPiso3D(-0.46, 0.05, zCentro - 0.16, w, h, yawRad);
-
-      if (!punta || !alaDer || !intDer || !centroInt || !intIzq || !alaIzq) continue;
+      const s = 1.0 + ((i + t * velocidad) % numFlechas) * separacion;
+      if (s > largoVisible - 0.3) continue;
+      const c = puntoEnCamino(camino.pts, s);
+      const rx = c.dz, rz = -c.dx; // derecha
+      const vertices = chevron.map(([lado, frente]) =>
+        P(c.x + lado * rx + frente * c.dx, 0.02, c.z + lado * rz + frente * c.dz)
+      );
+      if (vertices.some((v) => !v)) continue;
 
       const pulso = (Math.sin(t * 4.5 - i * 0.7) + 1) * 0.5;
-      const alpha = Math.min(1, Math.max(0.35, 1.15 - zCentro / 12.5));
-
-      // Sombra 3D bajo la flecha para darle volumen sobre el piso real
-      arCtx.save();
-      arCtx.translate(0, 5);
+      const alpha = Math.min(1, Math.max(0.3, 1.1 - s / 16));
       arCtx.beginPath();
-      arCtx.moveTo(punta.sx, punta.sy);
-      arCtx.lineTo(alaDer.sx, alaDer.sy);
-      arCtx.lineTo(intDer.sx, intDer.sy);
-      arCtx.lineTo(centroInt.sx, centroInt.sy);
-      arCtx.lineTo(intIzq.sx, intIzq.sy);
-      arCtx.lineTo(alaIzq.sx, alaIzq.sy);
+      vertices.forEach((v, k) => (k === 0 ? arCtx.moveTo(v.sx, v.sy) : arCtx.lineTo(v.sx, v.sy)));
       arCtx.closePath();
-      arCtx.fillStyle = `rgba(0, 20, 60, ${0.45 * alpha})`;
-      arCtx.fill();
-      arCtx.restore();
-
-      // Cara superior brillante de la flecha 3D
-      arCtx.beginPath();
-      arCtx.moveTo(punta.sx, punta.sy);
-      arCtx.lineTo(alaDer.sx, alaDer.sy);
-      arCtx.lineTo(intDer.sx, intDer.sy);
-      arCtx.lineTo(centroInt.sx, centroInt.sy);
-      arCtx.lineTo(intIzq.sx, intIzq.sy);
-      arCtx.lineTo(alaIzq.sx, alaIzq.sy);
-      arCtx.closePath();
-
       if (enDestino) {
         arCtx.fillStyle = `rgba(74, 222, 128, ${alpha})`;
         arCtx.strokeStyle = "#ffffff";
       } else {
-        const r = Math.round(0 + pulso * 90);
+        const r = Math.round(pulso * 90);
         const g = Math.round(205 + pulso * 50);
         arCtx.fillStyle = `rgba(${r}, ${g}, 255, ${alpha})`;
         arCtx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
       }
-      arCtx.lineWidth = Math.max(1.5, 3.2 - zCentro * 0.2);
+      arCtx.lineWidth = Math.max(1.2, 3 - s * 0.15);
       arCtx.fill();
       arCtx.stroke();
     }
 
-    // 3. Pin 3D de Destino/Parada al final del corredor
-    const zPin = Math.max(2.6, Math.min(10.8, distRestanteTramo));
-    const reboteY = Math.sin(t * 3.5) * 0.12;
-    const pPinBase = proyectarPuntoPiso3D(0, 0, zPin, w, h, yawRad);
-    const pPinAlto = proyectarPuntoPiso3D(0, 1.15 + reboteY, zPin, w, h, yawRad);
+    // 3. Pin en la posición REAL del siguiente nodo (dirección y distancia reales; no se desliza)
+    const zPin = Math.max(1.5, distRestanteTramo);
+    const reboteY = Math.sin(t * 3.5) * 0.08;
+    const pPinBase = P(0, 0, zPin);
+    const pPinAlto = P(0, 1.6 + reboteY, zPin);
 
     if (pPinBase && pPinAlto) {
-      // Anillo pulsante en el suelo
-      const radioAnillo = Math.max(14, 46 / (zPin * 0.25));
+      const radioAnillo = limitar(0.5 * pPinBase.escala, 6, 60);
       arCtx.beginPath();
-      arCtx.ellipse(
-        pPinBase.sx,
-        pPinBase.sy,
-        radioAnillo,
-        radioAnillo * 0.38,
-        0,
-        0,
-        Math.PI * 2
-      );
+      arCtx.ellipse(pPinBase.sx, pPinBase.sy, radioAnillo, radioAnillo * 0.35, 0, 0, Math.PI * 2);
       arCtx.strokeStyle = enDestino ? "#4ade80" : "#38bdf8";
       arCtx.lineWidth = 3;
       arCtx.stroke();
 
-      // Poste de luz vertical
       arCtx.beginPath();
       arCtx.moveTo(pPinBase.sx, pPinBase.sy);
       arCtx.lineTo(pPinAlto.sx, pPinAlto.sy);
@@ -1379,8 +1448,7 @@ window.ARGOS_CAMPUS_DATA = {
       arCtx.lineWidth = 2.5;
       arCtx.stroke();
 
-      // Rombo 3D flotante
-      const tamRombo = Math.max(12, 26 / (zPin * 0.28));
+      const tamRombo = limitar(0.22 * pPinAlto.escala, 9, 30);
       arCtx.beginPath();
       arCtx.moveTo(pPinAlto.sx, pPinAlto.sy - tamRombo);
       arCtx.lineTo(pPinAlto.sx + tamRombo * 0.8, pPinAlto.sy);
@@ -1393,11 +1461,10 @@ window.ARGOS_CAMPUS_DATA = {
       arCtx.strokeStyle = "#ffffff";
       arCtx.stroke();
 
-      // Etiqueta flotante sobre el pin 3D
       const textoPin = `${siguiente.id} · ${siguiente.name} (${Math.round(distRestanteTramo)} m)`;
       arCtx.font = "800 12px Inter, -apple-system, sans-serif";
       const tw = arCtx.measureText(textoPin).width;
-      const bx = pPinAlto.sx - tw / 2 - 10;
+      const bx = limitar(pPinAlto.sx - tw / 2 - 10, 6, w - tw - 26);
       const by = pPinAlto.sy - tamRombo - 30;
       arCtx.fillStyle = "rgba(15, 23, 42, 0.88)";
       arCtx.beginPath();
@@ -1413,7 +1480,7 @@ window.ARGOS_CAMPUS_DATA = {
 
       arCtx.fillStyle = "#ffffff";
       arCtx.textAlign = "center";
-      arCtx.fillText(textoPin, pPinAlto.sx, by + 16);
+      arCtx.fillText(textoPin, bx + (tw + 20) / 2, by + 16);
     }
   }
 
@@ -1782,66 +1849,138 @@ window.ARGOS_CAMPUS_DATA = {
   }
 
   // ============================================================================
-  // 8. SIMULACIÓN DE CAMINATA EN VIVO ("▶️ CAMINAR") + PODÓMETRO + GPS
+  // 8. NAVEGACIÓN REAL POR PASOS ("▶️ CAMINAR") + DEMO AUTOMÁTICA + GPS
+  //    "Caminar" ya NO mueve al usuario solo: cuenta TUS pasos con el acelerómetro.
+  //    La demo (avance automático a velocidad de persona) está en el menú: "🎬 Demo".
   // ============================================================================
+  const PASO_METROS = limitar(Number(parametrosURL.get("paso")) || 0.7, 0.4, 1.1);
+  const SENSIBILIDAD = limitar(Number(parametrosURL.get("sens")) || 1, 0.4, 2.5); // >1 = cuenta pasos más suaves
+  const btnDemo = document.getElementById("btnDemo");
   let idIntervaloCaminata = null;
 
-  function iniciarSimulacionCaminata() {
-    if (estado.caminandoSim) return;
+  function reiniciarSiYaLlego() {
     if (estado.indiceActual >= estado.ruta.length - 1) {
       estado.indiceActual = 0;
       estado.progresoTramo = 0;
       sincronizarCoordenadasUsuarioConProgreso();
+      actualizarHUD();
+      dibujarMapa2D();
+      dibujarMinimapa();
     }
-    // Bajar automáticamente el menú al caminar para que se vea todo el piso AR
+  }
+
+  // ---- Demo automática (para presentar sin caminar): 1.3 m/s, como una persona ----
+  function iniciarSimulacionCaminata() {
+    if (estado.caminandoSim) return;
+    if (estado.navegando) detenerNavegacion();
+    reiniciarSiYaLlego();
     fijarEstadoMenu(true);
     estado.caminandoSim = true;
-    btnWalkSim.classList.add("is-walking");
-    btnWalkSimText.textContent = "⏸️ Pausar";
-    locationModeBadge.textContent = "🏃 Caminando en vivo";
-
-    idIntervaloCaminata = setInterval(() => {
-      avanzarMetrosEnRuta(0.65);
-    }, 80);
+    if (btnDemo) btnDemo.textContent = "⏹️ Detener demo";
+    locationModeBadge.textContent = "🎬 Demo: avanzando solo";
+    idIntervaloCaminata = setInterval(() => avanzarMetrosEnRuta(0.13), 100);
   }
 
   function detenerSimulacionCaminata() {
+    if (!estado.caminandoSim && !idIntervaloCaminata) return;
     estado.caminandoSim = false;
     if (idIntervaloCaminata) {
       clearInterval(idIntervaloCaminata);
       idIntervaloCaminata = null;
     }
-    btnWalkSim.classList.remove("is-walking");
-    btnWalkSimText.textContent = "▶️ Caminar";
+    if (btnDemo) btnDemo.textContent = "🎬 Demo (avanza sola)";
     locationModeBadge.textContent = estado.gpsActivo
       ? "🛰️ Ubicación: GPS Activo"
       : `📍 ${estado.origenId} (QR + Pasos)`;
   }
 
+  if (btnDemo) {
+    btnDemo.addEventListener("click", () => {
+      if (estado.caminandoSim) detenerSimulacionCaminata();
+      else iniciarSimulacionCaminata();
+    });
+  }
+
+  // ---- Navegación real: cada paso detectado avanza PASO_METROS sobre la ruta ----
+  function iniciarNavegacion() {
+    if (estado.navegando) return;
+    detenerSimulacionCaminata();
+    reiniciarSiYaLlego();
+    estado.navegando = true;
+    estado.pasosDetectados = 0;
+    podometro.racha = 0;
+    podometro.inicioNavMs = performance.now();
+    fijarEstadoMenu(true);
+    btnWalkSim.classList.add("is-walking");
+    btnWalkSimText.textContent = "⏸️ Pausar";
+    locationModeBadge.textContent = "👣 Camina con el celular al frente";
+  }
+
+  function detenerNavegacion(mensaje) {
+    estado.navegando = false;
+    btnWalkSim.classList.remove("is-walking");
+    btnWalkSimText.textContent = "▶️ Caminar";
+    locationModeBadge.textContent = mensaje || `⏸️ Pausado · ${estado.pasosDetectados} pasos`;
+  }
+
   btnWalkSim.addEventListener("click", () => {
-    if (estado.caminandoSim) {
-      detenerSimulacionCaminata();
-    } else {
-      iniciarSimulacionCaminata();
+    if (estado.navegando) detenerNavegacion();
+    else iniciarNavegacion();
+  });
+
+  // ---- Podómetro: detecta el "sube y baja" del cuerpo al caminar ----
+  // 1) Se quita la gravedad (promedio lento) de la magnitud de la aceleración.
+  // 2) Un paso = pico arriba seguido de valle abajo en menos de 0.8 s.
+  // 3) Pasos separados entre 0.3 s y 2 s; solo cuentan tras 3 seguidos
+  //    (así un movimiento de la mano o estar parado mirando NO te mueve en el mapa).
+  const podometro = {
+    gravedad: 9.81, suave: 0, fase: "abajo", picoMs: 0,
+    ultimoPasoMs: -1e9, racha: 0, ultimaMuestraMs: 0, inicioNavMs: 0
+  };
+
+  function registrarPaso(ahora) {
+    const dt = ahora - podometro.ultimoPasoMs;
+    if (dt < 300) return; // demasiado rápido: sacudida
+    podometro.racha = dt > 2000 ? 1 : podometro.racha + 1;
+    podometro.ultimoPasoMs = ahora;
+    if (podometro.racha < 3) return;
+    const nuevos = podometro.racha === 3 ? 3 : 1; // al confirmar la racha se cuentan los 3
+    estado.pasosDetectados += nuevos;
+    if (estado.navegando) {
+      avanzarMetrosEnRuta(nuevos * PASO_METROS);
+      if (estado.navegando) {
+        const aviso = Math.abs(estado.desfaseMiradaGrados) > 100 ? " · ⚠️ vas al revés" : "";
+        locationModeBadge.textContent = `👣 ${estado.pasosDetectados} pasos${aviso}`;
+      }
+    }
+  }
+
+  window.addEventListener("devicemotion", (e) => {
+    const acc = e.accelerationIncludingGravity;
+    if (!acc || acc.x === null || acc.x === undefined) return;
+    const ahora = performance.now();
+    podometro.ultimaMuestraMs = ahora;
+    const mag = Math.hypot(acc.x || 0, acc.y || 0, acc.z || 0);
+    podometro.gravedad += 0.01 * (mag - podometro.gravedad);
+    podometro.suave += 0.3 * (mag - podometro.gravedad - podometro.suave);
+    const v = podometro.suave * SENSIBILIDAD;
+    if (podometro.fase === "abajo" && v > 0.9) {
+      podometro.fase = "arriba";
+      podometro.picoMs = ahora;
+    } else if (podometro.fase === "arriba" && v < -0.5) {
+      podometro.fase = "abajo";
+      if (ahora - podometro.picoMs < 800) registrarPaso(ahora);
     }
   });
 
-  // Podómetro con acelerómetro del celular
-  let ultimoPasoMs = 0;
-  window.addEventListener("devicemotion", (e) => {
-    const acc = e.accelerationIncludingGravity;
-    if (!acc) return;
-    const magnitud = Math.hypot(acc.x || 0, acc.y || 0, acc.z || 0);
+  // Si el celular no manda datos de movimiento, avisar para usar "Siguiente"
+  setInterval(() => {
+    if (!estado.navegando) return;
     const ahora = performance.now();
-    if (magnitud > 13.2 && ahora - ultimoPasoMs > 420) {
-      ultimoPasoMs = ahora;
-      estado.pasosDetectados += 1;
-      if (!estado.caminandoSim) {
-        locationModeBadge.textContent = `👣 Paso #${estado.pasosDetectados}`;
-        avanzarMetrosEnRuta(0.85);
-      }
+    if (ahora - podometro.inicioNavMs > 3000 && ahora - podometro.ultimaMuestraMs > 3000) {
+      locationModeBadge.textContent = "⚠️ Sin sensor de pasos: usa 'Siguiente'";
     }
-  });
+  }, 1000);
 
   // ---- Brújula: rumbo (0° = Norte, sentido horario) hacia donde apunta la cámara trasera ----
   // Mapa: X = Este, Z = Norte, así que rumboTramo y la brújula usan la misma convención.
@@ -1875,6 +2014,8 @@ window.ARGOS_CAMPUS_DATA = {
   }
 
   function manejarOrientacion(e, esEventoAbsoluto) {
+    // La inclinación (beta/gamma) es igual en ambos eventos: sirve para pegar las flechas al piso
+    if (typeof e.beta === "number" && typeof e.gamma === "number") registrarInclinacion(e.beta, e.gamma);
     if (typeof e.webkitCompassHeading === "number" && e.webkitCompassHeading >= 0) {
       registrarRumboSensor(e.webkitCompassHeading, true); // iPhone: ya viene referido al Norte
       return;
