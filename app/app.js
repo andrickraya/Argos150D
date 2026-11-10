@@ -57,9 +57,17 @@
       z: RADIO_TIERRA * (lat - LAT0) * r
     };
   }
+  function metrosALatLon(x, z) {
+    const r = 180 / Math.PI;
+    return {
+      lat: Number((LAT0 + (z / RADIO_TIERRA) * r).toFixed(7)),
+      lon: Number((LON0 + (x / (RADIO_TIERRA * Math.cos((LAT0 * Math.PI) / 180))) * r).toFixed(7))
+    };
+  }
 
-  // Pines puestos en campo con GPS (ver "📍 Poner pines con GPS"): reemplazan la posición del nodo
-  const CLAVE_PINES = "argos_pines_v1";
+  // Pines personalizados (GPS o toque en Mapa 2D): se usa v2 para limpiar pines de prueba viejos
+  const CLAVE_PINES = "argos_pines_v2";
+  try { localStorage.removeItem("argos_pines_v1"); } catch (_) {}
   function leerPines() {
     try { return JSON.parse(localStorage.getItem(CLAVE_PINES) || "{}") || {}; } catch (_) { return {}; }
   }
@@ -1992,6 +2000,50 @@
       pintarLista();
     }
 
+    // Permitir también colocar/mover cualquier pin tocando directamente el Mapa 2D (sin caminar con GPS)
+    let nodoPorUbicarEnMapa = null;
+    const btnMapaPin = document.createElement("button");
+    btnMapaPin.type = "button";
+    btnMapaPin.className = "action-btn btn-primary";
+    btnMapaPin.style.width = "100%";
+    btnMapaPin.style.marginTop = "6px";
+    btnMapaPin.textContent = "🗺️ O elegir punto tocando el Mapa 2D";
+    btnGuardar.insertAdjacentElement("afterend", btnMapaPin);
+
+    btnMapaPin.addEventListener("click", () => {
+      nodoPorUbicarEnMapa = selectPin.value;
+      if (dlg.open) dlg.close();
+      document.getElementById("tabMap")?.click();
+      const n = nodosPorId.get(nodoPorUbicarEnMapa);
+      locationModeBadge.textContent = `📌 Toca el Mapa 2D donde va ${n.id}`;
+    });
+
+    campusCanvas.addEventListener("click", (e) => {
+      if (!nodoPorUbicarEnMapa) return;
+      const rect = campusCanvas.getBoundingClientRect();
+      const cx = ((e.clientX - rect.left) / rect.width) * campusCanvas.width;
+      const cy = ((e.clientY - rect.top) / rect.height) * campusCanvas.height;
+      const b = datos.bounds;
+      const pad = 70;
+      const w = campusCanvas.width - pad * 2;
+      const h = campusCanvas.height - pad * 2;
+      const x = b.minX + ((cx - pad) / w) * (b.maxX - b.minX);
+      const z = b.maxZ - ((cy - pad) / h) * (b.maxZ - b.minZ);
+      const { lat, lon } = metrosALatLon(x, z);
+      const pines = leerPines();
+      pines[nodoPorUbicarEnMapa] = { lat, lon, acc: 1, n: 1, t: new Date().toISOString() };
+      const idMovido = nodoPorUbicarEnMapa;
+      nodoPorUbicarEnMapa = null;
+      guardarPinesLocal(pines);
+      aplicarPines();
+      reconstruirGrafo();
+      recalcularRutaCompleta();
+      const n = nodosPorId.get(idMovido);
+      locationModeBadge.textContent = `✅ ${n.id} movido en Mapa 2D`;
+      txtEstado.textContent = `✅ ${n.id} ${n.name} actualizado desde el Mapa 2D.`;
+      pintarLista();
+    });
+
     btnGuardar.addEventListener("click", () => {
       if (idWatch !== null) { terminarCaptura(); return; } // tocar otra vez = terminar antes
       if (!("geolocation" in navigator)) {
@@ -2007,14 +2059,14 @@
       idWatch = navigator.geolocation.watchPosition(
         (pos) => {
           const { latitude, longitude, accuracy } = pos.coords;
-          if (!Number.isFinite(accuracy) || accuracy > 60) return; // lectura muy mala: ignorar
-          muestras.push({ lat: latitude, lon: longitude, acc: Math.max(1, accuracy) });
+          if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return;
+          muestras.push({ lat: latitude, lon: longitude, acc: Math.max(1, Number.isFinite(accuracy) ? accuracy : 25) });
           mostrarProgreso();
         },
         (err) => {
           txtEstado.textContent = err && err.code === 1
             ? "❌ Permite la ubicación: Ajustes › Privacidad › Localización › Safari → Mientras se usa."
-            : "⚠️ Sin señal GPS todavía… sigue quieto, de preferencia sin techo.";
+            : "⚠️ Sin señal GPS todavía… o usa '🗺️ O elegir punto tocando el Mapa 2D'.";
         },
         { enableHighAccuracy: true, maximumAge: 0, timeout: 30000 }
       );
