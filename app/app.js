@@ -186,6 +186,8 @@
     gpsWatchId: null,
     pasosDetectados: 0,
     desfaseMiradaGrados: 0,
+    rumboUsuarioGrados: null, // Dirección real en el mundo hacia donde mira el usuario (0°=Norte, 90°=Este)
+    ultimoRumboGyro: null,    // Último ángulo del giroscopio para integrar giros suaves sin saltos magnéticos
     brjSensorActual: null,
     menuColapsado: true  // Inicia colapsado para que las flechas 3D se vean completas en el celular
   };
@@ -340,10 +342,15 @@
         estado.progresoTramo += restantePorAvanzar / longTramo;
         restantePorAvanzar = 0;
       } else {
+        // Antes de pasar al nuevo tramo, conservar hacia dónde venía caminando el usuario
+        // para que el nuevo nodo NO gire solo al frente, sino que quede quieto en su dirección real
+        // y la app indique "➡️ Gira a la derecha" o "⬅️ Gira a la izquierda".
+        if (estado.rumboUsuarioGrados === null) {
+          estado.rumboUsuarioGrados = calcularRumboGrados(a.x, a.z, b.x, b.z);
+        }
         restantePorAvanzar -= metrosEnTramo;
         estado.indiceActual += 1;
         estado.progresoTramo = 0;
-        estado.desfaseMiradaGrados = 0;
       }
     }
 
@@ -386,8 +393,10 @@
     if (!arrastrandoAR) return;
     const dx = e.clientX - ultimoXAR;
     ultimoXAR = e.clientX;
-    // Arrastrar ajusta la calibración (sirve con o sin brújula)
-    estado.calibracionGrados = ((estado.calibracionGrados - dx * 0.35 + 540) % 360) - 180;
+    if (estado.rumboUsuarioGrados === null) {
+      estado.rumboUsuarioGrados = obtenerTramoActivo().rumboTramo;
+    }
+    estado.rumboUsuarioGrados = (estado.rumboUsuarioGrados - dx * 0.35 + 360) % 360;
     estado.calibrado = true;
     dibujarMinimapa();
   });
@@ -406,21 +415,18 @@
   const videoAR = document.getElementById("arVideo");
 
   // "Arriba del mundo" medido en ejes del celular (x = derecha de la pantalla, y = arriba, z = hacia ti).
-  // Sale de beta/gamma del sensor y se filtra como vector: así no hay saltos de gamma cerca de ±90°.
-  // Sin sensor (PC): celular inclinado 30° hacia el piso.
+  // Se ignora el alabeo lateral de muñeca (gamma = 0) y se filtra el temblor para que el nodo se quede QUIETO.
+  // Sin sensor (PC): celular inclinado 30° hacia el piso (beta = 60°).
   estado.arribaDispositivo = [0, Math.sin((60 * Math.PI) / 180), Math.cos((60 * Math.PI) / 180)];
+  let betaFiltrada = 60;
 
-  function registrarInclinacion(beta, gamma) {
-    if (!Number.isFinite(beta) || !Number.isFinite(gamma)) return;
-    const r = Math.PI / 180;
-    const cB = Math.cos(beta * r), sB = Math.sin(beta * r);
-    const cG = Math.cos(gamma * r), sG = Math.sin(gamma * r);
-    const nuevo = [-cB * sG, sB, cB * cG]; // fila "arriba" de R = Rx(beta)·Ry(gamma) (W3C)
-    const a = estado.arribaDispositivo;
-    const k = 0.2; // filtro paso-bajo: quita temblor de la mano
-    const m = [a[0] + k * (nuevo[0] - a[0]), a[1] + k * (nuevo[1] - a[1]), a[2] + k * (nuevo[2] - a[2])];
-    const n = Math.hypot(m[0], m[1], m[2]) || 1;
-    estado.arribaDispositivo = [m[0] / n, m[1] / n, m[2] / n];
+  function registrarInclinacion(beta) {
+    if (!Number.isFinite(beta)) return;
+    const betaSegura = limitar(beta, 25, 95);
+    if (Math.abs(betaSegura - betaFiltrada) < 0.8) return; // Zona muerta anti-temblor de mano
+    betaFiltrada = betaFiltrada + 0.14 * (betaSegura - betaFiltrada);
+    const r = (betaFiltrada * Math.PI) / 180;
+    estado.arribaDispositivo = [0, Math.sin(r), Math.cos(r)];
   }
 
   // Ejes del mundo (Este, Norte, Arriba) expresados en ejes del celular.
@@ -516,6 +522,91 @@
     return { x: 0, z: 0, dx: 0, dz: 1 };
   }
 
+  // Calcula si en el siguiente nodo de la ruta habrá que dar vuelta a la derecha o a la izquierda
+  function obtenerGiroEnSiguienteNodo() {
+    if (estado.ruta.length < 3 || estado.indiceActual + 2 >= estado.ruta.length) return null;
+    const nA = estado.ruta[estado.indiceActual];
+    const nB = estado.ruta[estado.indiceActual + 1];
+    const nC = estado.ruta[estado.indiceActual + 2];
+    const r1 = calcularRumboGrados(nA.x, nA.z, nB.x, nB.z);
+    const r2 = calcularRumboGrados(nB.x, nB.z, nC.x, nC.z);
+    const giro = diferenciaAngularGrados(r2, r1); // > 0 = vuelta a la derecha, < 0 = vuelta a la izquierda
+    if (Math.abs(giro) < 20) return null;
+    const derecha = giro > 0;
+    const grados = Math.round(Math.abs(giro));
+    return {
+      derecha,
+      grados,
+      nodoGiro: nB,
+      nodoSiguiente: nC,
+      icono: derecha ? "➡️" : "⬅️",
+      textoCorto: derecha ? `➡️ Gira a la derecha (${grados}°)` : `⬅️ Gira a la izquierda (${grados}°)`
+    };
+  }
+
+  // Actualiza en vivo los letreros superiores para decir claramente "Gira a la derecha / izquierda"
+  function actualizarIndicacionesGiroEnVivo(tramoVista, llegoAlFinal) {
+    const { actual, siguiente, distRestanteTramo, rumboTramo } = tramoVista;
+    const distTotalRestante = calcularDistanciaTotalRestante();
+    const enDestino = llegoAlFinal || distTotalRestante < 0.8;
+    const desfase = estado.desfaseMiradaGrados; // < 0: el nodo queda a la DERECHA; > 0: queda a la IZQUIERDA
+    const absDesfase = Math.round(Math.abs(desfase));
+    const mTramo = Math.round(distRestanteTramo);
+    const cardinal = nombrePuntoCardinal(rumboTramo);
+    const proximoGiro = obtenerGiroEnSiguienteNodo();
+
+    if (hudCompass) {
+      // La aguja apunta hacia el nodo respecto a la mirada actual del usuario
+      hudCompass.style.transform = `rotate(${-desfase}deg)`;
+    }
+    if (arHeadingText) {
+      arHeadingText.textContent = absDesfase > 18
+        ? (desfase < 0 ? `➡️ Gira ${absDesfase}° a la derecha` : `⬅️ Gira ${absDesfase}° a la izquierda`)
+        : `🧭 De frente (${Math.round(rumboTramo)}° ${cardinal})`;
+    }
+
+    if (enDestino) {
+      if (arSignTurnIcon) arSignTurnIcon.textContent = "🏁";
+      if (arSignTitle) arSignTitle.textContent = `¡Llegaste a ${actual.name}!`;
+      if (arSignDist) arSignDist.textContent = `Destino alcanzado · 0 m restantes`;
+      return;
+    }
+
+    if (absDesfase > 135) {
+      if (arSignTurnIcon) arSignTurnIcon.textContent = "🔄";
+      if (arSignTitle) arSignTitle.textContent = `Da media vuelta (${absDesfase}°)`;
+      if (arSignDist) arSignDist.textContent = `El nodo ${siguiente.id} (${siguiente.name}) está detrás de ti a ${mTramo} m`;
+      hudInstruction.textContent = `🔄 Da media vuelta hacia ${siguiente.name}`;
+    } else if (desfase < -18) {
+      if (arSignTurnIcon) arSignTurnIcon.textContent = "➡️";
+      if (arSignTitle) arSignTitle.textContent = `Gira a la derecha (${absDesfase}°)`;
+      if (arSignDist) arSignDist.textContent = `Apunta hacia ${siguiente.id} · ${siguiente.name} (${mTramo} m)`;
+      hudInstruction.textContent = `➡️ Gira a la derecha (${absDesfase}°) hacia ${siguiente.name}`;
+    } else if (desfase > 18) {
+      if (arSignTurnIcon) arSignTurnIcon.textContent = "⬅️";
+      if (arSignTitle) arSignTitle.textContent = `Gira a la izquierda (${absDesfase}°)`;
+      if (arSignDist) arSignDist.textContent = `Apunta hacia ${siguiente.id} · ${siguiente.name} (${mTramo} m)`;
+      hudInstruction.textContent = `⬅️ Gira a la izquierda (${absDesfase}°) hacia ${siguiente.name}`;
+    } else {
+      // El usuario ya está alineado mirando al nodo quieto frente a él
+      if (proximoGiro && distRestanteTramo <= 8) {
+        if (arSignTurnIcon) arSignTurnIcon.textContent = proximoGiro.icono;
+        if (arSignTitle) arSignTitle.textContent = `En ${mTramo} m: ${proximoGiro.textoCorto}`;
+        if (arSignDist) arSignDist.textContent = `Al llegar a ${siguiente.name}, dobla hacia ${proximoGiro.nodoSiguiente.name}`;
+        hudInstruction.textContent = `${proximoGiro.textoCorto} en ${siguiente.name}`;
+      } else {
+        if (arSignTurnIcon) arSignTurnIcon.textContent = "⬆️";
+        if (arSignTitle) arSignTitle.textContent = `Camina de frente hacia ${siguiente.name}`;
+        if (arSignDist) {
+          arSignDist.textContent = proximoGiro
+            ? `${mTramo} m de frente · En ${siguiente.id}: ${proximoGiro.textoCorto}`
+            : `${mTramo} m de frente (${cardinal}) · El nodo está fijo frente a ti`;
+        }
+        hudInstruction.textContent = `⬆️ Camina ${mTramo} m de frente hacia ${siguiente.name}`;
+      }
+    }
+  }
+
   function renderizarBucleAR(tiempoMs) {
     requestAnimationFrame(renderizarBucleAR);
     if (estado.modoVista !== "ar") return;
@@ -524,33 +615,34 @@
     const h = window.innerHeight;
     arCtx.clearRect(0, 0, w, h);
 
-    // desfaseMiradaGrados = (hacia dónde mira la cámara) − (rumbo del pasillo).
-    // Positivo = el usuario mira a la DERECHA del pasillo, así que el pasillo se dibuja a la izquierda.
-    // Sin brújula se asume que mira al pasillo y solo cuenta la calibración (arrastre / Centrar).
+    // El nodo se queda QUIETO en el mundo real: rumboMirada es la dirección física del usuario
+    // (estado.rumboUsuarioGrados), NO gira pegado al celular ni salta solo al cambiar de tramo.
     const tramoVista = obtenerTramoActivo();
     const rumboPasillo = tramoVista.rumboTramo;
     const llegoAlFinal = tramoVista.actual.id === tramoVista.siguiente.id;
-    const rumboMirada = (estado.brjSensorActual !== null ? estado.brjSensorActual : rumboPasillo)
-      + estado.calibracionGrados;
-    // Al llegar al destino no hay pasillo que seguir: flechas al frente y sin avisos de giro
+    if (estado.rumboUsuarioGrados === null) {
+      estado.rumboUsuarioGrados = rumboPasillo;
+    }
+    const rumboMirada = estado.rumboUsuarioGrados;
+    // desfaseMiradaGrados < 0 significa que el nodo está a tu DERECHA; > 0 significa a tu IZQUIERDA
     estado.desfaseMiradaGrados = llegoAlFinal ? 0 : diferenciaAngularGrados(rumboMirada, rumboPasillo);
+
+    actualizarIndicacionesGiroEnVivo(tramoVista, llegoAlFinal);
 
     const cam = crearCamara(w, h, (estado.desfaseMiradaGrados * Math.PI) / 180);
     const miraArriba = -estado.arribaDispositivo[2] > 0.05; // la cámara apunta arriba del horizonte
 
     if (arTurnHint && arTurnHintText) {
+      const absD = Math.round(Math.abs(estado.desfaseMiradaGrados));
       if (miraArriba) {
         arTurnHint.hidden = false;
-        arTurnHintText.textContent = "📱 Inclina el celular hacia el piso para ver las flechas";
-      } else if (!llegoAlFinal && estado.brjSensorActual !== null && !estado.brujulaAbsoluta && !estado.calibrado) {
-        arTurnHint.hidden = false;
-        arTurnHintText.textContent = "🧭 Apunta el celular hacia el pasillo y toca '🎯 Centrar flechas'";
-      } else if (Math.abs(estado.desfaseMiradaGrados) > 38) {
+        arTurnHintText.textContent = "📱 Inclina un poco el celular hacia el piso para ver el camino";
+      } else if (!llegoAlFinal && absD > 18) {
         arTurnHint.hidden = false;
         arTurnHintText.textContent =
-          estado.desfaseMiradaGrados > 0
-            ? "⬅️ Gira a la izquierda o toca '🎯 Centrar flechas'"
-            : "➡️ Gira a la derecha o toca '🎯 Centrar flechas'";
+          estado.desfaseMiradaGrados < 0
+            ? `➡️ Gira a la derecha (${absD}°) hacia ${tramoVista.siguiente.name}`
+            : `⬅️ Gira a la izquierda (${absD}°) hacia ${tramoVista.siguiente.name}`;
       } else {
         arTurnHint.hidden = true;
       }
@@ -638,11 +730,13 @@
       arCtx.stroke();
     }
 
-    // 3. Pin en la posición REAL del siguiente nodo (dirección y distancia reales; no se desliza)
+    // 3. Pin QUIETO en la posición REAL del siguiente nodo (sin rebote ni giro con la cámara)
     const zPin = Math.max(1.5, distRestanteTramo);
-    const reboteY = Math.sin(t * 3.5) * 0.08;
     const pPinBase = P(0, 0, zPin);
-    const pPinAlto = P(0, 1.6 + reboteY, zPin);
+    const pPinAlto = P(0, 1.6, zPin);
+
+    const pinDentroDePantalla =
+      pPinAlto && pPinAlto.sx >= 24 && pPinAlto.sx <= w - 24 && pPinAlto.sy >= 24 && pPinAlto.sy <= h - 24;
 
     if (pPinBase && pPinAlto) {
       const radioAnillo = limitar(0.5 * pPinBase.escala, 6, 60);
@@ -692,6 +786,46 @@
       arCtx.fillStyle = "#ffffff";
       arCtx.textAlign = "center";
       arCtx.fillText(textoPin, bx + (tw + 20) / 2, by + 16);
+    }
+
+    // 4. Indicador lateral grande cuando el nodo quieto queda a tu derecha o izquierda
+    if (!enDestino && (!pinDentroDePantalla || Math.abs(estado.desfaseMiradaGrados) > 22)) {
+      const haciaDerecha = estado.desfaseMiradaGrados < 0;
+      const absGrados = Math.round(Math.abs(estado.desfaseMiradaGrados));
+      const etiquetaGiro = haciaDerecha
+        ? `Gira a la derecha (${absGrados}°) ➡️`
+        : `⬅️ Gira a la izquierda (${absGrados}°)`;
+      const subEtiqueta = `${siguiente.id} · ${siguiente.name} (${Math.round(distRestanteTramo)} m)`;
+
+      arCtx.font = "800 14px Inter, -apple-system, sans-serif";
+      const w1 = arCtx.measureText(etiquetaGiro).width;
+      arCtx.font = "600 12px Inter, -apple-system, sans-serif";
+      const w2 = arCtx.measureText(subEtiqueta).width;
+      const boxW = Math.max(w1, w2) + 28;
+      const boxH = 50;
+      const boxX = haciaDerecha ? Math.max(12, w - boxW - 14) : 14;
+      const boxY = Math.round(h * 0.44);
+
+      arCtx.fillStyle = "rgba(15, 23, 42, 0.92)";
+      arCtx.beginPath();
+      if (arCtx.roundRect) {
+        arCtx.roundRect(boxX, boxY, boxW, boxH, 14);
+      } else {
+        arCtx.rect(boxX, boxY, boxW, boxH);
+      }
+      arCtx.fill();
+      arCtx.strokeStyle = "#f59e0b";
+      arCtx.lineWidth = 2.5;
+      arCtx.stroke();
+
+      arCtx.fillStyle = "#fbbf24";
+      arCtx.font = "800 14px Inter, -apple-system, sans-serif";
+      arCtx.textAlign = "center";
+      arCtx.fillText(etiquetaGiro, boxX + boxW / 2, boxY + 22);
+
+      arCtx.fillStyle = "#ffffff";
+      arCtx.font = "600 12px Inter, -apple-system, sans-serif";
+      arCtx.fillText(subEtiqueta, boxX + boxW / 2, boxY + 40);
     }
   }
 
@@ -987,19 +1121,22 @@
     estado.distanciaTotal = res.distanciaTotal;
     estado.indiceActual = 0;
     estado.progresoTramo = 0;
-    estado.desfaseMiradaGrados = 0;
 
     sincronizarCoordenadasUsuarioConProgreso();
+    const tramoInicial = obtenerTramoActivo();
+    estado.rumboUsuarioGrados = tramoInicial.rumboTramo;
+    estado.desfaseMiradaGrados = 0;
+
     actualizarHUD();
     dibujarMapa2D();
     dibujarMinimapa();
   }
 
   function actualizarHUD() {
-    const { actual, siguiente, distRestanteTramo, rumboTramo } = obtenerTramoActivo();
+    const tramo = obtenerTramoActivo();
+    const { actual, siguiente, distRestanteTramo, rumboTramo } = tramo;
     const distTotalRestante = calcularDistanciaTotalRestante();
     const minutos = Math.max(0.2, distTotalRestante / 80).toFixed(1);
-    const cardinal = nombrePuntoCardinal(rumboTramo);
 
     const nodoDestinoFinal = nodosPorId.get(estado.destinoId);
     hudStepBadge.textContent = `${actual.id} ${actual.name} ➔ ${nodoDestinoFinal ? nodoDestinoFinal.name : estado.destinoId}`;
@@ -1007,26 +1144,16 @@
     if (actual.id === siguiente.id || distTotalRestante < 0.8) {
       hudInstruction.textContent = `🎉 ¡Llegaste a ${actual.name}!`;
       hudSub.textContent = `Destino alcanzado · 0 m restantes`;
-      if (arSignTurnIcon) arSignTurnIcon.textContent = "🏁";
-      if (arSignTitle) arSignTitle.textContent = `¡Llegaste a ${actual.name}!`;
-      if (arSignDist) arSignDist.textContent = `Has completado el recorrido`;
     } else {
-      const mTramo = Math.round(distRestanteTramo);
-      hudInstruction.textContent = `Camina ${mTramo} m hacia ${siguiente.name}`;
       hudSub.textContent = `${Math.round(distTotalRestante)} m restantes · ~${minutos} min`;
-      if (arSignTurnIcon) arSignTurnIcon.textContent = "⬆️";
-      if (arSignTitle) arSignTitle.textContent = `Sigue hacia ${siguiente.name}`;
-      if (arSignDist) {
-        arSignDist.textContent = `${mTramo} m al ${cardinal} (${Math.round(rumboTramo)}°) · Sigue las flechas en el piso`;
-      }
     }
 
-    if (hudCompass) {
-      hudCompass.style.transform = `rotate(${rumboTramo}deg)`;
+    if (estado.rumboUsuarioGrados === null) {
+      estado.rumboUsuarioGrados = rumboTramo;
     }
-    if (arHeadingText) {
-      arHeadingText.textContent = `🧭 Pasillo: ${Math.round(rumboTramo)}° ${cardinal}`;
-    }
+    estado.desfaseMiradaGrados =
+      actual.id === siguiente.id ? 0 : diferenciaAngularGrados(estado.rumboUsuarioGrados, rumboTramo);
+    actualizarIndicacionesGiroEnVivo(tramo, actual.id === siguiente.id);
 
     kpiNodesCount.textContent = String(estado.ruta.length);
     kpiDistanceMeters.textContent = `${Math.round(estado.distanciaTotal)} m totales`;
@@ -1035,11 +1162,19 @@
     estado.ruta.forEach((nodo, idx) => {
       const li = document.createElement("li");
       li.className = `itinerary-item ${idx === estado.indiceActual ? "is-current" : ""}`;
-      let detalle = "Origen";
-      if (idx === estado.ruta.length - 1) detalle = "🎯 Destino";
-      else if (idx > 0) {
+      let detalle = "📍 Origen";
+      if (idx === estado.ruta.length - 1) {
+        const dFin = idx > 0 ? Math.round(distanciaMetros(estado.ruta[idx - 1], nodo)) : 0;
+        detalle = dFin > 0 ? `+${dFin} m · 🎯 Destino` : "🎯 Destino";
+      } else if (idx > 0) {
         const d = Math.round(distanciaMetros(estado.ruta[idx - 1], nodo));
-        detalle = `+${d} m`;
+        const rEnt = calcularRumboGrados(estado.ruta[idx - 1].x, estado.ruta[idx - 1].z, nodo.x, nodo.z);
+        const rSal = calcularRumboGrados(nodo.x, nodo.z, estado.ruta[idx + 1].x, estado.ruta[idx + 1].z);
+        const giro = diferenciaAngularGrados(rSal, rEnt);
+        let txtGiro = "⬆️ Sigue recto";
+        if (giro >= 20) txtGiro = `➡️ Gira a la derecha (${Math.round(giro)}°)`;
+        else if (giro <= -20) txtGiro = `⬅️ Gira a la izquierda (${Math.round(Math.abs(giro))}°)`;
+        detalle = `+${d} m · ${txtGiro}`;
       }
       li.innerHTML = `
         <div><span class="itinerary-code">${nodo.id}</span><span>${nodo.name}</span></div>
@@ -1048,8 +1183,14 @@
       li.addEventListener("click", () => {
         estado.indiceActual = idx;
         estado.progresoTramo = 0;
-        estado.desfaseMiradaGrados = 0;
         sincronizarCoordenadasUsuarioConProgreso();
+        if (idx > 0 && idx < estado.ruta.length - 1) {
+          // Conserva el rumbo del pasillo del que venías para que veas el giro real ("Gira a la derecha/izquierda")
+          const ant = estado.ruta[idx - 1];
+          estado.rumboUsuarioGrados = calcularRumboGrados(ant.x, ant.z, nodo.x, nodo.z);
+        } else {
+          estado.rumboUsuarioGrados = obtenerTramoActivo().rumboTramo;
+        }
         actualizarHUD();
         dibujarMapa2D();
         dibujarMinimapa();
@@ -1193,62 +1334,75 @@
     }
   }, 1000);
 
-  // ---- Brújula: rumbo (0° = Norte, sentido horario) hacia donde apunta la cámara trasera ----
-  // Mapa: X = Este, Z = Norte, así que rumboTramo y la brújula usan la misma convención.
-  // estado.brjSensorActual = rumbo filtrado del sensor; estado.calibracionGrados = corrección manual.
+  // ---- Giroscopio / Orientación: mantiene el nodo QUIETO en el mundo real ----
+  // Se integra el giro horizontal del giroscopio (alpha/beta/gamma sin bloqueo de cardán)
+  // sobre estado.rumboUsuarioGrados, ignorando el ruido magnético de interiores y el temblor de la mano.
   estado.calibracionGrados = 0;
-  estado.brujulaAbsoluta = false;   // true si el sensor da Norte real (iOS o deviceorientationabsolute)
+  estado.brujulaAbsoluta = false;
   estado.calibrado = false;
 
   function rumboCamaraDesdeEuler(alpha, beta, gamma) {
-    // Fórmula de la especificación W3C DeviceOrientation (rumbo del eje -Z, la cámara trasera)
+    // Proyecta el eje de la cámara trasera (-Z inclinado 20° hacia +Y) al plano horizontal.
+    // Así no hay singularidad (gimbal lock) ni cuando el celular está vertical (beta ≈ 90°)
+    // ni cuando está plano (beta ≈ 0°).
     const r = Math.PI / 180;
     const cB = Math.cos(beta * r), sB = Math.sin(beta * r);
-    const cG = Math.cos(gamma * r), sG = Math.sin(gamma * r);
+    const cG = Math.cos(gamma * r), sG = Math.sin(gamma * r) * 0.2;
     const cA = Math.cos(alpha * r), sA = Math.sin(alpha * r);
-    const vx = -cA * sG - sA * sB * cG;
-    const vy = -sA * sG + cA * sB * cG;
+    const kY = 0.342, kZ = 0.940; // sin(20°), cos(20°)
+    const pitchFactor = sB * kZ + cB * kY;
+    const vx = -cA * sG * kZ - sA * pitchFactor * cG;
+    const vy = -sA * sG * kZ + cA * pitchFactor * cG;
     return ((Math.atan2(vx, vy) * 180) / Math.PI + 360) % 360;
   }
 
-  function registrarRumboSensor(rumbo, absoluto) {
-    if (!Number.isFinite(rumbo)) return;
-    // Si ya tenemos fuente absoluta, ignorar lecturas relativas
+  function registrarRumboSensor(rumboGyro, absoluto) {
+    if (!Number.isFinite(rumboGyro)) return;
+    // Evitar doble lectura en Android cuando disparan tanto deviceorientationabsolute como deviceorientation
     if (estado.brujulaAbsoluta && !absoluto) return;
     if (absoluto) estado.brujulaAbsoluta = true;
-    if (estado.brjSensorActual === null) {
-      estado.brjSensorActual = rumbo;
-    } else {
-      // Filtro paso-bajo circular para quitar temblor de la brújula
-      estado.brjSensorActual = (estado.brjSensorActual + 0.25 * diferenciaAngularGrados(rumbo, estado.brjSensorActual) + 360) % 360;
+
+    if (estado.ultimoRumboGyro === null) {
+      estado.ultimoRumboGyro = rumboGyro;
+      estado.brjSensorActual = rumboGyro;
+      return;
     }
+
+    const delta = diferenciaAngularGrados(rumboGyro, estado.ultimoRumboGyro);
+    estado.ultimoRumboGyro = rumboGyro;
+    estado.brjSensorActual = rumboGyro;
+
+    // Zona muerta (< 0.45°) para que con el celular en la mano el nodo se quede 100% QUIETO,
+    // y filtro de picos (> 55°) por si el sensor salta en un cuadro.
+    if (Math.abs(delta) < 0.45 || Math.abs(delta) > 55) return;
+
+    if (estado.rumboUsuarioGrados === null) {
+      estado.rumboUsuarioGrados = obtenerTramoActivo().rumboTramo;
+    }
+    estado.rumboUsuarioGrados = (estado.rumboUsuarioGrados + delta * 0.85 + 360) % 360;
+    dibujarMinimapa();
   }
 
   function manejarOrientacion(e, esEventoAbsoluto) {
-    // La inclinación (beta/gamma) es igual en ambos eventos: sirve para pegar las flechas al piso
-    if (typeof e.beta === "number" && typeof e.gamma === "number") registrarInclinacion(e.beta, e.gamma);
-    if (typeof e.webkitCompassHeading === "number" && e.webkitCompassHeading >= 0) {
-      registrarRumboSensor(e.webkitCompassHeading, true); // iPhone: ya viene referido al Norte
-      return;
-    }
+    if (typeof e.beta === "number") registrarInclinacion(e.beta);
     if (typeof e.alpha !== "number" || e.alpha === null) return;
     const rumbo = rumboCamaraDesdeEuler(e.alpha, e.beta || 0, e.gamma || 0);
     registrarRumboSensor(rumbo, esEventoAbsoluto || e.absolute === true);
   }
 
-  window.addEventListener("deviceorientationabsolute", (e) => manejarOrientacion(e, true), true);
-  window.addEventListener("deviceorientation", (e) => manejarOrientacion(e, false), true);
+  const listenerOrientacionAbs = (e) => manejarOrientacion(e, true);
+  const listenerOrientacionRel = (e) => manejarOrientacion(e, false);
+  window.addEventListener("deviceorientationabsolute", listenerOrientacionAbs, true);
+  window.addEventListener("deviceorientation", listenerOrientacionRel, true);
 
-  // "Centrar flechas": el usuario apunta el celular a lo largo del pasillo correcto y toca el botón.
-  // Corrige errores de la brújula (interferencia magnética, sensores sin Norte real).
+  // "Centrar flechas": alinea la dirección actual del usuario con el pasillo hacia el siguiente nodo.
   btnAlignArrows.addEventListener("click", () => {
     const { rumboTramo } = obtenerTramoActivo();
-    estado.calibracionGrados = estado.brjSensorActual !== null
-      ? diferenciaAngularGrados(rumboTramo, estado.brjSensorActual)
-      : 0;
+    estado.rumboUsuarioGrados = rumboTramo;
     estado.calibrado = true;
     estado.desfaseMiradaGrados = 0;
     if (arTurnHint) arTurnHint.hidden = true;
+    actualizarHUD();
     dibujarMinimapa();
   });
 
@@ -1363,14 +1517,21 @@
     }
   }
 
-  // iPhone/iPad (iOS 13+): la brújula y el podómetro requieren permiso pedido dentro de un toque
+  // iPhone/iPad (iOS 13+): el giroscopio y el podómetro requieren permiso pedido dentro de un toque
+  // y re-registrar los listeners DESPUÉS de que requestPermission() devuelva "granted".
   let permisosSensoresPedidos = false;
   async function solicitarPermisosSensores() {
     if (permisosSensoresPedidos) return;
     permisosSensoresPedidos = true;
     try {
       if (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === "function") {
-        await DeviceOrientationEvent.requestPermission();
+        const resO = await DeviceOrientationEvent.requestPermission();
+        if (resO === "granted") {
+          window.removeEventListener("deviceorientationabsolute", listenerOrientacionAbs, true);
+          window.removeEventListener("deviceorientation", listenerOrientacionRel, true);
+          window.addEventListener("deviceorientationabsolute", listenerOrientacionAbs, true);
+          window.addEventListener("deviceorientation", listenerOrientacionRel, true);
+        }
       }
       if (window.DeviceMotionEvent && typeof DeviceMotionEvent.requestPermission === "function") {
         await DeviceMotionEvent.requestPermission();
@@ -1383,6 +1544,7 @@
     if (v && (!v.srcObject || v.paused)) activarCamara(v);
   }
   document.addEventListener("click", solicitarPermisosSensores, { once: true, capture: true });
+  document.addEventListener("touchend", solicitarPermisosSensores, { once: true, capture: true });
 
   function fijarUbicacionPorNodo(idNodo, fuente = "QR") {
     if (!nodosPorId.has(idNodo)) return;
@@ -1470,12 +1632,18 @@
 
     btnNextNode.addEventListener("click", () => {
       if (estado.indiceActual < estado.ruta.length - 1) {
+        const a = estado.ruta[estado.indiceActual];
+        const b = estado.ruta[estado.indiceActual + 1];
+        // Conservar el rumbo del tramo que acabas de caminar para que el siguiente nodo NO gire solo
+        // y la app te indique "➡️ Gira a la derecha" o "⬅️ Gira a la izquierda".
+        estado.rumboUsuarioGrados = calcularRumboGrados(a.x, a.z, b.x, b.z);
         estado.indiceActual += 1;
         estado.progresoTramo = 0;
-        estado.desfaseMiradaGrados = 0;
       } else {
         estado.indiceActual = 0;
         estado.progresoTramo = 0;
+        sincronizarCoordenadasUsuarioConProgreso();
+        estado.rumboUsuarioGrados = obtenerTramoActivo().rumboTramo;
       }
       sincronizarCoordenadasUsuarioConProgreso();
       actualizarHUD();
@@ -1507,7 +1675,6 @@
 
       if (esAR) {
         activarCamara(document.getElementById("arVideo"));
-        estado.desfaseMiradaGrados = 0;
       } else {
         setTimeout(centrarMapaEnUsuario, 80);
       }
