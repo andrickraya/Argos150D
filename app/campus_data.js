@@ -4,9 +4,9 @@
 window.ARGOS_CAMPUS_DATA = {
   origen: { lat: 19.37024335, lon: -99.26414455 },
   nodos: [
-    { id: "N01", nombre: "Puerta 3", categoria: "Acceso", x: -22.29, z: 20.04, lat: 19.370423, lon: -99.264357, piso: "PB", desc: "Acceso peatonal poniente junto a la Biblioteca" },
+    { id: "N01", nombre: "Puerta 3", categoria: "Acceso", x: -87.20, z: 20.10, lat: 19.370424, lon: -99.264975, piso: "PB", desc: "Reja de acceso peatonal poniente (Puerta 3)" },
     { id: "N02", nombre: "Biblioteca FXC", categoria: "Académico", x: -19.00, z: 42.00, lat: 19.370621, lon: -99.264325, piso: "PB", desc: "Entrada principal de la Biblioteca Francisco Xavier Clavigero" },
-    { id: "N03", nombre: "Escultura de Lobos", categoria: "Referencia", x: -32.00, z: 18.00, lat: 19.370405, lon: -99.264449, piso: "PB", desc: "Explanada de la Escultura de Lobos en Puerta 3" },
+    { id: "N03", nombre: "Escultura de Lobos", categoria: "Referencia", x: -22.29, z: 20.04, lat: 19.370423, lon: -99.264357, piso: "PB", desc: "Explanada de la Escultura de Lobos al interior del acceso Puerta 3" },
     { id: "N04", nombre: "Centro de Meditación", categoria: "Referencia", x: -20.00, z: -28.00, lat: 19.369992, lon: -99.264335, piso: "PB", desc: "Jardín y acceso al Centro de Meditación" },
     { id: "N05", nombre: "Pasillo Poniente Norte", categoria: "Pasillo QR", x: -22.00, z: 95.00, lat: 19.371097, lon: -99.264354, piso: "PB", desc: "Corredor poniente que conecta Biblioteca con el Ala Norte" },
     { id: "N06", nombre: "Acceso Ala Norte (Edif. C)", categoria: "Pasillo QR", x: 38.00, z: 160.00, lat: 19.371681, lon: -99.263783, piso: "PB", desc: "Esquina noroeste de entrada al corredor del Salón C" },
@@ -26,15 +26,16 @@ window.ARGOS_CAMPUS_DATA = {
     { id: "N20", nombre: "Canchas Deportivas", categoria: "Deportes", x: -85.00, z: -175.00, lat: 19.368671, lon: -99.264954, piso: "PB", desc: "Zona de canchas deportivas del campus" }
   ],
   aristas: [
-    ["N01", "N02"], ["N01", "N03"], ["N01", "N04"], ["N01", "N05"],
-    ["N02", "N05"], ["N02", "N03"],
-    ["N03", "N04"], ["N03", "N19"],
+    ["N01", "N03"], ["N01", "N19"],
+    ["N02", "N03"], ["N02", "N05"],
+    ["N03", "N04"], ["N03", "N05"], ["N03", "N19"],
     ["N04", "N13"], ["N04", "N19"],
     ["N05", "N06"],
     ["N06", "N07"],
-    ["N07", "N08"],
+    ["N07", "N08"], ["N07", "N09"], ["N07", "N10"],
     ["N08", "N09"], ["N08", "N11"],
     ["N09", "N10"], ["N09", "N11"],
+    ["N10", "N11"], ["N10", "N12"],
     ["N11", "N12"],
     ["N12", "N13"],
     ["N13", "N14"],

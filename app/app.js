@@ -237,14 +237,6 @@
   const miniCtx = minimapCanvas.getContext("2d");
   const mapViewport = document.getElementById("mapViewport");
 
-  const imgMapa = new Image();
-  let mapaCargado = false;
-  imgMapa.onload = () => {
-    mapaCargado = true;
-    dibujarMapa2D();
-  };
-  imgMapa.src = "campus_map.png";
-
   // ============================================================================
   // 3. CONTROL DEL MENÚ INFERIOR (ABRIR / BAJAR CON BOTÓN O DESLIZANDO EL DEDO)
   // ============================================================================
@@ -845,18 +837,48 @@
     };
   }
 
+  function dibujarPoligonosCampus(contexto, proyectarPunto, modoOscuro) {
+    const poligonos = datos.poligonos || [];
+    if (!poligonos.length) return;
+    const estilos = modoOscuro
+      ? {
+          pasto: { fill: "rgba(34, 197, 94, 0.14)", stroke: "rgba(74, 222, 128, 0.25)" },
+          estacionamiento: { fill: "rgba(100, 116, 139, 0.18)", stroke: "rgba(148, 163, 184, 0.25)" },
+          cancha: { fill: "rgba(245, 158, 11, 0.16)", stroke: "rgba(251, 191, 36, 0.3)" },
+          edificio: { fill: "rgba(148, 163, 184, 0.22)", stroke: "rgba(203, 213, 225, 0.35)" },
+          ibero: { fill: "rgba(200, 16, 46, 0.22)", stroke: "rgba(248, 113, 113, 0.42)" }
+        }
+      : {
+          pasto: { fill: "rgba(187, 247, 208, 0.55)", stroke: "rgba(34, 197, 94, 0.35)" },
+          estacionamiento: { fill: "rgba(226, 232, 240, 0.7)", stroke: "rgba(148, 163, 184, 0.45)" },
+          cancha: { fill: "rgba(254, 243, 199, 0.75)", stroke: "rgba(217, 119, 6, 0.35)" },
+          edificio: { fill: "rgba(203, 213, 225, 0.65)", stroke: "rgba(100, 116, 139, 0.45)" },
+          ibero: { fill: "rgba(225, 29, 72, 0.14)", stroke: "rgba(200, 16, 46, 0.38)" }
+        };
+
+    poligonos.forEach((pol) => {
+      if (!pol.pts || pol.pts.length < 3) return;
+      const est = estilos[pol.tipo] || estilos.edificio;
+      contexto.beginPath();
+      pol.pts.forEach(([px, pz], idx) => {
+        const p = proyectarPunto(px, pz);
+        if (idx === 0) contexto.moveTo(p.x, p.y);
+        else contexto.lineTo(p.x, p.y);
+      });
+      contexto.closePath();
+      contexto.fillStyle = est.fill;
+      contexto.fill();
+      contexto.lineWidth = modoOscuro ? 1 : 1.5;
+      contexto.strokeStyle = est.stroke;
+      contexto.stroke();
+    });
+  }
+
   function dibujarMapa2D() {
     ctx.clearRect(0, 0, campusCanvas.width, campusCanvas.height);
 
     ctx.fillStyle = "#f4f3ee";
     ctx.fillRect(0, 0, campusCanvas.width, campusCanvas.height);
-
-    if (mapaCargado) {
-      ctx.save();
-      ctx.globalAlpha = 0.25;
-      ctx.drawImage(imgMapa, 0, 0, campusCanvas.width, campusCanvas.height);
-      ctx.restore();
-    }
 
     ctx.strokeStyle = "rgba(0, 0, 0, 0.04)";
     ctx.lineWidth = 1;
@@ -872,6 +894,16 @@
       ctx.lineTo(campusCanvas.width, y);
       ctx.stroke();
     }
+
+    // Edificios, canchas y áreas verdes reales del campus IBERO (desde map.osm)
+    dibujarPoligonosCampus(
+      ctx,
+      (x, z) => {
+        const p = mundoACanvas(x, z);
+        return { x: p.cx, y: p.cy };
+      },
+      false
+    );
 
     // Pasillos base
     ctx.strokeStyle = "rgba(100, 116, 139, 0.28)";
@@ -1019,6 +1051,15 @@
       mx: w / 2 + (x - estado.usuarioX) * escala,
       my: h / 2 - (z - estado.usuarioZ) * escala
     });
+
+    dibujarPoligonosCampus(
+      miniCtx,
+      (x, z) => {
+        const p = aMini(x, z);
+        return { x: p.mx, y: p.my };
+      },
+      true
+    );
 
     miniCtx.strokeStyle = "rgba(148, 163, 184, 0.35)";
     miniCtx.lineWidth = 2.5;
@@ -1700,16 +1741,134 @@
       chipsContainer.appendChild(chip);
     });
 
+    // Generador QR nativo offline (ISO/IEC 18004 Versión 1-M, 21x21) para etiquetas tipo "ARGOS:N01"
+    function generarSvgQR(texto) {
+      const N = 21;
+      const mat = Array.from({ length: N }, () => new Uint8Array(N));
+      const res = Array.from({ length: N }, () => new Uint8Array(N));
+      const fijar = (r, c, v) => {
+        if (r >= 0 && r < N && c >= 0 && c < N) {
+          mat[r][c] = v ? 1 : 0;
+          res[r][c] = 1;
+        }
+      };
+      // 1. Patrones de búsqueda (7x7) + separadores blancos
+      const ponerFinder = (r0, c0) => {
+        for (let dr = -1; dr <= 7; dr++) {
+          for (let dc = -1; dc <= 7; dc++) {
+            const en7 = dr >= 0 && dr <= 6 && dc >= 0 && dc <= 6;
+            const borde = dr === 0 || dr === 6 || dc === 0 || dc === 6;
+            const centro = dr >= 2 && dr <= 4 && dc >= 2 && dc <= 4;
+            fijar(r0 + dr, c0 + dc, en7 && (borde || centro));
+          }
+        }
+      };
+      ponerFinder(0, 0);
+      ponerFinder(0, 14);
+      ponerFinder(14, 0);
+      // 2. Patrones de sincronización (fila 6 y columna 6)
+      for (let i = 8; i <= 12; i++) {
+        fijar(6, i, i % 2 === 0);
+        fijar(i, 6, i % 2 === 0);
+      }
+      // 3. Información de formato (Nivel M = 01, Máscara 0 = 000 -> BCH 0x5412) + módulo oscuro (13, 8)
+      fijar(13, 8, 1);
+      const fmt = 0x5412;
+      const posTL = [
+        [0, 8], [1, 8], [2, 8], [3, 8], [4, 8], [5, 8], [7, 8], [8, 8],
+        [8, 7], [8, 5], [8, 4], [8, 3], [8, 2], [8, 1], [8, 0]
+      ];
+      for (let i = 0; i < 15; i++) {
+        const bit = (fmt >> i) & 1;
+        fijar(posTL[i][0], posTL[i][1], bit);
+        if (i < 8) fijar(8, 20 - i, bit);
+        else fijar(6 + i, 8, bit);
+      }
+      // 4. Codificación Byte Mode (16 bytes de datos + 10 bytes Reed-Solomon ECC en GF(256))
+      const bytes = Array.from(texto).map((ch) => ch.charCodeAt(0) & 0xff);
+      const bits = [];
+      const pushBits = (val, len) => {
+        for (let b = len - 1; b >= 0; b--) bits.push((val >> b) & 1);
+      };
+      pushBits(0b0100, 4);
+      pushBits(bytes.length, 8);
+      bytes.forEach((b) => pushBits(b, 8));
+      pushBits(0, Math.min(4, 128 - bits.length));
+      while (bits.length % 8 !== 0) bits.push(0);
+      const data = [];
+      for (let i = 0; i < bits.length; i += 8) {
+        let v = 0;
+        for (let b = 0; b < 8; b++) v = (v << 1) | bits[i + b];
+        data.push(v);
+      }
+      const pads = [0xec, 0x11];
+      while (data.length < 16) data.push(pads[data.length % 2]);
+      // Tablas GF(256) con polinomio primitivo 0x11d y generador grado 10
+      const exp = new Uint8Array(512);
+      const log = new Uint8Array(256);
+      let x = 1;
+      for (let i = 0; i < 255; i++) {
+        exp[i] = x;
+        exp[i + 255] = x;
+        log[x] = i;
+        x = (x << 1) ^ (x & 0x80 ? 0x11d : 0);
+      }
+      const mul = (a, b) => (a === 0 || b === 0 ? 0 : exp[log[a] + log[b]]);
+      let gen = [1];
+      for (let i = 0; i < 10; i++) {
+        const next = new Array(gen.length + 1).fill(0);
+        for (let j = 0; j < gen.length; j++) {
+          next[j] ^= gen[j];
+          next[j + 1] ^= mul(gen[j], exp[i]);
+        }
+        gen = next;
+      }
+      const ecc = new Uint8Array(10);
+      for (const d of data) {
+        const factor = d ^ ecc[0];
+        ecc.copyWithin(0, 1);
+        ecc[9] = 0;
+        for (let j = 0; j < 10; j++) ecc[j] ^= mul(gen[j + 1], factor);
+      }
+      const todos = [...data, ...ecc];
+      // 5. Colocación en zig-zag de 2 columnas + Máscara 0 ((r + c) % 2 === 0)
+      let bitIdx = 0;
+      let subiendo = true;
+      for (let c = N - 1; c > 0; c -= 2) {
+        if (c === 6) c--;
+        for (let paso = 0; paso < N; paso++) {
+          const r = subiendo ? N - 1 - paso : paso;
+          for (let dc = 0; dc < 2; dc++) {
+            const col = c - dc;
+            if (res[r][col]) continue;
+            const bit = bitIdx < todos.length * 8 ? (todos[bitIdx >> 3] >> (7 - (bitIdx & 7))) & 1 : 0;
+            bitIdx++;
+            mat[r][col] = bit ^ ((r + col) % 2 === 0 ? 1 : 0);
+          }
+        }
+        subiendo = !subiendo;
+      }
+      let rects = "";
+      for (let r = 0; r < N; r++) {
+        for (let c = 0; c < N; c++) {
+          if (mat[r][c]) rects += `<rect x="${c}" y="${r}" width="1" height="1"/>`;
+        }
+      }
+      return `<svg viewBox="-2 -2 25 25" width="108" height="108" shape-rendering="crispEdges" style="background:#fff;border-radius:8px;border:1px solid #cbd5e1;display:block;"><rect x="-2" y="-2" width="25" height="25" fill="#ffffff"/><g fill="#111827">${rects}</g></svg>`;
+    }
+
     const qrGrid = document.getElementById("qrCardsGrid");
     datos.nodes.forEach((nodo) => {
       const card = document.createElement("div");
       card.className = "qr-card-item";
       const qrBox = document.createElement("div");
-      qrBox.style.minHeight = "100px";
+      qrBox.style.minHeight = "116px";
       qrBox.style.display = "flex";
+      qrBox.style.flexDirection = "column";
       qrBox.style.alignItems = "center";
       qrBox.style.justifyContent = "center";
-      qrBox.innerHTML = `<code style="font-size:0.75rem;padding:8px;background:#fff;border-radius:8px;border:1px solid #cbd5e1;">ARGOS:${nodo.id}</code>`;
+      qrBox.style.gap = "4px";
+      qrBox.innerHTML = `${generarSvgQR(`ARGOS:${nodo.id}`)}<code style="font-size:0.7rem;color:#334155;">ARGOS:${nodo.id}</code>`;
 
       card.innerHTML = `
         <strong style="font-size:0.8rem;color:var(--accent);">${nodo.id}</strong>
@@ -1728,25 +1887,6 @@
       });
       card.appendChild(btnAqui);
       qrGrid.appendChild(card);
-
-      // Si la librería opcional QRCode ya cargó o cuando cargue, dibuja el QR gráfico
-      const intentarDibujarQR = () => {
-        if (typeof window.QRCode !== "undefined") {
-          qrBox.innerHTML = "";
-          new window.QRCode(qrBox, {
-            text: `ARGOS:${nodo.id}`,
-            width: 100,
-            height: 100,
-            colorDark: "#1c1c1e",
-            colorLight: "#ffffff"
-          });
-          return true;
-        }
-        return false;
-      };
-      if (!intentarDibujarQR()) {
-        window.addEventListener("load", intentarDibujarQR, { once: true });
-      }
     });
 
     document.getElementById("btnPrintCards")?.addEventListener("click", () => window.print());

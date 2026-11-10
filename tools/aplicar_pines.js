@@ -75,13 +75,16 @@ if (rutaUnity) {
   fs.writeFileSync(rutaUnity + ".bak", txt, "utf8");
   let n = 0;
   for (const c of cambios) {
-    const ini = txt.search(new RegExp(`"id"\\s*:\\s*"argos_${c.id}"`));
-    if (ini < 0) { console.warn(`⚠️  argos_${c.id} no está en campus_pois.json`); continue; }
-    const fin = txt.indexOf("}", ini);
-    const obj = txt.slice(ini, fin)
-      .replace(/("x"\s*:\s*)-?[\d.]+/, `$1${c.x.toFixed(2)}`)
-      .replace(/("z"\s*:\s*)-?[\d.]+/, `$1${c.z.toFixed(2)}`);
-    txt = txt.slice(0, ini) + obj + txt.slice(fin);
+    const idsUnity = c.id === "N01" ? [`argos_${c.id}`, "w1354446212"] : [`argos_${c.id}`];
+    for (const idU of idsUnity) {
+      const ini = txt.search(new RegExp(`"id"\\s*:\\s*"${idU}"`));
+      if (ini < 0) { if (idU.startsWith("argos_")) console.warn(`⚠️  ${idU} no está en campus_pois.json`); continue; }
+      const fin = txt.indexOf("}", ini);
+      const obj = txt.slice(ini, fin)
+        .replace(/("x"\s*:\s*)-?[\d.]+/, `$1${c.x.toFixed(2)}`)
+        .replace(/("z"\s*:\s*)-?[\d.]+/, `$1${c.z.toFixed(2)}`);
+      txt = txt.slice(0, ini) + obj + txt.slice(fin);
+    }
     n++;
   }
   JSON.parse(txt.replace(/^﻿/, "")); // si quedó mal formado, truena aquí antes de escribir
