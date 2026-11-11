@@ -35,6 +35,17 @@
       }
     </script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="assets/css/scroll-scrub.css">
+    <link rel="stylesheet" href="assets/css/campus3d.css">
+    <script type="importmap">
+      { "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+      } }
+    </script>
+    <link rel="preload" as="image" href="assets/world/ibero-poster.jpg" media="(min-width: 861px)">
+    <link rel="preload" as="image" href="assets/world/ibero-movil-poster.jpg" media="(max-width: 860px)">
     <style>
       :root {
         color-scheme: light;
@@ -84,7 +95,7 @@
     <header class="sticky top-0 z-50 border-b border-[#d6d6d6] bg-white/80 backdrop-blur-xl">
       <div class="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8">
         <nav class="flex flex-wrap items-center justify-between min-h-[48px] py-2 gap-2 text-[12px] leading-[1] tracking-[-0.12px] text-[#1d1d1f]">
-          <div class="flex items-center gap-6">
+          <div class="flex flex-wrap items-center gap-x-6 gap-y-2">
             <span class="font-semibold">Argos</span>
             <a href="#acerca" class="text-[#707070] hover:text-[#1d1d1f]">Proyecto</a>
             <a href="#features" class="text-[#707070] hover:text-[#1d1d1f]">Características</a>
@@ -103,6 +114,97 @@
     </header>
 
     <main>
+      <!-- Intro cinematográfica: el scroll recorre la película del campus (assets/js/scroll-scrub.js) -->
+      <section id="intro" class="ss" data-ss data-clip="assets/world/ibero.mp4" data-clip-movil="assets/world/ibero-movil.mp4" data-duracion="12" data-fps="30" aria-label="Recorrido por la Ibero">
+        <div class="ss__stage">
+          <figure class="ss__layer" aria-hidden="true">
+            <picture>
+              <source media="(hover: none) and (pointer: coarse), (max-width: 860px)" srcset="assets/world/ibero-movil-poster.jpg">
+              <img class="ss__poster" src="assets/world/ibero-poster.jpg" alt="" decoding="async" fetchpriority="high">
+            </picture>
+          </figure>
+          <div class="ss__tint" aria-hidden="true"></div>
+          <div class="ss__visor" aria-hidden="true">
+            <i></i><i></i><i></i><i></i>
+            <div class="ss__hud">
+              <span class="ss__timecode">00:00:00:00</span>
+              <span class="ss__rec">Argos // Recorrido</span>
+            </div>
+          </div>
+          <nav class="ss__route" aria-label="Capítulos del recorrido">
+            <button type="button" data-cap="cap-mapa"><span>El mapa</span></button>
+            <button type="button" data-cap="cap-puerta"><span>Puerta 3</span></button>
+            <button type="button" data-cap="cap-pasillo"><span>Pasillo</span></button>
+            <button type="button" data-cap="cap-salon"><span>Salón C</span></button>
+          </nav>
+          <div class="ss__progress" aria-hidden="true"><span></span></div>
+          <p class="ss__hint" aria-hidden="true">Desliza</p>
+          <div class="ss__fade" aria-hidden="true"></div>
+        </div>
+
+        <div class="ss__story">
+          <article class="ss__chapter" id="cap-mapa">
+            <div class="ss__copy">
+              <p class="ss__kicker">01 // El mapa</p>
+              <h2 class="ss__title">Argos <em>Ibero.</em></h2>
+              <p class="ss__body">Navegación en realidad mixta para la Universidad Iberoamericana. Elige a dónde vas y Argos traza la ruta más corta por el campus.</p>
+            </div>
+          </article>
+          <article class="ss__chapter" id="cap-puerta">
+            <div class="ss__copy">
+              <p class="ss__kicker">02 // Puerta 3</p>
+              <h2 class="ss__title">Empieza <em>en la puerta.</em></h2>
+              <p class="ss__body">Escanea el código QR del punto donde estás o elige tu origen en la lista. Argos te ubica en el mapa del campus.</p>
+              <ul class="ss__tags"><li>Código QR</li><li>20 puntos del campus</li></ul>
+            </div>
+          </article>
+          <article class="ss__chapter" id="cap-pasillo" data-align="right">
+            <div class="ss__copy">
+              <p class="ss__kicker">03 // Pasillo poniente</p>
+              <h2 class="ss__title">Sigue <em>las flechas.</em></h2>
+              <p class="ss__body">Flechas animadas sobre la cámara te guían paso a paso, nodo por nodo, por la ruta más corta.</p>
+              <ul class="ss__tags"><li>Ruta más corta</li><li>Cámara AR y mapa 2D</li></ul>
+            </div>
+          </article>
+          <article class="ss__chapter" id="cap-salon">
+            <div class="ss__copy">
+              <p class="ss__kicker">04 // Salón C</p>
+              <h2 class="ss__title">Llegaste.</h2>
+              <p class="ss__body">De Puerta 3 a Salón C: la misma ruta que calcula la app, ahora en tu mano.</p>
+              <div class="ss__actions">
+                <a class="ss__btn ss__btn--1" href="app/ar.html">📱 Abrir la app AR</a>
+                <a class="ss__btn ss__btn--2" href="#acerca">Conoce el proyecto</a>
+              </div>
+            </div>
+          </article>
+          <div class="ss__end" aria-hidden="true"></div>
+        </div>
+      </section>
+
+      <!-- Campus en 3D: modelo three.js con datos reales de OSM (assets/js/campus3d.js, datos de tools/campus_3d.js) -->
+      <section id="campus3d" class="c3d" data-campus3d data-datos="assets/data/campus3d.json" aria-label="Modelo 3D del campus">
+        <canvas class="c3d__canvas" aria-label="Modelo 3D interactivo de la Universidad Iberoamericana con la ruta de Puerta 3 a Salón C"></canvas>
+        <div class="c3d__pin" data-pin="inicio">Puerta 3<small>Inicio</small></div>
+        <div class="c3d__pin" data-pin="fin">Salón C<small>Destino</small></div>
+        <div class="c3d__llegaste" aria-live="polite">Llegaste a Salón C</div>
+        <div class="c3d__copy">
+          <p class="c3d__kicker">Campus en 3D</p>
+          <h2 class="c3d__title">La Ibero, <em>en tres dimensiones.</em></h2>
+          <p class="c3d__body">Los edificios salen de OpenStreetMap, con su altura real cuando el mapa la tiene (<span data-stat="alturas">10 de 21</span> en la Ibero). Encima, la misma ruta que calcula Argos: de Puerta 3 a Salón C, con las flechas que ves en la app.</p>
+          <div class="c3d__stats">
+            <div><b data-stat="ibero">21</b><span>edificios Ibero</span></div>
+            <div><b data-stat="metros">275 m</b><span>de ruta</span></div>
+            <div><b data-stat="puntos">5</b><span>puntos de paso</span></div>
+          </div>
+          <div class="c3d__actions">
+            <button type="button" class="c3d__btn" data-c3d="ruta" aria-pressed="false">▶ Recorrer la ruta</button>
+            <button type="button" class="c3d__btn" data-c3d="general" aria-pressed="true">Vista general</button>
+          </div>
+        </div>
+        <p class="c3d__hint" aria-hidden="true">Arrastra para girar</p>
+        <p class="c3d__credito">Datos © colaboradores de OpenStreetMap</p>
+      </section>
+
       <section id="inicio" class="relative overflow-hidden">
         <div class="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 pt-8 md:pt-10 pb-8 md:pb-14">
           <div class="mx-auto max-w-[980px] text-center">
@@ -363,6 +465,8 @@
     <script>
       document.getElementById('year').textContent = new Date().getFullYear();
     </script>
+    <script src="assets/js/scroll-scrub.js" defer></script>
+    <script type="module" src="assets/js/campus3d.js"></script>
   </body>
 </html>
 

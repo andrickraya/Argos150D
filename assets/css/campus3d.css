@@ -1,0 +1,182 @@
+/* Sección "Campus en 3D" (assets/js/campus3d.js) */
+.c3d {
+  --c3d-tinta: #2f241d;
+  --c3d-suave: #6f6357;
+  --c3d-azul: #0071e3;
+  --c3d-cielo: #f3ebde;
+  position: relative;
+  height: 100svh;
+  min-height: 560px;
+  max-height: 1000px;
+  overflow: hidden;
+  background: var(--c3d-cielo) url("../img/ibero-dibujo.svg") center / cover no-repeat;
+  color: var(--c3d-tinta);
+  isolation: isolate;
+}
+.c3d__canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  opacity: 0;
+  transition: opacity 0.9s ease;
+  touch-action: pan-y;
+  cursor: grab;
+}
+.c3d__canvas:active { cursor: grabbing; }
+.c3d--listo .c3d__canvas { opacity: 1; }
+.c3d--sin-webgl .c3d__canvas { display: none; }
+
+/* Velo para que el texto se lea sobre el modelo */
+.c3d::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(243, 235, 222, 0.92) 0%, rgba(243, 235, 222, 0.55) 34%, rgba(243, 235, 222, 0) 58%),
+    linear-gradient(0deg, rgba(243, 235, 222, 0.85) 0%, rgba(243, 235, 222, 0) 22%);
+  z-index: 1;
+}
+
+.c3d__copy {
+  position: absolute;
+  z-index: 2;
+  left: max(24px, calc((100vw - 1200px) / 2));
+  top: 50%;
+  transform: translateY(-50%);
+  max-width: 440px;
+  pointer-events: none;
+}
+.c3d__copy > * { pointer-events: auto; }
+.c3d__kicker {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #8c3a22;
+}
+.c3d__title {
+  margin-top: 14px;
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-weight: 600;
+  font-size: clamp(44px, 6.2vw, 82px);
+  line-height: 0.95;
+  letter-spacing: -0.02em;
+}
+.c3d__title em { font-style: italic; color: #c4613f; }
+.c3d__body {
+  margin-top: 18px;
+  font-size: 17px;
+  line-height: 1.5;
+  color: var(--c3d-suave);
+}
+.c3d__stats {
+  display: flex;
+  gap: 26px;
+  margin-top: 26px;
+}
+.c3d__stats div { display: flex; flex-direction: column; }
+.c3d__stats b { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; line-height: 1; }
+.c3d__stats span { margin-top: 6px; font-size: 12px; color: var(--c3d-suave); }
+.c3d__actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 28px; }
+.c3d__btn {
+  border-radius: 999px;
+  padding: 11px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  border: 1px solid rgba(47, 36, 29, 0.25);
+  background: rgba(255, 255, 255, 0.7);
+  color: var(--c3d-tinta);
+  backdrop-filter: blur(8px);
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+.c3d__btn:hover { background: #fff; }
+.c3d__btn[aria-pressed="true"] { background: var(--c3d-azul); border-color: var(--c3d-azul); color: #fff; }
+.c3d__hint {
+  position: absolute;
+  z-index: 2;
+  right: 24px;
+  bottom: 22px;
+  font-size: 12px;
+  color: var(--c3d-suave);
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 999px;
+  padding: 7px 12px;
+  backdrop-filter: blur(6px);
+}
+.c3d__credito {
+  position: absolute;
+  z-index: 2;
+  left: 24px;
+  bottom: 22px;
+  font-size: 10px;
+  color: var(--c3d-suave);
+  opacity: 0.8;
+}
+
+/* Etiquetas que siguen a los pines 3D */
+.c3d__pin {
+  position: absolute;
+  z-index: 2;
+  left: 0;
+  top: 0;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: #fff;
+  color: var(--c3d-tinta);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: 0 6px 20px rgba(47, 36, 29, 0.18);
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+  opacity: 0;
+}
+.c3d__pin small { display: block; font-weight: 500; color: var(--c3d-suave); font-size: 10px; }
+.c3d--sin-webgl .c3d__pin { display: none; }
+
+.c3d__llegaste {
+  position: absolute;
+  z-index: 3;
+  left: 50%;
+  top: 18%;
+  transform: translate(-50%, 10px);
+  padding: 10px 18px;
+  border-radius: 999px;
+  background: var(--c3d-azul);
+  color: #fff;
+  font-weight: 600;
+  font-size: 14px;
+  opacity: 0;
+  transition: opacity 0.35s ease, transform 0.35s ease;
+  pointer-events: none;
+}
+.c3d--llegaste .c3d__llegaste { opacity: 1; transform: translate(-50%, 0); }
+.c3d--recorriendo .c3d__copy { opacity: 0.25; transition: opacity 0.4s ease; }
+
+@media (max-width: 860px) {
+  .c3d { height: auto; min-height: 0; max-height: none; display: flex; flex-direction: column; background-position: top center; background-size: 100% max(62svh, 380px); }
+  .c3d::after { display: none; }
+  .c3d__canvas { position: relative; height: 62svh; min-height: 380px; order: 1; }
+  .c3d__copy {
+    position: relative;
+    order: 2;
+    left: auto;
+    top: auto;
+    transform: none;
+    max-width: none;
+    padding: 28px 16px 36px;
+    background: var(--c3d-cielo);
+  }
+  .c3d__stats { gap: 20px; }
+  .c3d__stats b { font-size: 24px; }
+  .c3d__hint { top: calc(62svh - 44px); bottom: auto; right: 16px; }
+  .c3d__credito { position: static; order: 3; padding: 0 16px 20px; background: var(--c3d-cielo); }
+  .c3d--sin-webgl .c3d__canvas { display: block; visibility: hidden; }
+  .c3d--recorriendo .c3d__copy { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .c3d__canvas, .c3d__pin, .c3d__llegaste { transition: none; }
+}

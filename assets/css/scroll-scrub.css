@@ -1,0 +1,319 @@
+/* Intro cinematográfica (scroll-scrub). Solo afecta a <section id="intro"> y a la cabecera mientras está encima. */
+.ss {
+  --ss-bg: #0a0c0b;
+  --ss-ink: #f2ede3;
+  --ss-muted: rgba(242, 237, 227, 0.74);
+  --ss-accent: #8ef0cf;
+  --ss-glow: rgba(142, 240, 207, 0.38);
+  --ss-p: 0;
+  position: relative;
+  margin-top: -49px; /* alto de la cabecera; scroll-scrub.js lo ajusta al real */
+  background: var(--ss-bg);
+  color: var(--ss-ink);
+  isolation: isolate;
+}
+
+/* Escenario fijo con la película */
+.ss__stage {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  height: 100svh;
+  overflow: hidden;
+  z-index: 0;
+}
+.ss__layer { position: absolute; inset: 0; margin: 0; }
+.ss__poster,
+.ss__video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 50%;
+  display: block;
+}
+.ss__video { opacity: 0; transition: opacity 0.25s ease; }
+.ss__layer[data-pintado] .ss__video { opacity: 1; }
+
+/* Velo para que el texto claro se lea sobre el dibujo */
+.ss__tint {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(8, 10, 9, 0.78) 0%, rgba(8, 10, 9, 0.42) 38%, rgba(8, 10, 9, 0.06) 68%, rgba(8, 10, 9, 0.2) 100%),
+    linear-gradient(180deg, rgba(8, 10, 9, 0.55) 0%, rgba(8, 10, 9, 0) 22%, rgba(8, 10, 9, 0) 72%, rgba(8, 10, 9, 0.6) 100%);
+}
+.ss[data-capitulo="2"] .ss__tint {
+  background:
+    linear-gradient(270deg, rgba(8, 10, 9, 0.78) 0%, rgba(8, 10, 9, 0.42) 38%, rgba(8, 10, 9, 0.06) 68%, rgba(8, 10, 9, 0.2) 100%),
+    linear-gradient(180deg, rgba(8, 10, 9, 0.55) 0%, rgba(8, 10, 9, 0) 22%, rgba(8, 10, 9, 0) 72%, rgba(8, 10, 9, 0.6) 100%);
+}
+
+/* Visor de cámara */
+.ss__visor { position: absolute; inset: 72px 24px 56px; pointer-events: none; }
+.ss__visor i {
+  position: absolute;
+  width: 26px;
+  height: 26px;
+  border: 0 solid rgba(242, 237, 227, 0.7);
+}
+.ss__visor i:nth-child(1) { top: 0; left: 0; border-top-width: 1.5px; border-left-width: 1.5px; }
+.ss__visor i:nth-child(2) { top: 0; right: 0; border-top-width: 1.5px; border-right-width: 1.5px; }
+.ss__visor i:nth-child(3) { bottom: 0; left: 0; border-bottom-width: 1.5px; border-left-width: 1.5px; }
+.ss__visor i:nth-child(4) { bottom: 0; right: 0; border-bottom-width: 1.5px; border-right-width: 1.5px; }
+.ss__hud {
+  position: absolute;
+  top: 10px;
+  left: 40px;
+  right: 40px;
+  display: flex;
+  justify-content: space-between;
+  font: 500 11px/1 "Inter", system-ui, sans-serif;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(242, 237, 227, 0.78);
+  font-variant-numeric: tabular-nums;
+}
+.ss__rec::before {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 8px;
+  border-radius: 50%;
+  background: #ff4d4d;
+  vertical-align: 1px;
+  animation: ss-parpadeo 1.6s steps(2, start) infinite;
+}
+@keyframes ss-parpadeo { to { visibility: hidden; } }
+.ss__timecode { color: var(--ss-accent); }
+
+/* Barra de progreso */
+.ss__progress {
+  position: absolute;
+  left: 24px;
+  right: 24px;
+  bottom: 28px;
+  height: 2px;
+  background: rgba(242, 237, 227, 0.16);
+  overflow: hidden;
+  border-radius: 2px;
+}
+.ss__progress span {
+  display: block;
+  height: 100%;
+  background: var(--ss-accent);
+  box-shadow: 0 0 12px var(--ss-glow);
+  transform: scaleX(0);
+  transform-origin: 0 50%;
+}
+
+/* Navegación por capítulos */
+.ss__route {
+  position: absolute;
+  right: 40px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  z-index: 3;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: rgba(10, 12, 11, 0.42);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+.ss__route button {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  background: none;
+  border: 0;
+  padding: 2px 0;
+  cursor: pointer;
+  font: 500 11px/1 "Inter", system-ui, sans-serif;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(242, 237, 227, 0.5);
+  transition: color 0.2s ease;
+}
+.ss__route button::after {
+  content: "";
+  width: 18px;
+  height: 1.5px;
+  background: currentColor;
+  transition: width 0.25s ease;
+}
+.ss__route button:hover,
+.ss__route button:focus-visible,
+.ss__route button[aria-current] { color: var(--ss-ink); }
+.ss__route button[aria-current]::after { width: 34px; background: var(--ss-accent); box-shadow: 0 0 10px var(--ss-glow); }
+.ss__route button:focus-visible { outline: 1px solid var(--ss-accent); outline-offset: 4px; }
+
+/* Fundido al blanco del sitio al terminar */
+.ss__fade {
+  position: absolute;
+  inset: 0;
+  background: #ffffff;
+  pointer-events: none;
+  opacity: clamp(0, calc((var(--ss-p) - 0.9) * 10), 1);
+}
+
+/* Capítulos (texto en HTML encima de la película) */
+.ss__story {
+  position: relative;
+  z-index: 2;
+  margin-top: -100vh;
+  margin-top: -100svh;
+  pointer-events: none;
+}
+.ss__chapter {
+  min-height: 135vh;
+  display: flex;
+  align-items: center;
+  padding: 0 clamp(20px, 7vw, 120px);
+}
+.ss__chapter:first-child { min-height: 115vh; align-items: center; }
+.ss__chapter[data-align="right"] { justify-content: flex-end; text-align: right; }
+.ss__chapter[data-align="right"] .ss__body { margin-left: auto; }
+.ss__copy {
+  max-width: 600px;
+  pointer-events: auto;
+  will-change: opacity, transform;
+  text-shadow: 0 2px 22px rgba(0, 0, 0, 0.45);
+}
+.ss__kicker {
+  margin: 0;
+  font: 600 11px/1 "Inter", system-ui, sans-serif;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--ss-accent);
+}
+.ss__title {
+  margin: 0.28em 0 0.32em;
+  font-family: "Cormorant Garamond", "Times New Roman", serif;
+  font-weight: 500;
+  font-size: clamp(54px, 8.4vw, 124px);
+  line-height: 0.92;
+  letter-spacing: -0.01em;
+  color: var(--ss-ink);
+}
+.ss__title em {
+  display: block;
+  font-style: normal;
+  color: var(--ss-accent);
+  text-shadow: 0 0 28px var(--ss-glow);
+}
+.ss__body {
+  margin: 0;
+  max-width: 44ch;
+  font: 400 17px/1.6 "Inter", system-ui, sans-serif;
+  color: var(--ss-muted);
+}
+.ss__tags {
+  list-style: none;
+  margin: 22px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.ss__chapter[data-align="right"] .ss__tags { justify-content: flex-end; }
+.ss__tags li {
+  font: 500 11px/1 "Inter", system-ui, sans-serif;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding: 8px 12px;
+  border: 1px solid rgba(242, 237, 227, 0.28);
+  border-radius: 999px;
+  color: var(--ss-ink);
+  background: rgba(10, 12, 11, 0.35);
+  text-shadow: none;
+}
+.ss__actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
+.ss__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 13px 22px;
+  border-radius: 999px;
+  font: 600 13px/1 "Inter", system-ui, sans-serif;
+  text-decoration: none;
+  text-shadow: none;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+.ss__btn--1 { background: var(--ss-accent); color: #062018; box-shadow: 0 0 24px var(--ss-glow); }
+.ss__btn--2 { border: 1px solid rgba(242, 237, 227, 0.45); color: var(--ss-ink); background: rgba(10, 12, 11, 0.3); }
+.ss__btn:hover { transform: translateY(-1px); }
+.ss__btn:focus-visible { outline: 2px solid var(--ss-ink); outline-offset: 3px; }
+.ss__end { height: 70vh; }
+.ss__hint {
+  position: absolute;
+  left: 50%;
+  bottom: 52px;
+  transform: translateX(-50%);
+  font: 500 11px/1 "Inter", system-ui, sans-serif;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: rgba(242, 237, 227, 0.7);
+  opacity: clamp(0, calc(1 - var(--ss-p) * 25), 1);
+  pointer-events: none;
+}
+.ss__hint::after {
+  content: "";
+  display: block;
+  width: 1px;
+  height: 26px;
+  margin: 10px auto 0;
+  background: linear-gradient(var(--ss-accent), transparent);
+}
+
+/* Cabecera del sitio mientras está sobre la intro */
+header.sobre-intro {
+  background: rgba(10, 12, 11, 0.5) !important;
+  border-color: rgba(242, 237, 227, 0.1) !important;
+}
+header.sobre-intro nav span,
+header.sobre-intro nav a:not(.rounded-full),
+header.sobre-intro nav button { color: #ece6da !important; }
+header.sobre-intro nav .outline-pill { background: transparent !important; border-color: rgba(242, 237, 227, 0.4) !important; }
+header { transition: background-color 0.3s ease, border-color 0.3s ease; }
+
+/* En escritorio, el capítulo alineado a la derecha deja libre la navegación por capítulos */
+@media (min-width: 861px) {
+  .ss__chapter[data-align="right"] { padding-right: 220px; }
+}
+
+/* Celular */
+@media (max-width: 860px) {
+  .ss__visor { inset: 64px 14px 44px; }
+  .ss__hud { left: 30px; right: 30px; font-size: 10px; letter-spacing: 0.16em; }
+  .ss__hud .ss__rec { display: none; }
+  .ss__route { top: auto; bottom: 40px; right: 50%; transform: translateX(50%); flex-direction: row; gap: 10px; padding: 6px 10px; background: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .ss__route button span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .ss__route button::after { width: 14px; }
+  .ss__route button[aria-current]::after { width: 26px; }
+  .ss__progress { left: 14px; right: 14px; bottom: 22px; }
+  .ss__tint {
+    background: linear-gradient(180deg, rgba(8, 10, 9, 0.6) 0%, rgba(8, 10, 9, 0.25) 30%, rgba(8, 10, 9, 0.35) 60%, rgba(8, 10, 9, 0.82) 100%);
+  }
+  .ss[data-capitulo="2"] .ss__tint { background: linear-gradient(180deg, rgba(8, 10, 9, 0.6) 0%, rgba(8, 10, 9, 0.25) 30%, rgba(8, 10, 9, 0.35) 60%, rgba(8, 10, 9, 0.82) 100%); }
+  .ss__chapter, .ss__chapter[data-align="right"] { align-items: flex-end; justify-content: flex-start; text-align: left; padding-bottom: 18vh; }
+  .ss__chapter:first-child { min-height: 100vh; min-height: 100svh; align-items: flex-end; padding-bottom: 15vh; }
+  .ss__chapter[data-align="right"] .ss__body { margin-left: 0; }
+  .ss__chapter[data-align="right"] .ss__tags { justify-content: flex-start; }
+  .ss__body { font-size: 15px; }
+  .ss__hint { display: none; }
+}
+
+/* Movimiento reducido: sin video, todo el texto visible */
+.ss--quieto .ss__copy { opacity: 1 !important; transform: none !important; }
+.ss--quieto .ss__rec::before { animation: none; }
+@media (prefers-reduced-motion: reduce) {
+  header { transition: none; }
+  .ss__btn { transition: none; }
+}
