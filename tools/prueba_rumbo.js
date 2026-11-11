@@ -41,7 +41,7 @@ const ok = (c, m, extra) => { if (!c) fallos++; console.log((c ? "OK   " : "FALL
     p.errs = errs;
     return p;
   }
-  const leer = async (p) => { await new Promise((r) => setTimeout(r, 250)); return p.evaluate(() => ({
+  const leer = async (p) => { await new Promise((r) => setTimeout(r, 500)); return p.evaluate(() => ({
     rumbo: document.getElementById("arHeadingText").textContent, titulo: document.getElementById("arSignTitle").textContent,
     boton: document.getElementById("btnAlignArrows").textContent, badge: (document.getElementById("locationModeBadge") || {}).textContent })); };
   const mod = (x) => ((x % 360) + 360) % 360;
@@ -96,6 +96,33 @@ const ok = (c, m, extra) => { if (!c) fallos++; console.log((c ? "OK   " : "FALL
   ok(/Gira (8[5-9]|9[0-6])° a la izquierda/.test(t.rumbo), "C3 sólo abs: giro 90°", t.rumbo);
   await p.evaluate(() => document.getElementById("btnAlignArrows").click()); t = await leer(p);
   ok(/Gira (8[5-9]|9[0-6])° a la izquierda/.test(t.rumbo), "C4 Android con brújula: el toque NO mueve las flechas", t.rumbo);
+  await p.close();
+
+  // ---- E. Avance suave: 4 pasos reales (2.8 m) no deben mover al usuario de golpe ----
+  p = await nueva("N01", "N07");
+  await p.click("#btnWalkSim");
+  const av = await p.evaluate(async () => {
+    const ini = window.ARGOS_DEBUG();
+    let ant = ini, maxSalto = 0, vivo = true;
+    const medir = () => { const a = window.ARGOS_DEBUG(); maxSalto = Math.max(maxSalto, Math.hypot(a.x - ant.x, a.z - ant.z)); ant = a; if (vivo) requestAnimationFrame(medir); };
+    requestAnimationFrame(medir);
+    const mov = (mag) => { const e = new Event("devicemotion"); Object.defineProperty(e, "accelerationIncludingGravity", { value: { x: 0, y: mag, z: 0 } }); window.dispatchEvent(e); };
+    const pausa = (ms) => new Promise((r) => setTimeout(r, ms));
+    for (let paso = 0; paso < 4; paso++) {
+      for (let i = 0; i < 8; i++) mov(15);   // sube el cuerpo
+      await pausa(120);
+      for (let i = 0; i < 8; i++) mov(4);    // baja
+      await pausa(330);
+    }
+    await pausa(2500);
+    vivo = false;
+    const fin = window.ARGOS_DEBUG();
+    return { total: Math.hypot(fin.x - ini.x, fin.z - ini.z), maxSalto, pasos: fin.pasos, cola: fin.cola };
+  });
+  ok(av.pasos === 4, "E1 el podómetro contó 4 pasos", JSON.stringify(av));
+  ok(Math.abs(av.total - 2.8) < 0.1 && av.cola < 0.01, "E2 al final avanzó los 2.8 m completos", av.total.toFixed(2) + " m");
+  ok(av.maxSalto < 0.3, "E3 ningún cuadro movió al usuario más de 30 cm (antes: 2.1 m de golpe)", (av.maxSalto * 100).toFixed(0) + " cm");
+  ok(p.errs.length === 0, "E4 sin errores JS", p.errs.join(" | "));
   await p.close();
 
   // ---- D. Rutas pedidas ----

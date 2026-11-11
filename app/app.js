@@ -379,9 +379,25 @@
     estado.usuarioZ = actual.z + (siguiente.z - actual.z) * t;
   }
 
-  function avanzarMetrosEnRuta(metros) {
+  // ---- Avance suave ----
+  // Los pasos (y la demo) NO mueven al usuario de golpe: dejan metros en esta cola y el bucle de dibujo
+  // los gasta poco a poco, a velocidad de persona. Así la alfombra de flechas se desliza en vez de brincar.
+  let colaAvanceMetros = 0;
+  let ultimoRefrescoAvanceMs = 0;
+  function gastarColaAvance(dtSeg) {
+    if (colaAvanceMetros <= 0) return;
+    if (!estado.navegando && !estado.caminandoSim) { colaAvanceMetros = 0; return; }
+    // Mientras más atrasado va el dibujo, más rápido alcanza (entre 0.6 y 2.4 m/s)
+    const velocidad = Math.min(2.4, Math.max(0.6, colaAvanceMetros * 2.5));
+    const metros = Math.min(colaAvanceMetros, velocidad * dtSeg);
+    colaAvanceMetros -= metros;
+    avanzarMetrosEnRuta(metros, true);
+  }
+
+  // ligero = true: llamada cuadro a cuadro; el HUD y los mapas se redibujan sólo 5 veces por segundo
+  function avanzarMetrosEnRuta(metros, ligero) {
     // Ya en el destino: un paso de más NO debe regresarte al origen
-    if (estado.ruta.length < 2 || estado.indiceActual >= estado.ruta.length - 1) return;
+    if (estado.ruta.length < 2 || estado.indiceActual >= estado.ruta.length - 1) { colaAvanceMetros = 0; return; }
     const indiceAntes = estado.indiceActual;
 
     let restantePorAvanzar = metros;
@@ -408,12 +424,18 @@
     }
 
     sincronizarCoordenadasUsuarioConProgreso();
-    actualizarHUD();
-    dibujarMapa2D();
-    dibujarMinimapa();
+    const cambioNodo = estado.indiceActual !== indiceAntes;
+    const ahoraMs = performance.now();
+    if (!ligero || cambioNodo || ahoraMs - ultimoRefrescoAvanceMs > 200) {
+      ultimoRefrescoAvanceMs = ahoraMs;
+      actualizarHUD();
+      dibujarMapa2D();
+      dibujarMinimapa();
+    }
 
-    if (estado.indiceActual !== indiceAntes && navigator.vibrate) navigator.vibrate(120);
+    if (cambioNodo && navigator.vibrate) navigator.vibrate(120);
     if (estado.indiceActual >= estado.ruta.length - 1) {
+      colaAvanceMetros = 0;
       if (estado.caminandoSim) detenerSimulacionCaminata();
       if (estado.navegando) detenerNavegacion("🏁 Llegaste a tu destino");
     }
@@ -474,14 +496,29 @@
   // Sin sensor (PC): celular inclinado 30° hacia el piso (beta = 60°).
   estado.arribaDispositivo = [0, Math.sin((60 * Math.PI) / 180), Math.cos((60 * Math.PI) / 180)];
   let betaFiltrada = 60;
+  let betaObjetivo = 60;
+  // Suavizado de inclinación y giro, en segundos (ajustable con ?suave=0.2). Chico = las flechas siguen
+  // a la cámara sin retraso; grande = más amortiguado. Sin zonas muertas: nada se mueve a saltitos.
+  const SUAVIZADO_SEG = limitar(Number(parametrosURL.get("suave")) || 0.1, 0.02, 1);
+  let rumboVistaGrados = null; // rumbo con el que se DIBUJA (sigue suavemente a estado.rumboUsuarioGrados)
 
   function registrarInclinacion(beta) {
     if (!Number.isFinite(beta)) return;
-    const betaSegura = limitar(beta, 25, 95);
-    if (Math.abs(betaSegura - betaFiltrada) < 0.8) return; // Zona muerta anti-temblor de mano
-    betaFiltrada = betaFiltrada + 0.14 * (betaSegura - betaFiltrada);
+    betaObjetivo = limitar(beta, 25, 95);
+  }
+
+  // Se llama una vez por cuadro: acerca la inclinación y el rumbo dibujados a los valores del sensor
+  function suavizarSensores(dtSeg) {
+    const k = 1 - Math.exp(-dtSeg / SUAVIZADO_SEG);
+    betaFiltrada += k * (betaObjetivo - betaFiltrada);
     const r = (betaFiltrada * Math.PI) / 180;
     estado.arribaDispositivo = [0, Math.sin(r), Math.cos(r)];
+    if (estado.rumboUsuarioGrados === null) { rumboVistaGrados = null; return; }
+    if (rumboVistaGrados === null) { rumboVistaGrados = estado.rumboUsuarioGrados; return; }
+    const error = diferenciaAngularGrados(estado.rumboUsuarioGrados, rumboVistaGrados);
+    // El giro se suaviza 3 veces menos que la inclinación: si se retrasa, las flechas "nadan" al voltear
+    const kGiro = 1 - Math.exp(-dtSeg / (SUAVIZADO_SEG * 0.3));
+    rumboVistaGrados = (rumboVistaGrados + kGiro * error + 360) % 360;
   }
 
   // Ejes del mundo (Este, Norte, Arriba) expresados en ejes del celular.
@@ -888,8 +925,15 @@
     dibujarGloboInaki(cuerpo.sx, cuerpo.sy - tam * 0.55, w);
   }
 
+  // Sólo lectura, para las pruebas automáticas (tools/prueba_rumbo.js)
+  window.ARGOS_DEBUG = () => ({ x: estado.usuarioX, z: estado.usuarioZ, cola: colaAvanceMetros, pasos: estado.pasosDetectados });
+  let ultimoCuadroMs = 0;
   function renderizarBucleAR(tiempoMs) {
     requestAnimationFrame(renderizarBucleAR);
+    const dtSeg = Math.min(0.1, Math.max(0, (tiempoMs - ultimoCuadroMs) / 1000));
+    ultimoCuadroMs = tiempoMs;
+    gastarColaAvance(dtSeg);
+    suavizarSensores(dtSeg);
     if (estado.modoVista !== "ar") return;
 
     const w = window.innerWidth;
@@ -904,7 +948,7 @@
     if (estado.rumboUsuarioGrados === null) {
       estado.rumboUsuarioGrados = rumboPasillo;
     }
-    const rumboMirada = estado.rumboUsuarioGrados;
+    const rumboMirada = rumboVistaGrados !== null ? rumboVistaGrados : estado.rumboUsuarioGrados;
     // desfaseMiradaGrados < 0 significa que el nodo está a tu DERECHA; > 0 significa a tu IZQUIERDA
     estado.desfaseMiradaGrados = llegoAlFinal ? 0 : diferenciaAngularGrados(rumboMirada, rumboPasillo);
 
@@ -1462,6 +1506,7 @@
     estado.distanciaTotal = res.distanciaTotal;
     estado.indiceActual = 0;
     estado.progresoTramo = 0;
+    colaAvanceMetros = 0;
 
     sincronizarCoordenadasUsuarioConProgreso();
     const tramoInicial = obtenerTramoActivo();
@@ -1573,7 +1618,7 @@
     estado.caminandoSim = true;
     if (btnDemo) btnDemo.textContent = "⏹️ Detener demo";
     locationModeBadge.textContent = "🎬 Demo: avanzando solo";
-    idIntervaloCaminata = setInterval(() => avanzarMetrosEnRuta(0.13), 100);
+    idIntervaloCaminata = setInterval(() => { colaAvanceMetros += 0.13; }, 100);
   }
 
   function detenerSimulacionCaminata() {
@@ -1642,7 +1687,7 @@
     const nuevos = podometro.racha === 3 ? 3 : 1; // al confirmar la racha se cuentan los 3
     estado.pasosDetectados += nuevos;
     if (estado.navegando) {
-      avanzarMetrosEnRuta(nuevos * PASO_METROS);
+      colaAvanceMetros += nuevos * PASO_METROS; // el bucle de dibujo lo avanza suave
       if (estado.navegando) {
         const aviso = Math.abs(estado.desfaseMiradaGrados) > 100 ? " · ⚠️ vas al revés" : "";
         locationModeBadge.textContent = `👣 ${estado.pasosDetectados} pasos${aviso}`;
@@ -1689,7 +1734,7 @@
   const K_CORRECCION_BRUJULA = 0.02; // fracción del error que se corrige por lectura de brújula
   const SALTO_MAX_BRUJULA = 60;      // lecturas que brincan más de esto se ignoran (fierros, laptops)
   const SALTO_MAX_GIRO = 55;         // un giro mayor a esto en una sola lectura es un error del sensor
-  const UMBRAL_TEMBLOR = 0.5;        // grados acumulados antes de mover el rumbo (anti-temblor de mano)
+  const UMBRAL_TEMBLOR = 0.5;        // grados de giro acumulados antes de repintar el minimapa
   const DECLINACION_MAGNETICA = 4;   // CDMX: el Norte real está ~4° al este del Norte magnético
 
   estado.brujulaReal = false;        // true cuando el celular entrega Norte (brújula)
@@ -1723,6 +1768,7 @@
   function fijarRumboSiSinBrujula(grados) {
     if (estado.brujulaReal || estado.hayGiroscopio || estado.rumboManual) return;
     estado.rumboUsuarioGrados = grados;
+    rumboVistaGrados = grados; // sin sensores no hay nada que suavizar
   }
 
   // 1. GIRO: fuente "rel" = giroscopio puro (preferida); "abs" = orientación con brújula (respaldo).
@@ -1739,13 +1785,15 @@
 
     const delta = diferenciaAngularGrados(rumboSensor, anterior);
     if (Math.abs(delta) > SALTO_MAX_GIRO) return;
-    giroPendiente += delta;
-    // El temblor de la mano va y viene y se cancela solo; un giro real (aunque sea lento) se acumula y pasa.
-    if (Math.abs(giroPendiente) < UMBRAL_TEMBLOR) return;
+    // Cada giro se suma completo al rumbo (sin umbral: un umbral hacía que las flechas se movieran a saltitos).
+    // El temblor de la mano lo absorbe el suavizado por cuadro (suavizarSensores).
     if (estado.rumboUsuarioGrados === null) {
       estado.rumboUsuarioGrados = obtenerTramoActivo().rumboTramo;
     }
-    estado.rumboUsuarioGrados = (estado.rumboUsuarioGrados + giroPendiente + 360) % 360;
+    estado.rumboUsuarioGrados = (estado.rumboUsuarioGrados + delta + 360) % 360;
+    // El minimapa es caro de dibujar: sólo se repinta cuando el giro acumulado ya se nota
+    giroPendiente += delta;
+    if (Math.abs(giroPendiente) < UMBRAL_TEMBLOR) return;
     giroPendiente = 0;
     dibujarMinimapa();
   }
