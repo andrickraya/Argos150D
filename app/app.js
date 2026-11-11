@@ -383,9 +383,11 @@
   ajustarTamanoCanvasAR();
 
   // Permitir girar la cámara 3D arrastrando horizontalmente sobre la vista AR
+  // (sólo SIN brújula, p. ej. en la PC; con brújula real un toque accidental desalinearía el mundo)
   let arrastrandoAR = false;
   let ultimoXAR = 0;
   arFloorCanvas.addEventListener("pointerdown", (e) => {
+    if (estado.brujulaReal) return;
     arrastrandoAR = true;
     ultimoXAR = e.clientX;
   });
@@ -1004,7 +1006,8 @@
     // Marcador en vivo del USUARIO ("TÚ")
     const posU = mundoACanvas(estado.usuarioX, estado.usuarioZ);
     const { rumboTramo } = obtenerTramoActivo();
-    const rumboMirada = (rumboTramo + estado.desfaseMiradaGrados + 360) % 360;
+    // Norte arriba fijo: el cono verde apunta a donde realmente miras
+    const rumboMirada = estado.rumboUsuarioGrados !== null ? estado.rumboUsuarioGrados : rumboTramo;
     const radCanvas = ((rumboMirada - 90) * Math.PI) / 180;
 
     ctx.save();
@@ -1106,7 +1109,8 @@
     });
 
     const { rumboTramo } = obtenerTramoActivo();
-    const rumboMirada = (rumboTramo + estado.desfaseMiradaGrados + 360) % 360;
+    // Mapa con Norte arriba FIJO (como Google Maps): sólo gira el cono según tu rumbo real
+    const rumboMirada = estado.rumboUsuarioGrados !== null ? estado.rumboUsuarioGrados : rumboTramo;
     const radMini = ((rumboMirada - 90) * Math.PI) / 180;
 
     miniCtx.save();
@@ -1127,6 +1131,12 @@
     miniCtx.lineWidth = 2;
     miniCtx.strokeStyle = "#ffffff";
     miniCtx.stroke();
+
+    // Indicador de Norte fijo arriba (el minimapa nunca gira)
+    miniCtx.font = "800 12px Inter, sans-serif";
+    miniCtx.textAlign = "center";
+    miniCtx.fillStyle = "#ef4444";
+    miniCtx.fillText("N", w / 2, 14);
   }
 
   function centrarMapaEnUsuario() {
@@ -1173,7 +1183,8 @@
 
     sincronizarCoordenadasUsuarioConProgreso();
     const tramoInicial = obtenerTramoActivo();
-    estado.rumboUsuarioGrados = tramoInicial.rumboTramo;
+    // Con brújula real tu rumbo NO cambia al elegir otra ruta (el mundo no gira); sin ella se asume el pasillo
+    fijarRumboSiSinBrujula(tramoInicial.rumboTramo);
     estado.desfaseMiradaGrados = 0;
 
     actualizarHUD();
@@ -1236,9 +1247,9 @@
         if (idx > 0 && idx < estado.ruta.length - 1) {
           // Conserva el rumbo del pasillo del que venías para que veas el giro real ("Gira a la derecha/izquierda")
           const ant = estado.ruta[idx - 1];
-          estado.rumboUsuarioGrados = calcularRumboGrados(ant.x, ant.z, nodo.x, nodo.z);
+          fijarRumboSiSinBrujula(calcularRumboGrados(ant.x, ant.z, nodo.x, nodo.z));
         } else {
-          estado.rumboUsuarioGrados = obtenerTramoActivo().rumboTramo;
+          fijarRumboSiSinBrujula(obtenerTramoActivo().rumboTramo);
         }
         actualizarHUD();
         dibujarMapa2D();
@@ -1405,6 +1416,43 @@
     return ((Math.atan2(vx, vy) * 180) / Math.PI + 360) % 360;
   }
 
+  // ---- Brújula REAL (Norte verdadero), como Google Maps ----
+  // El giroscopio da suavidad (sin temblor) y la brújula da la VERDAD (hacia dónde miras en el mundo).
+  // Se fusionan con un filtro complementario: cada lectura de brújula corrige un poquito el rumbo.
+  //   iPhone:  e.webkitCompassHeading (0° = Norte, ya absoluto)
+  //   Android: evento "deviceorientationabsolute" (alpha referido al Norte magnético)
+  const K_CORRECCION_BRUJULA = 0.03; // 3% por lectura (~60/s) → corrige en ~1 s sin saltos
+  const SALTO_MAX_BRUJULA = 60;      // Lecturas que brincan más de esto en un cuadro se ignoran (fierros, laptops)
+  estado.brujulaReal = false;        // true cuando el celular entrega Norte verdadero
+  estado.ultimaBrujula = null;       // Último rumbo absoluto leído (grados)
+  estado.ultimaBrujulaMs = 0;
+  estado.precisionBrujula = null;    // iOS: ± grados (webkitCompassAccuracy)
+
+  // Sólo se usa SIN brújula (PC o permiso negado): sin Norte real no hay otra referencia que el pasillo.
+  function fijarRumboSiSinBrujula(grados) {
+    if (estado.brujulaReal) return;
+    estado.rumboUsuarioGrados = grados;
+  }
+
+  function registrarBrujula(rumboAbs, precision) {
+    if (!Number.isFinite(rumboAbs)) return;
+    const ahora = performance.now();
+    const salto = estado.ultimaBrujula === null ? 0 : Math.abs(diferenciaAngularGrados(rumboAbs, estado.ultimaBrujula));
+    estado.ultimaBrujula = rumboAbs;
+    estado.ultimaBrujulaMs = ahora;
+    if (Number.isFinite(precision)) estado.precisionBrujula = precision;
+
+    if (!estado.brujulaReal || estado.rumboUsuarioGrados === null) {
+      // Primera lectura: tu rumbo es el Norte real, NO el pasillo
+      estado.brujulaReal = true;
+      estado.rumboUsuarioGrados = rumboAbs;
+      return;
+    }
+    if (salto > SALTO_MAX_BRUJULA) return;
+    const error = diferenciaAngularGrados(rumboAbs, estado.rumboUsuarioGrados);
+    estado.rumboUsuarioGrados = (estado.rumboUsuarioGrados + error * K_CORRECCION_BRUJULA + 360) % 360;
+  }
+
   function registrarRumboSensor(rumboGyro, absoluto) {
     if (!Number.isFinite(rumboGyro)) return;
     // Evitar doble lectura en Android cuando disparan tanto deviceorientationabsolute como deviceorientation
@@ -1428,15 +1476,29 @@
     if (estado.rumboUsuarioGrados === null) {
       estado.rumboUsuarioGrados = obtenerTramoActivo().rumboTramo;
     }
-    estado.rumboUsuarioGrados = (estado.rumboUsuarioGrados + delta * 0.85 + 360) % 360;
+    // Con brújula se usa el giro completo (la brújula corrige la deriva); sin ella se conserva el 0.85 anterior
+    const ganancia = estado.brujulaReal ? 1 : 0.85;
+    estado.rumboUsuarioGrados = (estado.rumboUsuarioGrados + delta * ganancia + 360) % 360;
     dibujarMinimapa();
   }
 
   function manejarOrientacion(e, esEventoAbsoluto) {
     if (typeof e.beta === "number") registrarInclinacion(e.beta);
     if (typeof e.alpha !== "number" || e.alpha === null) return;
+    const absoluto = esEventoAbsoluto || e.absolute === true;
     const rumbo = rumboCamaraDesdeEuler(e.alpha, e.beta || 0, e.gamma || 0);
-    registrarRumboSensor(rumbo, esEventoAbsoluto || e.absolute === true);
+    registrarRumboSensor(rumbo, absoluto);
+
+    if (typeof e.webkitCompassHeading === "number" && e.webkitCompassHeading >= 0) {
+      // iPhone: webkitCompassHeading no considera si la pantalla está girada → se suma el ángulo de pantalla
+      const angPantalla = (screen.orientation && screen.orientation.angle) || window.orientation || 0;
+      const precision = typeof e.webkitCompassAccuracy === "number" && e.webkitCompassAccuracy >= 0
+        ? e.webkitCompassAccuracy : null;
+      registrarBrujula((e.webkitCompassHeading + angPantalla + 360) % 360, precision);
+    } else if (absoluto) {
+      // Android: el alpha del evento absoluto ya está referido al Norte
+      registrarBrujula(rumbo, null);
+    }
   }
 
   const listenerOrientacionAbs = (e) => manejarOrientacion(e, true);
@@ -1444,13 +1506,23 @@
   window.addEventListener("deviceorientationabsolute", listenerOrientacionAbs, true);
   window.addEventListener("deviceorientation", listenerOrientacionRel, true);
 
-  // "Centrar flechas": alinea la dirección actual del usuario con el pasillo hacia el siguiente nodo.
+  // "🧭 Recalibrar": vuelve a enganchar tu rumbo al Norte real de la brújula.
+  // NUNCA fuerza las flechas hacia el frente: si el camino está a tu espalda, seguirá diciendo "Da media vuelta".
+  btnAlignArrows.textContent = "🧭 Recalibrar";
   btnAlignArrows.addEventListener("click", () => {
-    const { rumboTramo } = obtenerTramoActivo();
-    estado.rumboUsuarioGrados = rumboTramo;
+    const brujulaReciente = estado.brujulaReal && performance.now() - estado.ultimaBrujulaMs < 2000;
+    if (brujulaReciente) {
+      estado.rumboUsuarioGrados = estado.ultimaBrujula;
+      const p = estado.precisionBrujula;
+      locationModeBadge.textContent = p !== null && p > 25
+        ? `⚠️ Brújula imprecisa (±${Math.round(p)}°): mueve el celular en forma de 8`
+        : "🧭 Brújula calibrada al Norte real";
+    } else {
+      // Sin brújula (PC o permiso negado): única referencia posible = el pasillo
+      estado.rumboUsuarioGrados = obtenerTramoActivo().rumboTramo;
+      locationModeBadge.textContent = "⚠️ Sin brújula: apunta el celular hacia el camino azul";
+    }
     estado.calibrado = true;
-    estado.desfaseMiradaGrados = 0;
-    if (arTurnHint) arTurnHint.hidden = true;
     actualizarHUD();
     dibujarMinimapa();
   });
@@ -1588,6 +1660,10 @@
     } catch (err) {
       console.warn("ARGOS sensores:", err);
     }
+    // Si a los 3 s no llegó Norte real, avisar que las flechas son aproximadas
+    setTimeout(() => {
+      if (!estado.brujulaReal) locationModeBadge.textContent = "⚠️ Sin brújula: modo aproximado";
+    }, 3000);
     // Reintentar la cámara si el navegador exigía un gesto del usuario para reproducir el video
     const v = document.getElementById("arVideo");
     if (v && (!v.srcObject || v.paused)) activarCamara(v);
@@ -1685,14 +1761,14 @@
         const b = estado.ruta[estado.indiceActual + 1];
         // Conservar el rumbo del tramo que acabas de caminar para que el siguiente nodo NO gire solo
         // y la app te indique "➡️ Gira a la derecha" o "⬅️ Gira a la izquierda".
-        estado.rumboUsuarioGrados = calcularRumboGrados(a.x, a.z, b.x, b.z);
+        fijarRumboSiSinBrujula(calcularRumboGrados(a.x, a.z, b.x, b.z));
         estado.indiceActual += 1;
         estado.progresoTramo = 0;
       } else {
         estado.indiceActual = 0;
         estado.progresoTramo = 0;
         sincronizarCoordenadasUsuarioConProgreso();
-        estado.rumboUsuarioGrados = obtenerTramoActivo().rumboTramo;
+        fijarRumboSiSinBrujula(obtenerTramoActivo().rumboTramo);
       }
       sincronizarCoordenadasUsuarioConProgreso();
       actualizarHUD();
