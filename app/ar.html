@@ -1514,6 +1514,185 @@ window.ARGOS_CAMPUS_DATA = {
     }
   }
 
+  // ============================================================================
+  // IÑAKI: el lobo guía. Camina sobre la ruta unos metros adelante de ti y te va hablando.
+  //   - Sin configurar nada usa frases locales (funciona sin internet).
+  //   - Con ?inaki=https://TU-SERVIDOR/inaki  manda el contexto (dónde estás, a dónde vas, qué hay cerca)
+  //     a tools/inaki_server.js, que le pregunta a un modelo local (Ollama) y regresa la frase.
+  //   - ?inaki=off borra el servidor guardado.  ?lobo=0 oculta a Iñaki.
+  // ============================================================================
+  const inaki = {
+    activo: parametrosURL.get("lobo") !== "0",
+    servidor: null,
+    texto: "",
+    textoMs: 0,
+    claveRuta: null,
+    indice: -1,
+    llego: false,
+    avisados: new Set(),
+    pedido: 0,
+    ultimoEvento: null
+  };
+  (function configurarServidorInaki() {
+    const p = parametrosURL.get("inaki");
+    try {
+      if (p === "off") localStorage.removeItem("argos_inaki_url");
+      else if (p && /^https?:\/\//.test(p)) localStorage.setItem("argos_inaki_url", p);
+      inaki.servidor = localStorage.getItem("argos_inaki_url");
+    } catch (_) {
+      inaki.servidor = p && /^https?:\/\//.test(p) ? p : null;
+    }
+  })();
+
+  // Todo lo que Iñaki sabe en este instante (esto es lo que recibe el modelo)
+  function contextoInaki() {
+    const tramo = obtenerTramoActivo();
+    const giro = obtenerGiroEnSiguienteNodo();
+    const destino = estado.ruta[estado.ruta.length - 1];
+    const cerca = datos.nodes
+      .map((n) => ({ n, d: Math.hypot(n.x - estado.usuarioX, n.z - estado.usuarioZ) }))
+      .filter((c) => c.d <= 40)
+      .sort((a, b) => a.d - b.d)
+      .slice(0, 5)
+      .map((c) => ({ id: c.n.id, nombre: c.n.name, categoria: c.n.category, metros: Math.round(c.d) }));
+    return {
+      origen: estado.ruta[0] ? estado.ruta[0].name : null,
+      destino: destino ? destino.name : null,
+      nodoActual: tramo.actual.name,
+      siguienteNodo: tramo.siguiente.name,
+      metrosAlSiguiente: Math.round(tramo.distRestanteTramo),
+      metrosAlDestino: Math.round(calcularDistanciaTotalRestante()),
+      giroEnSiguienteNodo: giro ? giro.textoCorto.replace(/[^\p{L}\p{N} ()°]/gu, "").trim() : "ninguno",
+      rumboUsuarioGrados: estado.rumboUsuarioGrados === null ? null : Math.round(estado.rumboUsuarioGrados),
+      desfaseConCaminoGrados: Math.round(estado.desfaseMiradaGrados || 0),
+      lugaresCerca: cerca,
+      ruta: estado.ruta.map((n) => n.name)
+    };
+  }
+
+  function decirInaki(evento, textoLocal) {
+    inaki.texto = textoLocal;
+    inaki.textoMs = performance.now();
+    inaki.ultimoEvento = evento;
+    if (!inaki.servidor) return;
+    const miPedido = ++inaki.pedido;
+    const ctl = typeof AbortController === "function" ? new AbortController() : null;
+    const corte = setTimeout(() => ctl && ctl.abort(), 8000);
+    fetch(inaki.servidor, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ evento, sugerencia: textoLocal, contexto: contextoInaki() }),
+      signal: ctl ? ctl.signal : undefined
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        // Si mientras tanto pasó otra cosa, la respuesta vieja ya no se muestra
+        if (!j || typeof j.texto !== "string" || !j.texto.trim() || miPedido !== inaki.pedido) return;
+        inaki.texto = j.texto.trim().slice(0, 220);
+        inaki.textoMs = performance.now();
+      })
+      .catch(() => {}) // sin servidor o sin red: se queda la frase local
+      .finally(() => clearTimeout(corte));
+  }
+
+  // Revisa una vez por segundo qué cambió (ruta nueva, nodo nuevo, restaurante cerca, llegada)
+  function pensarInaki() {
+    if (!inaki.activo || !estado.ruta || estado.ruta.length < 2) return;
+    const destino = estado.ruta[estado.ruta.length - 1];
+    const clave = estado.ruta[0].id + ">" + destino.id;
+    const restante = calcularDistanciaTotalRestante();
+    const tramo = obtenerTramoActivo();
+
+    if (clave !== inaki.claveRuta) {
+      inaki.claveRuta = clave;
+      inaki.indice = estado.indiceActual;
+      inaki.llego = false;
+      inaki.avisados = new Set();
+      decirInaki("inicio", `¡Auuu! Soy Iñaki. Vamos a ${destino.name}: son ${Math.round(restante)} m. Sígueme.`);
+      return;
+    }
+    if (!inaki.llego && (restante < 0.8 || tramo.actual.id === tramo.siguiente.id)) {
+      inaki.llego = true;
+      decirInaki("llegada", `¡Llegamos a ${destino.name}! Bien hecho.`);
+      return;
+    }
+    if (inaki.llego) return;
+    if (estado.indiceActual !== inaki.indice) {
+      inaki.indice = estado.indiceActual;
+      const giro = obtenerGiroEnSiguienteNodo();
+      decirInaki("nodo", giro
+        ? `Pasamos ${tramo.actual.name}. En ${Math.round(tramo.distRestanteTramo)} m, al llegar a ${tramo.siguiente.name}: ${giro.textoCorto}.`
+        : `Pasamos ${tramo.actual.name}. Faltan ${Math.round(restante)} m para ${destino.name}.`);
+      return;
+    }
+    const comida = datos.nodes.find((n) =>
+      /cafeter|restaur|comida/i.test(n.category || "") && n.id !== destino.id && !inaki.avisados.has(n.id) &&
+      Math.hypot(n.x - estado.usuarioX, n.z - estado.usuarioZ) <= 25);
+    if (comida) {
+      inaki.avisados.add(comida.id);
+      decirInaki("restaurante", `Mira, aquí cerca está ${comida.name}. ¿Se te antoja algo?`);
+    }
+  }
+  setInterval(pensarInaki, 1000);
+
+  function dibujarGloboInaki(cx, yBase, w) {
+    if (!inaki.texto || performance.now() - inaki.textoMs > 12000) return;
+    arCtx.save();
+    arCtx.font = "600 15px system-ui, -apple-system, sans-serif";
+    const anchoMax = Math.min(w - 32, 300);
+    const lineas = [];
+    let linea = "";
+    inaki.texto.split(/\s+/).forEach((palabra) => {
+      const prueba = linea ? linea + " " + palabra : palabra;
+      if (arCtx.measureText(prueba).width > anchoMax - 24 && linea) { lineas.push(linea); linea = palabra; } else { linea = prueba; }
+    });
+    if (linea) lineas.push(linea);
+    const ancho = Math.min(anchoMax, Math.max(...lineas.map((l) => arCtx.measureText(l).width)) + 24);
+    const alto = lineas.length * 19 + 16;
+    const x = limitar(cx - ancho / 2, 16, w - 16 - ancho);
+    const y = Math.max(96, yBase - alto - 10);
+    arCtx.beginPath();
+    if (arCtx.roundRect) arCtx.roundRect(x, y, ancho, alto, 12); else arCtx.rect(x, y, ancho, alto);
+    arCtx.fillStyle = "rgba(15, 23, 42, 0.86)";
+    arCtx.fill();
+    arCtx.strokeStyle = "rgba(255, 255, 255, 0.55)";
+    arCtx.lineWidth = 1.5;
+    arCtx.stroke();
+    arCtx.fillStyle = "#ffffff";
+    arCtx.textAlign = "left";
+    arCtx.textBaseline = "top";
+    lineas.forEach((l, i) => arCtx.fillText(l, x + 12, y + 9 + i * 19));
+    arCtx.restore();
+  }
+
+  // Dibuja a Iñaki parado sobre el camino, ~3 m adelante (fijo en el mundo igual que las flechas)
+  function dibujarInaki(P, camino, largoVisible, t, enDestino, w, h) {
+    if (!inaki.activo) return;
+    const s = enDestino ? 1.6 : Math.min(3, Math.max(1.2, largoVisible - 0.5));
+    const c = puntoEnCamino(camino.pts, s);
+    const salto = Math.abs(Math.sin(t * 5)) * (enDestino ? 0.22 : 0.07);
+    const piso = P(c.x, 0.02, c.z);
+    const cuerpo = P(c.x, 0.42 + salto, c.z);
+    const visible = piso && cuerpo && cuerpo.sx > -40 && cuerpo.sx < w + 40 && cuerpo.sy > 0 && cuerpo.sy < h + 40;
+    if (!visible) {
+      // Iñaki quedó fuera de la pantalla (estás mirando a otro lado): su globo se queda abajo al centro
+      dibujarGloboInaki(w / 2, h * 0.62, w);
+      return;
+    }
+    const tam = limitar(0.85 * cuerpo.escala, 22, 150);
+    arCtx.save();
+    arCtx.beginPath();
+    arCtx.ellipse(piso.sx, piso.sy, tam * 0.38, tam * 0.12, 0, 0, Math.PI * 2);
+    arCtx.fillStyle = "rgba(0, 0, 0, 0.35)";
+    arCtx.fill();
+    arCtx.font = `${Math.round(tam)}px serif`;
+    arCtx.textAlign = "center";
+    arCtx.textBaseline = "middle";
+    arCtx.fillText("🐺", cuerpo.sx, cuerpo.sy);
+    arCtx.restore();
+    dibujarGloboInaki(cuerpo.sx, cuerpo.sy - tam * 0.55, w);
+  }
+
   function renderizarBucleAR(tiempoMs) {
     requestAnimationFrame(renderizarBucleAR);
     if (estado.modoVista !== "ar") return;
@@ -1636,6 +1815,9 @@ window.ARGOS_CAMPUS_DATA = {
       arCtx.fill();
       arCtx.stroke();
     }
+
+    // 2b. Iñaki, el lobo guía, caminando sobre la ruta
+    dibujarInaki(P, camino, largoVisible, t, enDestino, w, h);
 
     // 3. Pin QUIETO en la posición REAL del siguiente nodo (sin rebote ni giro con la cámara)
     const zPin = Math.max(1.5, distRestanteTramo);
