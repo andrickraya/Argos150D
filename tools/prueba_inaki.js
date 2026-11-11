@@ -34,6 +34,8 @@ const espera = (ms) => new Promise((r) => setTimeout(r, ms));
     // Espía del canvas: guarda todo texto que se dibuja (el globo y el lobo se pintan en el canvas AR)
     await p.evaluateOnNewDocument(() => {
       window.__txt = [];
+      window.__voz = [];
+      if (window.speechSynthesis) { window.speechSynthesis.speak = (u) => window.__voz.push(u.lang + "|" + u.text); window.speechSynthesis.cancel = () => {}; }
       const orig = CanvasRenderingContext2D.prototype.fillText;
       CanvasRenderingContext2D.prototype.fillText = function (t, ...r) { window.__txt.push(String(t)); if (window.__txt.length > 400) window.__txt.shift(); return orig.call(this, t, ...r); };
     });
@@ -84,6 +86,21 @@ const espera = (ms) => new Promise((r) => setTimeout(r, ms));
   t = await dibujado(p);
   ok(/Soy Iñaki/.test(t), "D1 sin servidor Iñaki sigue hablando con frases locales");
   ok(p.errs.length === 0, "D2 sin errores JS", p.errs.join(" | "));
+
+  await p.close();
+
+  // ---- E. Voz: apagada por omisión; con el botón habla en español y sin emojis ----
+  p = await abrir("");
+  await ruta(p, "N01", "N07"); await espera(1600);
+  let voz = await p.evaluate(() => window.__voz.slice());
+  ok(voz.length === 0, "E1 con la voz apagada Iñaki no habla", voz.join(" / "));
+  await p.evaluate(() => document.getElementById("btnVozInaki").click()); await espera(200);
+  voz = await p.evaluate(() => window.__voz.slice());
+  ok(voz.length === 1 && /^es-MX\|.*Soy Iñaki/.test(voz[0]), "E2 al encender dice la frase actual en es-MX", voz[0]);
+  await p.evaluate(() => document.getElementById("btnNextNode").click()); await espera(1600);
+  voz = await p.evaluate(() => window.__voz.slice());
+  ok(voz.length === 2 && /Gira a la derecha/.test(voz[1]) && !/[\u{1F300}-\u{1FAFF}\u{2190}-\u{21FF}\u{2B00}-\u{2BFF}]/u.test(voz[1]), "E3 al pasar un nodo dice el giro, sin emojis ni flechas", voz[1]);
+  ok(p.errs.length === 0, "E4 sin errores JS", p.errs.join(" | "));
 
   await b.close(); srv.close(); ollama.close();
   console.log(fallos ? `\n${fallos} FALLOS` : "\nTODO OK");

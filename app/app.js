@@ -708,11 +708,49 @@
     };
   }
 
+  // ---- Voz de Iñaki (la del propio celular, en español). Se enciende con el botón 🔇/🔊 ----
+  // El celular sólo deja hablar después de un toque del usuario: por eso el botón dice una frase al encenderse.
+  try { inaki.voz = localStorage.getItem("argos_inaki_voz") === "1"; } catch (_) { inaki.voz = false; }
+  function hablarInaki(texto, forzar) {
+    if ((!inaki.voz && !forzar) || !("speechSynthesis" in window) || typeof SpeechSynthesisUtterance !== "function") return;
+    try {
+      // Sin emojis ni flechas: el lector los diría en voz alta
+      const limpio = String(texto).replace(/[^\p{L}\p{N}\p{P}\p{Zs}°]/gu, " ").replace(/\s+/g, " ").trim();
+      if (!limpio) return;
+      window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(limpio);
+      u.lang = "es-MX";
+      const voces = window.speechSynthesis.getVoices().filter((v) => /^es/i.test(v.lang));
+      const voz = voces.find((v) => /es[-_]MX/i.test(v.lang)) || voces.find((v) => /es[-_](US|419)/i.test(v.lang)) || voces[0];
+      if (voz) u.voice = voz;
+      u.rate = 1.05;
+      u.pitch = 0.9;
+      window.speechSynthesis.speak(u);
+    } catch (_) {}
+  }
+  (function crearBotonVozInaki() {
+    if (!inaki.activo || !("speechSynthesis" in window) || !btnAlignArrows || !btnAlignArrows.parentNode) return;
+    const btn = document.createElement("button");
+    btn.id = "btnVozInaki";
+    btn.type = "button";
+    btn.className = btnAlignArrows.className;
+    const pintar = () => { btn.textContent = inaki.voz ? "🔊 Iñaki" : "🔇 Iñaki"; };
+    pintar();
+    btn.addEventListener("click", () => {
+      inaki.voz = !inaki.voz;
+      try { localStorage.setItem("argos_inaki_voz", inaki.voz ? "1" : "0"); } catch (_) {}
+      pintar();
+      if (inaki.voz) hablarInaki(inaki.texto || "Hola, soy Iñaki. Ya te puedo hablar.", true);
+      else if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+    });
+    btnAlignArrows.insertAdjacentElement("afterend", btn);
+  })();
+
   function decirInaki(evento, textoLocal) {
     inaki.texto = textoLocal;
     inaki.textoMs = performance.now();
     inaki.ultimoEvento = evento;
-    if (!inaki.servidor) return;
+    if (!inaki.servidor) { hablarInaki(textoLocal); return; }
     const miPedido = ++inaki.pedido;
     const ctl = typeof AbortController === "function" ? new AbortController() : null;
     const corte = setTimeout(() => ctl && ctl.abort(), 8000);
@@ -725,11 +763,13 @@
       .then((r) => (r.ok ? r.json() : null))
       .then((j) => {
         // Si mientras tanto pasó otra cosa, la respuesta vieja ya no se muestra
-        if (!j || typeof j.texto !== "string" || !j.texto.trim() || miPedido !== inaki.pedido) return;
+        if (miPedido !== inaki.pedido) return;
+        if (!j || typeof j.texto !== "string" || !j.texto.trim()) { hablarInaki(textoLocal); return; }
         inaki.texto = j.texto.trim().slice(0, 220);
         inaki.textoMs = performance.now();
+        hablarInaki(inaki.texto);
       })
-      .catch(() => {}) // sin servidor o sin red: se queda la frase local
+      .catch(() => { if (miPedido === inaki.pedido) hablarInaki(textoLocal); }) // sin servidor o sin red: se queda la frase local
       .finally(() => clearTimeout(corte));
   }
 
