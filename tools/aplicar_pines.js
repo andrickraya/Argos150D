@@ -36,13 +36,13 @@ leer(rutaPines).split(/\r?\n/).slice(1).forEach((linea, i) => {
   if (!linea.trim()) return;
   const c = linea.split(",");
   if (c.length < 7) { console.warn(`Línea ${i + 2} ignorada (columnas incompletas): ${linea}`); return; }
-  const [lat, lon, , id, prec, fuente] = c.slice(-6).map((s) => s.trim());
+  const [lat, lon, tipo, id, prec, fuente] = c.slice(-6).map((s) => s.trim());
   const nombre = c.slice(0, -6).join(",").trim();
-  if (fuente !== "gps") return;
+  if (fuente !== "gps" && fuente !== "nuevo") return;
   if (!/^N\d{2}$/.test(id) || !Number.isFinite(+lat) || !Number.isFinite(+lon)) {
     console.warn(`Línea ${i + 2} ignorada (id o coordenadas inválidas): ${linea}`); return;
   }
-  pines.push({ id, nombre, lat: +lat, lon: +lon, prec: prec === "" ? null : +prec });
+  pines.push({ id, nombre, lat: +lat, lon: +lon, prec: prec === "" ? null : +prec, nuevo: fuente === "nuevo", categoria: tipo });
 });
 if (!pines.length) { console.log("El CSV no trae ningún pin con fuente=gps. Nada que hacer."); process.exit(0); }
 
@@ -51,6 +51,22 @@ const cambios = [];
 for (const p of pines) {
   const re = new RegExp(`(\\{ id: "${p.id}",[^\\n]*?x: )(-?[\\d.]+)(, z: )(-?[\\d.]+)(, lat: )(-?[\\d.]+)(, lon: )(-?[\\d.]+)`);
   const m = datosTxt.match(re);
+  if (!m && p.nuevo) {
+    // Lugar NUEVO dado de alta en campo: se agrega el nodo y una arista a su nodo más cercano
+    const { x, z } = aMetros(p.lat, p.lon);
+    const existentes = [...datosTxt.matchAll(/\{ id: "(N\d{2})",[^\n]*?x: (-?[\d.]+), z: (-?[\d.]+)/g)].map((e) => ({ id: e[1], x: +e[2], z: +e[3] }));
+    const cerca = existentes.reduce((a, b) => (Math.hypot(b.x - x, b.z - z) < Math.hypot(a.x - x, a.z - z) ? b : a));
+    const nombre = p.nombre.replace(/"/g, "'");
+    const linea = `    { id: "${p.id}", nombre: "${nombre}", categoria: "${p.categoria || "Referencia"}", x: ${x.toFixed(2)}, z: ${z.toFixed(2)}, lat: ${p.lat.toFixed(7)}, lon: ${p.lon.toFixed(7)}, piso: "PB", desc: "Agregado en campo con pin (más cercano: ${cerca.id})" }`;
+    const finNodos = datosTxt.search(/\r?\n  \],\r?\n  aristas: \[/);
+    if (finNodos < 0) throw new Error("No encontré el final de 'nodos' en campus_data.js");
+    datosTxt = datosTxt.slice(0, finNodos) + ",\n" + linea + datosTxt.slice(finNodos);
+    const iniAristas = datosTxt.indexOf("aristas: [") + "aristas: [".length;
+    datosTxt = datosTxt.slice(0, iniAristas) + `\n    ["${p.id}", "${cerca.id}"],` + datosTxt.slice(iniAristas);
+    cambios.push({ ...p, x, z, movido: 0 });
+    console.log(`➕ NUEVO ${p.id} ${p.nombre} → unido a ${cerca.id} (${Math.hypot(cerca.x - x, cerca.z - z).toFixed(0)} m). Revisa si necesita más aristas.`);
+    continue;
+  }
   if (!m) { console.warn(`⚠️  ${p.id} no está en campus_data.js; lo salto.`); continue; }
   const { x, z } = aMetros(p.lat, p.lon);
   const movido = Math.hypot(x - +m[2], z - +m[4]);

@@ -35,6 +35,49 @@
     return;
   }
 
+  // ---- Lugares NUEVOS dados de alta en campo (Edificios A–W, restaurantes…) ----
+  // Se guardan en el celular y al arrancar se agregan como nodos normales, unidos al nodo más cercano.
+  // Con "📤 Enviar resultados" viajan en el CSV y tools/aplicar_pines.js los pasa a campus_data.js.
+  const CLAVE_LUGARES_NUEVOS = "argos_lugares_nuevos_v1";
+  function leerLugaresNuevos() {
+    try { const v = JSON.parse(localStorage.getItem(CLAVE_LUGARES_NUEVOS) || "[]"); return Array.isArray(v) ? v : []; } catch (_) { return []; }
+  }
+  function guardarLugaresNuevos(lista) {
+    try { localStorage.setItem(CLAVE_LUGARES_NUEVOS, JSON.stringify(lista)); } catch (_) {}
+  }
+  (function inyectarLugaresNuevos() {
+    const lat0 = datos.origen ? datos.origen.lat : 19.37024335;
+    const lon0 = datos.origen ? datos.origen.lon : -99.26414455;
+    const r = Math.PI / 180;
+    const originales = datos.nodes.slice();
+    datos.edges = datos.edges.slice();
+    leerLugaresNuevos().forEach((l) => {
+      if (!l || !l.id || !Number.isFinite(l.lat) || !Number.isFinite(l.lon)) return;
+      if (datos.nodes.some((x) => x.id === l.id)) return; // ya viene en campus_data.js
+      const x = 6378137.0 * (l.lon - lon0) * r * Math.cos(lat0 * r);
+      const z = 6378137.0 * (l.lat - lat0) * r;
+      let cerca = null, dMin = Infinity;
+      originales.forEach((o) => { const d = Math.hypot(o.x - x, o.z - z); if (d < dMin) { dMin = d; cerca = o; } });
+      datos.nodes.push({ id: l.id, name: l.name, nombre: l.name, category: l.category || "Referencia", categoria: l.category || "Referencia",
+        x, z, lat: l.lat, lon: l.lon, piso: "PB", desc: "Lugar agregado en campo", nuevo: true, acc: l.acc });
+      if (cerca) datos.edges.push([l.id, cerca.id]);
+      const b = datos.bounds;
+      b.minX = Math.min(b.minX, x - 25); b.maxX = Math.max(b.maxX, x + 25);
+      b.minZ = Math.min(b.minZ, z - 25); b.maxZ = Math.max(b.maxZ, z + 25);
+    });
+  })();
+  function crearLugarNuevo(nombre, categoria, lat, lon, acc) {
+    const lista = leerLugaresNuevos();
+    let num = 1;
+    const usados = new Set(datos.nodes.map((x) => x.id).concat(lista.map((x) => x.id)));
+    while (usados.has("N" + String(num).padStart(2, "0"))) num++;
+    const id = "N" + String(num).padStart(2, "0");
+    lista.push({ id, name: nombre, category: categoria, lat, lon, acc });
+    guardarLugaresNuevos(lista);
+    try { sessionStorage.setItem("argos_aviso", `✅ ${id} ${nombre} agregado: ya puedes elegirlo como destino`); } catch (_) {}
+    location.reload();
+  }
+
   // ============================================================================
   // 1. GRAFO DE LOS 20 NODOS CAMINABLES DEL CAMPUS IBERO (DIJKSTRA)
   // ============================================================================
@@ -2006,6 +2049,34 @@
       o.textContent = `${n.id} — ${n.name}`;
       selectPin.appendChild(o);
     });
+    // Lugares que todavía NO existen: se dan de alta parándote en su puerta (o tocando el Mapa 2D)
+    const PREFIJO_NUEVO = "NUEVO:";
+    const yaExiste = (nombre) => datos.nodes.some((x) => x.name.toLowerCase() === nombre.toLowerCase());
+    const agregarOpcionNueva = (valor, texto) => {
+      const o = document.createElement("option");
+      o.value = PREFIJO_NUEVO + valor;
+      o.textContent = texto;
+      selectPin.appendChild(o);
+    };
+    agregarOpcionNueva("?", "➕ Lugar nuevo (restaurante, salón…): escribir nombre");
+    "ABCDEFGHIJKLMNOPQRSTUVW".split("").forEach((letra) => {
+      if (!yaExiste("Edificio " + letra)) agregarOpcionNueva("Edificio " + letra, "➕ Edificio " + letra + " (dar de alta)");
+    });
+    let lugarNuevo = null; // { nombre, categoria } mientras se ubica un lugar que aún no existe
+    function prepararLugarNuevo() {
+      lugarNuevo = null;
+      if (!selectPin.value.startsWith(PREFIJO_NUEVO)) return true;
+      let nombre = selectPin.value.slice(PREFIJO_NUEVO.length);
+      let categoria = "Académico";
+      if (nombre === "?") {
+        nombre = (window.prompt("Nombre del lugar nuevo (ej. Cafetería Capeltic):") || "").trim().replace(/,/g, " ");
+        if (!nombre) return false;
+        if (yaExiste(nombre)) { txtEstado.textContent = "⚠️ Ya existe un lugar con ese nombre: elígelo en la lista."; return false; }
+        categoria = window.confirm("¿Es restaurante o cafetería?\n\nAceptar = Sí · Cancelar = No") ? "Cafetería" : "Referencia";
+      }
+      lugarNuevo = { nombre, categoria };
+      return true;
+    }
 
     const movidoMetros = (id) => {
       const n = nodosPorId.get(id);
@@ -2048,7 +2119,7 @@
       const seg = Math.round((Date.now() - t0) / 1000);
       const mejor = muestras.length ? Math.round(Math.min(...muestras.map((m) => m.acc))) : null;
       txtEstado.textContent = muestras.length
-        ? `⏳ Midiendo ${idMidiendo}… ${seg}/${SEGUNDOS} s · ${muestras.length} lecturas · mejor ±${mejor} m. No te muevas.`
+        ? `⏳ Midiendo ${lugarNuevo ? lugarNuevo.nombre : idMidiendo}… ${seg}/${SEGUNDOS} s · ${muestras.length} lecturas · mejor ±${mejor} m. No te muevas.`
         : `⏳ Buscando señal GPS… ${seg} s`;
     }
 
@@ -2066,6 +2137,12 @@
         const wgt = 1 / (m.acc * m.acc);
         sw += wgt; slat += m.lat * wgt; slon += m.lon * wgt;
       });
+      if (lugarNuevo) {
+        const nuevo = lugarNuevo;
+        lugarNuevo = null;
+        crearLugarNuevo(nuevo.nombre, nuevo.categoria, Number((slat / sw).toFixed(7)), Number((slon / sw).toFixed(7)), Math.round(mejor));
+        return;
+      }
       const pines = leerPines();
       pines[idMidiendo] = {
         lat: Number((slat / sw).toFixed(7)),
@@ -2095,11 +2172,12 @@
     btnGuardar.insertAdjacentElement("afterend", btnMapaPin);
 
     btnMapaPin.addEventListener("click", () => {
+      if (!prepararLugarNuevo()) return;
       nodoPorUbicarEnMapa = selectPin.value;
       if (dlg.open) dlg.close();
       document.getElementById("tabMap")?.click();
       const n = nodosPorId.get(nodoPorUbicarEnMapa);
-      locationModeBadge.textContent = `📌 Toca el Mapa 2D donde va ${n.id}`;
+      locationModeBadge.textContent = `📌 Toca el Mapa 2D donde va ${lugarNuevo ? lugarNuevo.nombre : n.id}`;
     });
 
     campusCanvas.addEventListener("click", (e) => {
@@ -2114,6 +2192,13 @@
       const x = b.minX + ((cx - pad) / w) * (b.maxX - b.minX);
       const z = b.maxZ - ((cy - pad) / h) * (b.maxZ - b.minZ);
       const { lat, lon } = metrosALatLon(x, z);
+      if (lugarNuevo) {
+        const nuevo = lugarNuevo;
+        lugarNuevo = null;
+        nodoPorUbicarEnMapa = null;
+        crearLugarNuevo(nuevo.nombre, nuevo.categoria, lat, lon, 1);
+        return;
+      }
       const pines = leerPines();
       pines[nodoPorUbicarEnMapa] = { lat, lon, acc: 1, n: 1, t: new Date().toISOString() };
       const idMovido = nodoPorUbicarEnMapa;
@@ -2134,6 +2219,7 @@
         txtEstado.textContent = "❌ Este navegador no da ubicación GPS.";
         return;
       }
+      if (!prepararLugarNuevo()) return;
       muestras = [];
       idMidiendo = selectPin.value;
       t0 = Date.now();
@@ -2172,6 +2258,7 @@
         const o = posicionOriginal.get(n.id);
         const lat = p ? p.lat : o.lat;
         const lon = p ? p.lon : o.lon;
+        if (n.nuevo) { filas.push(`${n.name},${lat},${lon},${n.category},${n.id},${p ? p.acc : (n.acc || "")},nuevo`); return; }
         filas.push(`${n.name},${lat},${lon},destino,${n.id},${p ? p.acc : ""},${p ? "gps" : "mapa"}`);
       });
       return filas.join("\n");
@@ -2198,6 +2285,11 @@
     btnBorrar.addEventListener("click", () => {
       if (!window.confirm("¿Borrar TODOS los pines guardados en este celular?")) return;
       guardarPinesLocal({});
+      if (leerLugaresNuevos().length && window.confirm("¿Borrar TAMBIÉN los lugares nuevos que diste de alta (edificios, restaurantes)?")) {
+        guardarLugaresNuevos([]);
+        location.reload();
+        return;
+      }
       aplicarPines();
       reconstruirGrafo();
       recalcularRutaCompleta();
@@ -2206,6 +2298,10 @@
     });
 
     pintarLista();
+    try {
+      const aviso = sessionStorage.getItem("argos_aviso");
+      if (aviso) { sessionStorage.removeItem("argos_aviso"); locationModeBadge.textContent = aviso; }
+    } catch (_) {}
   }
 
   // ============================================================================
