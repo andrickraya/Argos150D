@@ -17,14 +17,15 @@ const espera = (ms) => new Promise((r) => setTimeout(r, ms));
   await b.defaultBrowserContext().overridePermissions(origen, ["geolocation"]);
   const p = await b.newPage();
   await p.setViewport({ width: 393, height: 851, isMobile: true, hasTouch: true });
+  const nombres = ["Salón Prueba", "Cafetería Prueba"];
   const errs = []; p.on("pageerror", (e) => errs.push(e.message));
-  p.on("dialog", (d) => d.type() === "prompt" ? d.accept("Cafetería Prueba") : d.accept());
+  p.on("dialog", (d) => d.type() === "prompt" ? d.accept(nombres.shift() || "Otro Lugar") : d.accept());
   await p.setGeolocation({ latitude: 19.3716, longitude: -99.2631, accuracy: 4 }); // ~30 m al este del Salón C
   await p.goto(origen + "/index.html", { waitUntil: "load" });
 
   const opciones = () => p.evaluate(() => [...document.getElementById("selectPin").options].map((o) => o.value));
   let ops = await opciones();
-  ok(ops.includes("NUEVO:Edificio A") && ops.includes("NUEVO:Edificio W") && ops.includes("NUEVO:?"), "1 la lista de pines ofrece Edificios A–W y 'Lugar nuevo'", ops.filter((o) => o.startsWith("NUEVO")).length + " opciones nuevas");
+  ok(ops.includes("N21") && ops.includes("N43") && !ops.includes("NUEVO:Edificio A") && ops.includes("NUEVO:?"), "1 los Edificios A–W ya vienen como N21–N43 y se ofrece 'Lugar nuevo'", ops.filter((o) => o.startsWith("NUEVO")).length + " opciones nuevas");
 
   async function darDeAlta(valor) {
     await p.evaluate((v) => { document.getElementById("selectPin").value = v; document.getElementById("btnGuardarPin").click(); }, valor);
@@ -33,25 +34,26 @@ const espera = (ms) => new Promise((r) => setTimeout(r, ms));
     await p.evaluate(() => document.getElementById("btnGuardarPin").click()); // "Terminar ya"
     await nav; await espera(400);
   }
-  await darDeAlta("NUEVO:Edificio A");
+  await darDeAlta("NUEVO:?");
   let dest = await p.evaluate(() => [...document.getElementById("selectDestino").options].map((o) => o.value + " " + o.textContent));
-  ok(dest.some((d) => /N21.*Edificio A/.test(d)), "2 Edificio A quedó como N21 y aparece como destino", dest.filter((d) => /N2[1-9]/.test(d)).join(" | "));
-  ok(/N21 Edificio A agregado/.test(await p.evaluate(() => document.getElementById("locationModeBadge").textContent)), "3 aviso de lugar agregado");
+  ok(dest.some((d) => /N45.*Salón Prueba/.test(d)), "2 el lugar nuevo quedó como N45 y aparece como destino", dest.filter((d) => /N4[4-9]/.test(d)).join(" | "));
+  const aviso = await p.evaluate(() => document.getElementById("locationModeBadge").textContent);
+  ok(/N45 Salón Prueba agregado/.test(aviso), "3 aviso de lugar agregado", aviso);
   ops = await opciones();
-  ok(!ops.includes("NUEVO:Edificio A") && ops.includes("N21"), "4 Edificio A ya no se ofrece como nuevo (ahora es N21)");
+  ok(ops.includes("N45"), "4 el lugar nuevo ya está en la lista de pines como N45");
 
   await p.setGeolocation({ latitude: 19.37128, longitude: -99.2636, accuracy: 5 });
   await darDeAlta("NUEVO:?");
   dest = await p.evaluate(() => [...document.getElementById("selectDestino").options].map((o) => o.value + " " + o.textContent));
-  ok(dest.some((d) => /N22.*Cafetería Prueba/.test(d)), "5 lugar con nombre libre quedó como N22", dest.filter((d) => /N2[1-9]/.test(d)).join(" | "));
+  ok(dest.some((d) => /N46.*Cafetería Prueba/.test(d)), "5 segundo lugar con nombre libre quedó como N46", dest.filter((d) => /N4[4-9]/.test(d)).join(" | "));
 
   const ruta = await p.evaluate(() => {
     const so = document.getElementById("selectOrigen"), sd = document.getElementById("selectDestino");
     so.value = "N01"; so.dispatchEvent(new Event("change", { bubbles: true }));
-    sd.value = "N21"; sd.dispatchEvent(new Event("change", { bubbles: true }));
+    sd.value = "N45"; sd.dispatchEvent(new Event("change", { bubbles: true }));
     return [...document.querySelectorAll("li")].map((l) => l.innerText.replace(/\s+/g, " ").trim()).filter((x) => /^N\d\d/.test(x)).map((x) => x.slice(0, 3)).join(">");
   });
-  ok(/^N01>.*N09>N21$/.test(ruta), "6 ruta Puerta 3 → Edificio A termina en su nodo más cercano (Patio El Cubo)", ruta);
+  ok(/^N01>.*N09>N45$/.test(ruta), "6 ruta Puerta 3 → lugar nuevo termina en su nodo más cercano (Patio El Cubo)", ruta);
 
   // CSV que se comparte: se captura sobrescribiendo navigator.share
   const csv = await p.evaluate(async () => {
