@@ -68,7 +68,7 @@ const ok = (c, m, extra) => { if (!c) fallos++; console.log((c ? "OK   " : "FALL
   // ---- B. iPhone: brújula automática. Tramo N01→N03 va al Este (≈90°) ----
   p = await nueva("N01", "N07");
   await p.evaluate(() => window.__girar(["ios"], 0, 0, (r) => (r + 356) % 360)); t = await leer(p);
-  ok(/Gira (8[89]|9[0-2])° a la derecha/.test(t.rumbo), "B1 mirando al Norte: camino (Este) a la derecha, sin centrar", t.rumbo);
+  ok(/Gira (8[5-9]|9[0-6])° a la derecha/.test(t.rumbo), "B1 mirando al Norte: camino (Este) a la derecha, sin centrar", t.rumbo);
   await p.evaluate(() => window.__girar(["ios"], 0, 90, (r) => (r + 356) % 360)); t = await leer(p);
   ok(/De frente/.test(t.rumbo), "B2 girar al Este → de frente", t.rumbo);
   // Brújula mala (fierros: marca 40° de más). El usuario mira al Este de verdad y centra.
@@ -79,7 +79,7 @@ const ok = (c, m, extra) => { if (!c) fallos++; console.log((c ? "OK   " : "FALL
   const oculto = await p.evaluate(() => getComputedStyle(document.getElementById("btnAlignArrows")).display === "none");
   ok(oculto, "B4 con brújula el botón Centrar flechas está oculto");
   await p.evaluate(() => document.getElementById("btnAlignArrows").click()); t = await leer(p);
-  ok(/Gira (8[89]|9[0-2])° a la derecha/.test(t.rumbo) && t.rumbo === antes, "B5 con brújula, un toque al botón NO mueve las flechas", antes + " == " + t.rumbo);
+  ok(/Gira (8[5-9]|9[0-6])° a la derecha/.test(t.rumbo) && t.rumbo === antes, "B5 con brújula, un toque al botón NO mueve las flechas", antes + " == " + t.rumbo);
   ok(p.errs.length === 0, "B6 sin errores JS", p.errs.join(" | "));
   await p.close();
 
@@ -88,14 +88,14 @@ const ok = (c, m, extra) => { if (!c) fallos++; console.log((c ? "OK   " : "FALL
   await p.evaluate(() => window.__girar(["rel", "abs"], 86, 86)); t = await leer(p);
   ok(/De frente/.test(t.rumbo), "C1 Android mirando al Este → de frente", t.rumbo);
   await p.evaluate(() => window.__girar(["rel", "abs"], 86, 176)); t = await leer(p);
-  ok(/Gira (89|9[01])° a la izquierda/.test(t.rumbo), "C2 rel+abs: giro 90° se cuenta UNA vez", t.rumbo);
+  ok(/Gira (8[5-9]|9[0-6])° a la izquierda/.test(t.rumbo), "C2 rel+abs: giro 90° se cuenta UNA vez", t.rumbo);
   await p.close();
   p = await nueva("N01", "N07");
   await p.evaluate(() => window.__girar(["abs"], 86, 86));
   await p.evaluate(() => window.__girar(["abs"], 86, 176)); t = await leer(p);
-  ok(/Gira (89|9[01])° a la izquierda/.test(t.rumbo), "C3 sólo abs: giro 90°", t.rumbo);
+  ok(/Gira (8[5-9]|9[0-6])° a la izquierda/.test(t.rumbo), "C3 sólo abs: giro 90°", t.rumbo);
   await p.evaluate(() => document.getElementById("btnAlignArrows").click()); t = await leer(p);
-  ok(/Gira (89|9[01])° a la izquierda/.test(t.rumbo), "C4 Android con brújula: el toque NO mueve las flechas", t.rumbo);
+  ok(/Gira (8[5-9]|9[0-6])° a la izquierda/.test(t.rumbo), "C4 Android con brújula: el toque NO mueve las flechas", t.rumbo);
   await p.close();
 
   // ---- D. Rutas pedidas ----

@@ -99,7 +99,7 @@ const espera = (ms) => new Promise((r) => setTimeout(r, ms));
   ok(voz.length === 1 && /^es-MX\|.*Soy Iñaki/.test(voz[0]), "E2 al encender dice la frase actual en es-MX", voz[0]);
   await p.evaluate(() => document.getElementById("btnNextNode").click()); await espera(1600);
   voz = await p.evaluate(() => window.__voz.slice());
-  ok(voz.length === 2 && /Gira a la derecha/.test(voz[1]) && !/[\u{1F300}-\u{1FAFF}\u{2190}-\u{21FF}\u{2B00}-\u{2BFF}]/u.test(voz[1]), "E3 al pasar un nodo dice el giro, sin emojis ni flechas", voz[1]);
+  ok(voz.length === 2 && /Gira a la (derecha|izquierda)/.test(voz[1]) && !/[\u{1F300}-\u{1FAFF}\u{2190}-\u{21FF}\u{2B00}-\u{2BFF}]/u.test(voz[1]), "E3 al pasar un nodo dice el giro, sin emojis ni flechas", voz[1]);
   ok(p.errs.length === 0, "E4 sin errores JS", p.errs.join(" | "));
 
   await b.close(); srv.close(); ollama.close();

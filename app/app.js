@@ -111,6 +111,16 @@
   // Pines personalizados (GPS o toque en Mapa 2D): se usa v2 para limpiar pines de prueba viejos
   const CLAVE_PINES = "argos_pines_v2";
   try { localStorage.removeItem("argos_pines_v1"); } catch (_) {}
+  // 2026-11-11: Puerta 3, Escultura de Lobos y Salón C se recolocaron con los puntos reales de la ruta.
+  // Un pin viejo guardado en el celular los regresaría a su lugar anterior: se borra UNA sola vez.
+  try {
+    if (localStorage.getItem("argos_limpieza_pines") !== "2026-11-11") {
+      const guardados = JSON.parse(localStorage.getItem(CLAVE_PINES) || "{}") || {};
+      ["N01", "N03", "N07"].forEach((id) => { delete guardados[id]; });
+      localStorage.setItem(CLAVE_PINES, JSON.stringify(guardados));
+      localStorage.setItem("argos_limpieza_pines", "2026-11-11");
+    }
+  } catch (_) {}
   function leerPines() {
     try { return JSON.parse(localStorage.getItem(CLAVE_PINES) || "{}") || {}; } catch (_) { return {}; }
   }
@@ -650,6 +660,13 @@
         hudInstruction.textContent = `⬆️ Camina ${mTramo} m de frente hacia ${siguiente.name}`;
       }
     }
+
+    // Escaleras (nodos con escaleras: true en campus_data.js): se avisa al acercarse y al pasar por ellas
+    const metrosDesdeActual = tramoVista.distTramo - distRestanteTramo;
+    let avisoEscaleras = "";
+    if (siguiente.escaleras && distRestanteTramo <= 15) avisoEscaleras = `🪜 Escaleras en ${mTramo} m`;
+    else if (actual.escaleras && metrosDesdeActual <= 10) avisoEscaleras = "🪜 Aquí hay escaleras, con cuidado";
+    if (avisoEscaleras && arSignDist) arSignDist.textContent = `${avisoEscaleras} · ${arSignDist.textContent}`;
   }
 
   // ============================================================================
@@ -1501,6 +1518,7 @@
         else if (giro <= -20) txtGiro = `⬅️ Gira a la izquierda (${Math.round(Math.abs(giro))}°)`;
         detalle = `+${d} m · ${txtGiro}`;
       }
+      if (nodo.escaleras) detalle += " · 🪜 Escaleras";
       li.innerHTML = `
         <div><span class="itinerary-code">${nodo.id}</span><span>${nodo.name}</span></div>
         <span>${detalle}</span>

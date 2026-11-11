@@ -4,13 +4,13 @@
 window.ARGOS_CAMPUS_DATA = {
   origen: { lat: 19.37024335, lon: -99.26414455 },
   nodos: [
-    { id: "N01", nombre: "Puerta 3", categoria: "Acceso", x: -92.27, z: 20.59, lat: 19.3704283, lon: -99.2650232, piso: "PB", desc: "Reja exterior de acceso peatonal poniente sobre Prol. Paseo de la Reforma (OSM n8186241757)" },
+    { id: "N01", nombre: "Puerta 3", categoria: "Acceso", x: -59.62, z: 32.08, lat: 19.3705315, lon: -99.2647123, piso: "PB", desc: "Acceso peatonal Puerta 3 (punto de Google Maps de Andrick, 2026-11-11)" },
     { id: "N02", nombre: "Biblioteca FXC", categoria: "Académico", x: -16.80, z: 38.50, lat: 19.3705892, lon: -99.2643045, piso: "PB", desc: "Entrada principal oriente de la Biblioteca Francisco Xavier Clavigero (OSM w452760365)" },
-    { id: "N03", nombre: "Escultura de Lobos", categoria: "Referencia", x: -22.29, z: 20.04, lat: 19.3704234, lon: -99.2643568, piso: "PB", desc: "Explanada interior del acceso Puerta 3 junto a la Escultura de Lobos (OSM n12534392974)" },
+    { id: "N03", nombre: "Escultura de Lobos", categoria: "Referencia", x: -5.79, z: 28.34, lat: 19.3704979, lon: -99.2641997, piso: "PB", desc: "Andador junto al Jardín de los Lobos, entrando por Puerta 3 (punto de Google Maps de Andrick, 2026-11-11)" },
     { id: "N04", nombre: "Centro de Meditación", categoria: "Referencia", x: -18.50, z: -30.50, lat: 19.3699694, lon: -99.2643207, piso: "PB", desc: "Andador de acceso oriente al jardín y Centro de Meditación (OSM w1354446214)" },
     { id: "N05", nombre: "Pasillo Poniente Norte", categoria: "Pasillo QR", x: -18.50, z: 96.00, lat: 19.3711060, lon: -99.2643207, piso: "PB", desc: "Corredor poniente entre Biblioteca FXC, Edificio T y el Ala Norte" },
     { id: "N06", nombre: "Acceso Ala Norte (Edif. C)", categoria: "Pasillo QR", x: 34.50, z: 158.00, lat: 19.3716627, lon: -99.2638160, piso: "PB", desc: "Esquina noroeste de entrada al corredor del Edificio C (OSM w30291948)" },
-    { id: "N07", nombre: "Salón C", categoria: "Académico", x: 81.55, z: 154.00, lat: 19.3716268, lon: -99.2633680, piso: "PB", desc: "Puerta exterior del Salón C en el corredor del Ala Norte" },
+    { id: "N07", nombre: "Salón C", categoria: "Académico", x: 59.52, z: 162.31, lat: 19.3717014, lon: -99.2635778, piso: "PB", desc: "Salón C, Edificio C (punto de Google Maps de Andrick, 2026-11-11)" },
     { id: "N08", nombre: "Paso Noreste (Hacia El Cubo)", categoria: "Pasillo QR", x: 164.50, z: 128.50, lat: 19.3713977, lon: -99.2625782, piso: "PB", desc: "Cruce nororiente entre Edificios D-E y el corredor central hacia El Cubo" },
     { id: "N09", nombre: "Patio El Cubo", categoria: "Pasillo QR", x: 112.00, z: 134.00, lat: 19.3714471, lon: -99.2630781, piso: "PB", desc: "Explanada exterior del Patio Académico frente a la Cafetería El Cubo" },
     { id: "N10", nombre: "Cafetería El Cubo", categoria: "Cafetería", x: 77.67, z: 115.84, lat: 19.3712840, lon: -99.2634050, piso: "PB", desc: "Zona de mesas y barra de la Cafetería El Cubo (Edificio F)" },
@@ -47,9 +47,15 @@ window.ARGOS_CAMPUS_DATA = {
     { id: "N41", nombre: "Edificio U", categoria: "Académico", x: -95.68, z: -187.88, lat: 19.3685556, lon: -99.2650556, piso: "PB", desc: "Ubicación tomada de Google Maps, falta confirmarla caminando (unido a N20)" },
     { id: "N42", nombre: "Edificio V", categoria: "Académico", x: -145.92, z: -188.46, lat: 19.3685504, lon: -99.2655340, piso: "PB", desc: "Ubicación tomada de Google Maps, falta confirmarla caminando (unido a N35)" },
     { id: "N43", nombre: "Edificio W", categoria: "Académico", x: -203.60, z: -271.37, lat: 19.3678056, lon: -99.2660833, piso: "PB", desc: "Ubicación tomada de Google Maps, falta confirmarla caminando (unido a N42)" },
-    { id: "N44", nombre: "Capeltic (Edificio H)", categoria: "Cafetería", x: 151.77, z: 126.71, lat: 19.3713816, lon: -99.2626994, piso: "PB", desc: "Ubicación tomada de Google Maps, falta confirmarla caminando (unido a N08)" }
+    { id: "N44", nombre: "Capeltic (Edificio H)", categoria: "Cafetería", x: 151.77, z: 126.71, lat: 19.3713816, lon: -99.2626994, piso: "PB", desc: "Ubicación tomada de Google Maps, falta confirmarla caminando (unido a N08)" },
+    { id: "N60", nombre: "Esquina Centro de Atención", categoria: "Pasillo QR", x: 12.48, z: 28.23, lat: 19.3704969, lon: -99.2640257, piso: "PB", desc: "Esquina del Centro de Atención Universitaria, donde el camino dobla hacia la Explanada (punto de Google Maps de Andrick, 2026-11-11)" },
+    { id: "N61", nombre: "Explanada (escaleras)", categoria: "Pasillo QR", x: 48.95, z: 82.09, lat: 19.3709808, lon: -99.2636784, piso: "PB", desc: "Explanada entre Edificio N y El Cubo; aquí están las escaleras (punto de Google Maps de Andrick, 2026-11-11)", escaleras: true },
+    { id: "N62", nombre: "Servicios Escolares", categoria: "Referencia", x: 15.64, z: 110.19, lat: 19.3712332, lon: -99.2639956, piso: "PB", desc: "punto de Google Maps de Andrick, 2026-11-11; unido a su nodo más cercano, falta confirmar el pasillo" },
+    { id: "N63", nombre: "Punto D", categoria: "Referencia", x: 8.68, z: 132.20, lat: 19.3714309, lon: -99.2640619, piso: "PB", desc: "punto de Google Maps de Andrick, 2026-11-11; unido a su nodo más cercano, falta confirmar el pasillo" },
+    { id: "N64", nombre: "Camellia", categoria: "Referencia", x: 36.81, z: 165.93, lat: 19.3717339, lon: -99.2637940, piso: "PB", desc: "punto de Google Maps de Andrick, 2026-11-11; unido a su nodo más cercano, falta confirmar el pasillo" }
   ],
   aristas: [
+    ["N03", "N60"], ["N60", "N61"], ["N61", "N07"], ["N62", "N34"], ["N63", "N25"], ["N64", "N06"],
     ["N44", "N08"],
     ["N43", "N42"],
     ["N42", "N35"],
