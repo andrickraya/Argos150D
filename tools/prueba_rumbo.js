@@ -74,11 +74,12 @@ const ok = (c, m, extra) => { if (!c) fallos++; console.log((c ? "OK   " : "FALL
   // Brújula mala (fierros: marca 40° de más). El usuario mira al Este de verdad y centra.
   await p.evaluate(() => { for (let i = 0; i < 300; i++) window.__ev("ios", 90, 130); }); t = await leer(p);
   ok(/Gira/.test(t.rumbo), "B3 brújula con error de 40° desvía las flechas (esperado antes de centrar)", t.rumbo);
-  await p.click("#btnAlignArrows");
-  await p.evaluate(() => { for (let i = 0; i < 300; i++) window.__ev("ios", 90, 130); }); t = await leer(p);
-  ok(/De frente/.test(t.rumbo), "B4 tras centrar, la brújula mala ya NO mueve las flechas", t.rumbo);
-  await p.evaluate(() => window.__girar(["ios"], 90, 0, () => 250)); t = await leer(p);
-  ok(/Gira (89|9[01])° a la derecha/.test(t.rumbo), "B5 tras centrar, girar 90° a la izq. → camino a la derecha (fijas)", t.rumbo);
+  await p.evaluate(() => window.__girar(["ios"], 90, 0, (r) => (r + 356) % 360)); t = await leer(p);
+  const antes = t.rumbo;
+  const oculto = await p.evaluate(() => getComputedStyle(document.getElementById("btnAlignArrows")).display === "none");
+  ok(oculto, "B4 con brújula el botón Centrar flechas está oculto");
+  await p.evaluate(() => document.getElementById("btnAlignArrows").click()); t = await leer(p);
+  ok(/Gira (8[89]|9[0-2])° a la derecha/.test(t.rumbo) && t.rumbo === antes, "B5 con brújula, un toque al botón NO mueve las flechas", antes + " == " + t.rumbo);
   ok(p.errs.length === 0, "B6 sin errores JS", p.errs.join(" | "));
   await p.close();
 
@@ -93,9 +94,8 @@ const ok = (c, m, extra) => { if (!c) fallos++; console.log((c ? "OK   " : "FALL
   await p.evaluate(() => window.__girar(["abs"], 86, 86));
   await p.evaluate(() => window.__girar(["abs"], 86, 176)); t = await leer(p);
   ok(/Gira (89|9[01])° a la izquierda/.test(t.rumbo), "C3 sólo abs: giro 90°", t.rumbo);
-  await p.click("#btnAlignArrows");
-  await p.evaluate(() => window.__girar(["abs"], 176, 266)); t = await leer(p);
-  ok(/Gira (89|9[01])° a la izquierda/.test(t.rumbo), "C4 sólo abs + centrar + giro 90°", t.rumbo);
+  await p.evaluate(() => document.getElementById("btnAlignArrows").click()); t = await leer(p);
+  ok(/Gira (89|9[01])° a la izquierda/.test(t.rumbo), "C4 Android con brújula: el toque NO mueve las flechas", t.rumbo);
   await p.close();
 
   // ---- D. Rutas pedidas ----

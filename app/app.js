@@ -1400,7 +1400,7 @@
   //   1. GIRO (giroscopio): cada cambio de orientación se SUMA al rumbo. Así, si giras, las flechas
   //      se quedan donde estaban en el mundo. No se descarta ningún giro, por lento que sea.
   //   2. BRÚJULA (Norte real): corrige poco a poco el rumbo mientras no hayas centrado a mano.
-  //   3. "🎯 Centrar flechas": tú apuntas el celular a lo largo del camino y tocas el botón.
+  //   3. "🎯 Centrar flechas" (SÓLO en celulares SIN brújula; con brújula el botón se oculta): tú apuntas el celular a lo largo del camino y tocas el botón.
   //      Desde ese momento manda SOLO el giroscopio (la brújula ya no mueve nada), de modo que
   //      las flechas quedan fijas en el mundo aunque gires o haya fierros cerca.
   const K_CORRECCION_BRUJULA = 0.02; // fracción del error que se corrige por lectura de brújula
@@ -1474,6 +1474,8 @@
     const salto = estado.ultimaBrujula === null ? 0 : Math.abs(diferenciaAngularGrados(rumboAbs, estado.ultimaBrujula));
     const primera = !estado.brujulaReal;
     estado.brujulaReal = true;
+    // Con brújula el mundo ya está orientado: se quita el botón para que NADA pueda girar las flechas
+    if (primera) { btnAlignArrows.style.display = "none"; estado.rumboManual = false; }
     estado.ultimaBrujula = rumboAbs;
     estado.ultimaBrujulaMs = performance.now();
     if (Number.isFinite(precision)) estado.precisionBrujula = precision;
@@ -1521,6 +1523,7 @@
   // si giras, ya NO giran contigo (verás "Gira a la derecha/izquierda" o "Da media vuelta").
   btnAlignArrows.textContent = "🎯 Centrar flechas";
   btnAlignArrows.addEventListener("click", () => {
+    if (estado.brujulaReal) return; // Con brújula las flechas NUNCA se mueven por un toque
     estado.rumboUsuarioGrados = obtenerTramoActivo().rumboTramo;
     giroPendiente = 0;
     estado.rumboManual = true;
