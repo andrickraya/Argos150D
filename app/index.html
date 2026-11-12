@@ -1175,6 +1175,12 @@ window.ARGOS_CAMPUS_DATA = {
   const viewAR = document.getElementById("viewAR");
   const viewMap = document.getElementById("viewMap");
   const locationModeBadge = document.getElementById("locationModeBadge");
+  // Avisos que el usuario debe alcanzar a leer: durante 6 s el mensaje de "toca para activar la cámara" no los tapa
+  let avisoProtegidoHastaMs = 0;
+  function avisarImportante(texto) {
+    locationModeBadge.textContent = texto;
+    avisoProtegidoHastaMs = performance.now() + 6000;
+  }
 
   const bottomSheet = document.getElementById("bottomSheet");
   const btnToggleSheet = document.getElementById("btnToggleSheet");
@@ -1222,7 +1228,7 @@ window.ARGOS_CAMPUS_DATA = {
     bottomSheet.classList.toggle("is-collapsed", colapsado);
     btnToggleSheet.setAttribute("aria-expanded", String(!colapsado));
     sheetToggleLabel.textContent = colapsado
-      ? "🔼 Cambiar Origen / Destino (20 Nodos)"
+      ? "🔼 Cambiar Origen / Destino"
       : "🔽 Bajar Menú (Ver Piso AR)";
   }
 
@@ -1295,19 +1301,134 @@ window.ARGOS_CAMPUS_DATA = {
     estado.usuarioZ = actual.z + (siguiente.z - actual.z) * t;
   }
 
+  // ---- Posición libre: el usuario puede estar A MEDIO pasillo, no sólo parado en un nodo ----
+  // estado.puntoInicio = null  → estás parado en el nodo estado.origenId
+  //                    = { x, z, a, b } → estás sobre el pasillo que une los nodos a y b
+  // Se usa al cambiar de destino a media ruta y al ubicarte con GPS.
+  function proyectarEnSegmento(px, pz, a, b) {
+    const dx = b.x - a.x, dz = b.z - a.z;
+    const l2 = dx * dx + dz * dz;
+    const t = l2 > 0 ? Math.max(0, Math.min(1, ((px - a.x) * dx + (pz - a.z) * dz) / l2)) : 0;
+    const x = a.x + dx * t, z = a.z + dz * t;
+    return { x, z, t, d: Math.hypot(px - x, pz - z) };
+  }
+
+  // Punto de la red de pasillos más cercano a una posición cualquiera (p. ej. la del GPS)
+  function puntoMasCercanoEnGrafo(px, pz) {
+    let mejor = null;
+    datos.edges.forEach(([u, v]) => {
+      const a = nodosPorId.get(u), b = nodosPorId.get(v);
+      if (!a || !b) return;
+      const p = proyectarEnSegmento(px, pz, a, b);
+      if (!mejor || p.d < mejor.d) mejor = { x: p.x, z: p.z, t: p.t, d: p.d, a: a.id, b: b.id };
+    });
+    return mejor;
+  }
+
+  // Ruta más corta desde un punto a medio pasillo: sale por el extremo que convenga
+  function rutaDesdePunto(punto, destinoId) {
+    const a = nodosPorId.get(punto.a), b = nodosPorId.get(punto.b);
+    if (!a || !b) return calcularRutaDijkstra(estado.origenId, destinoId);
+    const dA = Math.hypot(punto.x - a.x, punto.z - a.z);
+    const dB = Math.hypot(punto.x - b.x, punto.z - b.z);
+    if (dA < 1.5) return calcularRutaDijkstra(a.id, destinoId); // prácticamente parado en el nodo
+    if (dB < 1.5) return calcularRutaDijkstra(b.id, destinoId);
+    const rA = calcularRutaDijkstra(a.id, destinoId);
+    const rB = calcularRutaDijkstra(b.id, destinoId);
+    const okA = rA.ruta.length > 0, okB = rB.ruta.length > 0;
+    if (!okA && !okB) return { ruta: [], distanciaTotal: 0 };
+    const porA = okA && (!okB || dA + rA.distanciaTotal <= dB + rB.distanciaTotal);
+    const r = porA ? rA : rB;
+    const yo = { id: "📍", name: "Tu ubicación", nombre: "Tu ubicación", category: "Ubicación", x: punto.x, z: punto.z, virtual: true };
+    return { ruta: [yo, ...r.ruta], distanciaTotal: (porA ? dA : dB) + r.distanciaTotal };
+  }
+
+  // Convierte "donde voy ahorita" en el nuevo punto de partida (al elegir otro destino a media ruta).
+  // Antes la app regresaba al usuario al origen original aunque ya hubiera caminado o llegado.
+  function tomarPosicionActualComoInicio() {
+    const n = estado.ruta.length;
+    if (n === 0) return;
+    const ultimo = estado.ruta[n - 1];
+    if (n === 1 || estado.indiceActual >= n - 1) { // ya llegaste: estás parado en ese nodo
+      estado.puntoInicio = null;
+      if (!ultimo.virtual) estado.origenId = ultimo.id;
+      return;
+    }
+    const a = estado.ruta[estado.indiceActual];
+    const b = estado.ruta[estado.indiceActual + 1];
+    const t = estado.progresoTramo;
+    if (!a.virtual && t < 0.02) { estado.puntoInicio = null; estado.origenId = a.id; return; }
+    if (t > 0.98) { estado.puntoInicio = null; estado.origenId = b.id; return; }
+    // A medio pasillo. Si este tramo salía de "Tu ubicación", el pasillo real es el del punto anterior.
+    const extremos = a.virtual
+      ? (estado.puntoInicio ? [estado.puntoInicio.a, estado.puntoInicio.b] : null)
+      : [a.id, b.id];
+    if (!extremos) { estado.puntoInicio = null; estado.origenId = b.id; return; }
+    estado.puntoInicio = { x: estado.usuarioX, z: estado.usuarioZ, a: extremos[0], b: extremos[1] };
+    const na = nodosPorId.get(extremos[0]), nb = nodosPorId.get(extremos[1]);
+    estado.origenId =
+      Math.hypot(na.x - estado.usuarioX, na.z - estado.usuarioZ) <= Math.hypot(nb.x - estado.usuarioX, nb.z - estado.usuarioZ)
+        ? na.id : nb.id;
+  }
+
+  // ---- Distancia recorrida sobre la ruta ("arco"), para comparar con el GPS ----
+  function largoTramoRuta(i) {
+    return Math.max(0.1, distanciaMetros(estado.ruta[i], estado.ruta[i + 1]));
+  }
+  function arcoActual() {
+    const ult = estado.ruta.length - 1;
+    let s = 0;
+    for (let i = 0; i < Math.min(estado.indiceActual, ult); i++) s += largoTramoRuta(i);
+    if (estado.indiceActual < ult) s += estado.progresoTramo * largoTramoRuta(estado.indiceActual);
+    return s;
+  }
+
   // ---- Avance suave ----
-  // Los pasos (y la demo) NO mueven al usuario de golpe: dejan metros en esta cola y el bucle de dibujo
-  // los gasta poco a poco, a velocidad de persona. Así la alfombra de flechas se desliza en vez de brincar.
+  // Los pasos, la demo y las correcciones del GPS NO mueven al usuario de golpe: dejan metros en esta cola
+  // (positivos = adelante, negativos = atrás) y el bucle de dibujo los gasta poco a poco, a velocidad de persona.
+  // Así la alfombra de flechas se desliza en vez de brincar.
   let colaAvanceMetros = 0;
   let ultimoRefrescoAvanceMs = 0;
   function gastarColaAvance(dtSeg) {
-    if (colaAvanceMetros <= 0) return;
-    if (!estado.navegando && !estado.caminandoSim) { colaAvanceMetros = 0; return; }
-    // Mientras más atrasado va el dibujo, más rápido alcanza (entre 0.6 y 2.4 m/s)
-    const velocidad = Math.min(2.4, Math.max(0.6, colaAvanceMetros * 2.5));
-    const metros = Math.min(colaAvanceMetros, velocidad * dtSeg);
-    colaAvanceMetros -= metros;
-    avanzarMetrosEnRuta(metros, true);
+    if (colaAvanceMetros === 0) return;
+    if (!estado.navegando && !estado.caminandoSim && !estado.gpsActivo) { colaAvanceMetros = 0; return; }
+    const pendiente = Math.abs(colaAvanceMetros);
+    if (pendiente < 1e-4) { colaAvanceMetros = 0; return; }
+    // Mientras más atrasado va el dibujo, más rápido alcanza: entre 0.6 y 2.4 m/s al caminar;
+    // si la diferencia es grande (corrección del GPS de más de ~3 m) se pone al día en un par de segundos.
+    const velocidad = Math.min(Math.max(0.6, pendiente * 2.5), Math.max(2.4, pendiente * 0.8));
+    const metros = Math.min(pendiente, velocidad * dtSeg);
+    if (colaAvanceMetros > 0) {
+      colaAvanceMetros -= metros;
+      avanzarMetrosEnRuta(metros, true);
+    } else {
+      colaAvanceMetros += metros;
+      retrocederMetrosEnRuta(metros);
+    }
+  }
+
+  // Sólo lo usa la corrección del GPS, cuando los pasos contados te adelantaron de más
+  function retrocederMetrosEnRuta(metros) {
+    const ult = estado.ruta.length - 1;
+    if (ult < 1 || estado.indiceActual >= ult) { colaAvanceMetros = 0; return; } // ya llegaste: no se regresa
+    let resto = metros;
+    while (resto > 0) {
+      const largo = largoTramoRuta(estado.indiceActual);
+      const hecho = estado.progresoTramo * largo;
+      if (resto <= hecho) { estado.progresoTramo -= resto / largo; break; }
+      resto -= hecho;
+      if (estado.indiceActual === 0) { estado.progresoTramo = 0; colaAvanceMetros = 0; break; }
+      estado.indiceActual -= 1;
+      estado.progresoTramo = 1;
+    }
+    sincronizarCoordenadasUsuarioConProgreso();
+    const ahoraMs = performance.now();
+    if (ahoraMs - ultimoRefrescoAvanceMs > 200) {
+      ultimoRefrescoAvanceMs = ahoraMs;
+      actualizarHUD();
+      dibujarMapa2D();
+      dibujarMinimapa();
+    }
   }
 
   // ligero = true: llamada cuadro a cuadro; el HUD y los mapas se redibujan sólo 5 veces por segundo
@@ -1842,7 +1963,12 @@ window.ARGOS_CAMPUS_DATA = {
   }
 
   // Sólo lectura, para las pruebas automáticas (tools/prueba_rumbo.js)
-  window.ARGOS_DEBUG = () => ({ x: estado.usuarioX, z: estado.usuarioZ, cola: colaAvanceMetros, pasos: estado.pasosDetectados });
+  window.ARGOS_DEBUG = () => ({
+    x: estado.usuarioX, z: estado.usuarioZ, cola: colaAvanceMetros, pasos: estado.pasosDetectados,
+    origen: estado.origenId, destino: estado.destinoId, indice: estado.indiceActual, progreso: estado.progresoTramo,
+    ruta: estado.ruta.map((n) => n.id), total: estado.distanciaTotal, arco: estado.ruta.length > 1 ? arcoActual() : 0,
+    punto: estado.puntoInicio, gps: estado.gps, navegando: estado.navegando
+  });
   let ultimoCuadroMs = 0;
   function renderizarBucleAR(tiempoMs) {
     requestAnimationFrame(renderizarBucleAR);
@@ -2199,6 +2325,23 @@ window.ARGOS_CAMPUS_DATA = {
       ctx.stroke();
     }
 
+    // Lectura cruda del GPS (círculo = su margen de error), para comparar con donde te coloca la app
+    if (estado.gpsActivo && estado.gps) {
+      const g = mundoACanvas(estado.gps.x, estado.gps.z);
+      const borde = mundoACanvas(estado.gps.x + estado.gps.acc, estado.gps.z);
+      ctx.beginPath();
+      ctx.arc(g.cx, g.cy, Math.max(6, borde.cx - g.cx), 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(245, 158, 11, 0.16)";
+      ctx.fill();
+      ctx.strokeStyle = "rgba(217, 119, 6, 0.7)";
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(g.cx, g.cy, 4, 0, Math.PI * 2);
+      ctx.fillStyle = "#d97706";
+      ctx.fill();
+    }
+
     // Nodos
     const idsEnRuta = new Set(estado.ruta.map((n) => n.id));
     datos.nodes.forEach((nodo) => {
@@ -2416,8 +2559,13 @@ window.ARGOS_CAMPUS_DATA = {
   // ============================================================================
   // 7. ACTUALIZACIÓN DE INTERFAZ Y RECÁLCULO DE RUTA
   // ============================================================================
-  function recalcularRutaCompleta() {
-    const res = calcularRutaDijkstra(estado.origenId, estado.destinoId);
+  // conservarPunto = true sólo cuando quien llama acaba de fijar estado.puntoInicio (a medio pasillo o GPS).
+  // En cualquier otro caso (QR, lista, pines…) el usuario está parado en el nodo estado.origenId.
+  function recalcularRutaCompleta(conservarPunto) {
+    if (!conservarPunto) estado.puntoInicio = null;
+    const res = estado.puntoInicio
+      ? rutaDesdePunto(estado.puntoInicio, estado.destinoId)
+      : calcularRutaDijkstra(estado.origenId, estado.destinoId);
     estado.ruta = res.ruta;
     estado.distanciaTotal = res.distanciaTotal;
     estado.indiceActual = 0;
@@ -2782,43 +2930,149 @@ window.ARGOS_CAMPUS_DATA = {
     dibujarMinimapa();
   });
 
-  // El GPS usa latLonAMetros (sección 1), igual que osm_a_unity.py
+  // ---- GPS: ubicarte en la red de pasillos y corregir el avance ----
+  // El GPS del celular tiene ±5 a ±15 m, así que NUNCA mueve al usuario directo (las flechas bailarían).
+  // Se usa de tres formas:
+  //   1. Al encenderlo: te coloca en el punto de la red de pasillos más cercano a ti y recalcula la ruta.
+  //   2. Al caminar: la lectura se proyecta sobre la ruta; si los pasos contados se atrasaron o adelantaron
+  //      más que la precisión del GPS, el avance se corrige poco a poco.
+  //   3. Si te sales de la ruta (4 lecturas seguidas lejos), vuelve a ubicarte y recalcula.
+  // Los QR siguen mandando: escanear uno te coloca exacto en ese nodo.
+  const GPS_PRECISION_MAX = 35;   // lecturas peores que ±35 m se ignoran
+  estado.gps = null;              // última lectura { x, z, acc, ms }
+  let gpsUbicado = false;
+  let gpsFueraDeRuta = 0;
+
+  // Punto de la ruta activa más cercano a (px, pz). Prefiere los tramos cercanos a donde ya vas.
+  function proyectarEnRuta(px, pz) {
+    const sAhora = arcoActual();
+    let mejor = null;
+    let acumulado = 0;
+    for (let i = 0; i < estado.ruta.length - 1; i++) {
+      const largo = largoTramoRuta(i);
+      const p = proyectarEnSegmento(px, pz, estado.ruta[i], estado.ruta[i + 1]);
+      const s = acumulado + p.t * largo;
+      const costo = p.d + 0.15 * Math.abs(s - sAhora);
+      if (!mejor || costo < mejor.costo) mejor = { s, d: p.d, costo };
+      acumulado += largo;
+    }
+    if (mejor) mejor.total = acumulado;
+    return mejor;
+  }
+
+  function ubicarConGPS(g) {
+    const p = puntoMasCercanoEnGrafo(g.x, g.z);
+    if (!p) return false;
+    if (p.d > Math.max(40, 2.5 * g.acc)) {
+      locationModeBadge.textContent = `🛰️ Estás a ${Math.round(p.d)} m de los caminos: usa QR`;
+      return false;
+    }
+    detenerSimulacionCaminata();
+    estado.puntoInicio = { x: p.x, z: p.z, a: p.a, b: p.b };
+    estado.origenId = p.t < 0.5 ? p.a : p.b;
+    selectOrigen.value = estado.origenId;
+    recalcularRutaCompleta(true);
+    return true;
+  }
+
+  function manejarLecturaGPS(pos) {
+    const { latitude, longitude, accuracy } = pos.coords;
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return;
+    const m = latLonAMetros(latitude, longitude);
+    const acc = Math.max(3, Number.isFinite(accuracy) ? accuracy : 50);
+    estado.gps = { x: m.x, z: m.z, acc, ms: performance.now() };
+    const redibujar = () => { dibujarMapa2D(); dibujarMinimapa(); };
+    const b = datos.bounds;
+    if (m.x < b.minX - 150 || m.x > b.maxX + 150 || m.z < b.minZ - 150 || m.z > b.maxZ + 150) {
+      locationModeBadge.textContent = "📍 Fuera de IBERO (usa QR)";
+      return;
+    }
+    if (acc > GPS_PRECISION_MAX) {
+      locationModeBadge.textContent = `🛰️ GPS impreciso (±${Math.round(acc)} m)`;
+      redibujar();
+      return;
+    }
+    const precision = `🛰️ GPS ±${Math.round(acc)} m`;
+
+    if (!gpsUbicado) {
+      gpsUbicado = ubicarConGPS(estado.gps);
+      if (gpsUbicado) locationModeBadge.textContent = `${precision} · junto a ${nodosPorId.get(estado.origenId).name}`;
+      redibujar();
+      return;
+    }
+
+    const ultimo = estado.ruta.length - 1;
+    if (ultimo < 1 || estado.indiceActual >= ultimo) { // sin ruta o ya llegaste: nada que corregir
+      locationModeBadge.textContent = precision;
+      redibujar();
+      return;
+    }
+
+    const pr = proyectarEnRuta(m.x, m.z);
+    if (pr.d > Math.max(30, 2.5 * acc)) {
+      gpsFueraDeRuta += 1;
+      locationModeBadge.textContent = `${precision} · a ${Math.round(pr.d)} m de la ruta`;
+      if (gpsFueraDeRuta >= 4) {
+        gpsFueraDeRuta = 0;
+        if (ubicarConGPS(estado.gps)) locationModeBadge.textContent = "🔄 Ruta recalculada con GPS";
+      }
+      redibujar();
+      return;
+    }
+    gpsFueraDeRuta = 0;
+
+    // Diferencia entre donde el GPS dice que vas y donde la app cree (pasos contados + lo que falta por dibujar)
+    const holgura = Math.max(3, acc * 0.5);
+    const error = pr.s - (arcoActual() + colaAvanceMetros);
+    if (Math.abs(error) > holgura) {
+      colaAvanceMetros += 0.5 * (error - Math.sign(error) * holgura);
+    }
+    // Llegada: el GPS ya te pone prácticamente en el destino
+    const destino = estado.ruta[ultimo];
+    if (Math.hypot(m.x - destino.x, m.z - destino.z) < Math.max(5, acc * 0.6)) {
+      colaAvanceMetros = Math.max(colaAvanceMetros, pr.total - arcoActual() + 0.2); // +0.2: que el redondeo no te deje a un pelo
+    }
+    locationModeBadge.textContent = estado.navegando ? `${precision} · ${estado.pasosDetectados} pasos` : precision;
+    redibujar();
+  }
+
+  function apagarGPS() {
+    if (estado.gpsWatchId !== null) navigator.geolocation.clearWatch(estado.gpsWatchId);
+    estado.gpsWatchId = null;
+    estado.gpsActivo = false;
+    estado.gps = null;
+    btnToggleGps.textContent = "🛰️ Activar GPS Real";
+    dibujarMapa2D();
+    dibujarMinimapa();
+  }
+
   btnToggleGps.addEventListener("click", () => {
     if (!("geolocation" in navigator)) {
       alert("Tu navegador no soporta geolocalización GPS.");
       return;
     }
     if (estado.gpsActivo) {
-      navigator.geolocation.clearWatch(estado.gpsWatchId);
-      estado.gpsActivo = false;
-      btnToggleGps.textContent = "🛰️ Activar GPS Real";
+      apagarGPS();
       locationModeBadge.textContent = "📍 Modo: QR + Pasos";
       return;
     }
 
     estado.gpsActivo = true;
+    gpsFueraDeRuta = 0;
+    // Si ya vas caminando una ruta, el GPS sólo la corrige; si no, primero te ubica.
+    gpsUbicado = estado.navegando || estado.indiceActual > 0 || estado.progresoTramo > 0.02;
     btnToggleGps.textContent = "🛰️ GPS Activo (Apagar)";
     locationModeBadge.textContent = "🛰️ Buscando GPS...";
+    fijarEstadoMenu(true);
 
     estado.gpsWatchId = navigator.geolocation.watchPosition(
-      (pos) => {
-        const { latitude, longitude } = pos.coords;
-        const { x: dxMetros, z: dzMetros } = latLonAMetros(latitude, longitude);
-
-        if (Math.hypot(dxMetros, dzMetros) < 600) {
-          estado.usuarioX = dxMetros;
-          estado.usuarioZ = dzMetros;
-          locationModeBadge.textContent = `🛰️ GPS IBERO (±${Math.round(pos.coords.accuracy)}m)`;
-          dibujarMapa2D();
-          dibujarMinimapa();
-        } else {
-          locationModeBadge.textContent = "📍 Fuera de IBERO (Usa QR o ▶️ Caminar)";
-        }
+      manejarLecturaGPS,
+      (err) => {
+        locationModeBadge.textContent = err && err.code === 1
+          ? "📍 Permite la ubicación en Ajustes"
+          : "📍 Sin señal GPS (usa QR)";
       },
-      () => {
-        locationModeBadge.textContent = "📍 Sin GPS (Usa QR o ▶️ Caminar)";
-      },
-      { enableHighAccuracy: true, maximumAge: 2000 }
+      { enableHighAccuracy: true, maximumAge: 1000, timeout: 30000 }
     );
   });
 
@@ -2886,10 +3140,8 @@ window.ARGOS_CAMPUS_DATA = {
       cargarJsQRSiHaceFalta();
     } catch (err) {
       console.warn("ARGOS cámara:", err);
-      locationModeBadge.textContent =
-        err && err.name === "NotAllowedError"
-          ? "📷 Permite la cámara en el navegador y recarga"
-          : "📷 Toca la pantalla para activar la cámara";
+      if (err && err.name === "NotAllowedError") locationModeBadge.textContent = "📷 Permite la cámara en el navegador y recarga";
+      else if (performance.now() > avisoProtegidoHastaMs) locationModeBadge.textContent = "📷 Toca la pantalla para activar la cámara";
     }
   }
 
@@ -2926,17 +3178,41 @@ window.ARGOS_CAMPUS_DATA = {
   document.addEventListener("click", solicitarPermisosSensores, { once: true, capture: true });
   document.addEventListener("touchend", solicitarPermisosSensores, { once: true, capture: true });
 
+  // Texto de un QR → id de nodo. Acepta el link de la app ("…/app/?qr=N07"), "ARGOS:N07" o "N07" a secas.
+  function idDeTextoQR(texto) {
+    const m = texto.match(/[?&]qr=(N\d{2})(?!\d)/i) || texto.match(/ARGOS:\s*(N\d{2})(?!\d)/i) || texto.match(/^(N\d{2})$/i);
+    return m ? m[1].toUpperCase() : null;
+  }
+  const ultimoQR = { id: null, ms: -1e9 };
+  function estoyParadoEnOrigen() {
+    return !estado.puntoInicio && estado.indiceActual === 0 && estado.progresoTramo < 0.02;
+  }
+
+  // El destino se recuerda 3 horas: si escaneas un QR con la cámara del celular (la página se vuelve a abrir),
+  // sigues yendo al mismo lugar.
+  const CLAVE_DESTINO = "argos_destino";
+  function guardarDestino() {
+    try { localStorage.setItem(CLAVE_DESTINO, JSON.stringify({ id: estado.destinoId, t: Date.now() })); } catch (_) {}
+  }
+  function leerDestinoGuardado() {
+    try {
+      const v = JSON.parse(localStorage.getItem(CLAVE_DESTINO) || "null");
+      return v && nodosPorId.has(v.id) && Date.now() - v.t < 3 * 3600 * 1000 ? v.id : null;
+    } catch (_) { return null; }
+  }
+
   function fijarUbicacionPorNodo(idNodo, fuente = "QR") {
     if (!nodosPorId.has(idNodo)) return;
     detenerSimulacionCaminata();
     estado.origenId = idNodo;
     selectOrigen.value = idNodo;
-    if (estado.destinoId === idNodo) {
-      estado.destinoId = idNodo === "N10" ? "N07" : "N10";
-      selectDestino.value = estado.destinoId;
-    }
     const nodo = nodosPorId.get(idNodo);
     locationModeBadge.textContent = `📍 ${fuente}: ${nodo.id} ${nodo.name}`;
+    if (estado.destinoId === idNodo) {
+      // Estás parado en tu destino (p. ej. escaneaste su QR): llegaste. Antes aquí se cambiaba el destino solo.
+      if (estado.navegando) detenerNavegacion("🏁 Llegaste a tu destino");
+      else locationModeBadge.textContent = `🏁 Estás en ${nodo.name}: elige a dónde ir`;
+    }
     recalcularRutaCompleta();
     centrarMapaEnUsuario();
     fijarEstadoMenu(true);
@@ -2956,13 +3232,19 @@ window.ARGOS_CAMPUS_DATA = {
     try {
       const leido = await leerQRDeVideo(videoActivo);
       if (leido) {
-        const texto = leido.trim();
-        const match = texto.match(/N\d{2}/i);
-        if (match) {
-          const idDetectado = match[0].toUpperCase();
-          if (nodosPorId.has(idDetectado) && idDetectado !== estado.origenId) {
+        const idDetectado = idDeTextoQR(leido.trim());
+        const ahora = performance.now();
+        // El mismo QR sigue a la vista varios segundos: sólo se aplica una vez cada 6 s.
+        // (Antes se ignoraba si era tu origen, y volver a escanearlo a media ruta no te reubicaba.)
+        const repetido = ultimoQR.id === idDetectado && ahora - ultimoQR.ms < 6000;
+        if (idDetectado && nodosPorId.has(idDetectado)) {
+          ultimoQR.ms = ahora;
+          if (!repetido && !(idDetectado === estado.origenId && estoyParadoEnOrigen())) {
+            ultimoQR.id = idDetectado;
             fijarUbicacionPorNodo(idDetectado, "QR Escaneado");
+            if (navigator.vibrate) navigator.vibrate([60, 40, 60]);
           }
+          ultimoQR.id = idDetectado;
         }
       }
     } catch (_) {
@@ -2995,8 +3277,17 @@ window.ARGOS_CAMPUS_DATA = {
     });
 
     selectDestino.addEventListener("change", () => {
+      // El nuevo destino se calcula desde donde ESTÁS (ya caminaste o ya llegaste), no desde el origen viejo
+      tomarPosicionActualComoInicio();
+      selectOrigen.value = estado.origenId;
       estado.destinoId = selectDestino.value;
-      recalcularRutaCompleta();
+      guardarDestino();
+      recalcularRutaCompleta(true);
+      if (estado.ruta.length === 1) {
+        locationModeBadge.textContent = `🏁 Ya estás en ${estado.ruta[0].name}`;
+      } else if (estado.ruta.length === 0) {
+        locationModeBadge.textContent = "⚠️ No hay camino registrado hasta ese lugar";
+      }
       fijarEstadoMenu(true);
     });
 
@@ -3006,6 +3297,7 @@ window.ARGOS_CAMPUS_DATA = {
       estado.destinoId = temp;
       selectOrigen.value = estado.origenId;
       selectDestino.value = estado.destinoId;
+      guardarDestino();
       recalcularRutaCompleta();
       fijarEstadoMenu(true);
     });
@@ -3038,6 +3330,7 @@ window.ARGOS_CAMPUS_DATA = {
         estado.destinoId = d;
         selectOrigen.value = o;
         selectDestino.value = d;
+        guardarDestino();
         recalcularRutaCompleta();
         fijarEstadoMenu(true);
       });
@@ -3504,7 +3797,7 @@ window.ARGOS_CAMPUS_DATA = {
     pintarLista();
     try {
       const aviso = sessionStorage.getItem("argos_aviso");
-      if (aviso) { sessionStorage.removeItem("argos_aviso"); locationModeBadge.textContent = aviso; }
+      if (aviso) { sessionStorage.removeItem("argos_aviso"); avisarImportante(aviso); }
     } catch (_) {}
   }
 
@@ -3572,10 +3865,24 @@ window.ARGOS_CAMPUS_DATA = {
   // ============================================================================
   // 12. ARRANQUE INMEDIATO
   // ============================================================================
+  // Link de un QR impreso: .../app/?qr=N01  (opcional &a=N07 para fijar también el destino).
+  // Al escanearlo con la cámara normal del celular, la app abre ya ubicada en ese nodo.
+  const qrInicial = idDeTextoQR("?qr=" + (parametrosURL.get("qr") || ""));
+  const destinoInicial = idDeTextoQR("?qr=" + (parametrosURL.get("a") || "")) || leerDestinoGuardado();
+  if (qrInicial && nodosPorId.has(qrInicial)) estado.origenId = qrInicial;
+  if (destinoInicial && nodosPorId.has(destinoInicial) && destinoInicial !== estado.origenId) {
+    estado.destinoId = destinoInicial;
+  } else if (estado.destinoId === estado.origenId) {
+    estado.destinoId = estado.origenId === "N10" ? "N07" : "N10";
+  }
+
   inicializarControles();
   configurarFallbacksWebModernos();
   configurarPines();
   recalcularRutaCompleta();
+  if (qrInicial && nodosPorId.has(qrInicial)) {
+    avisarImportante(`📍 QR: ${qrInicial} ${nodosPorId.get(qrInicial).name}`);
+  }
   activarCamara(document.getElementById("arVideo"));
   requestAnimationFrame(renderizarBucleAR);
 })();
