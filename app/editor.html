@@ -1,0 +1,432 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Editor de caminos</title>
+    <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
+    <style>
+      :root { --tinta: #0f172a; --gris: #475569; --borde: #cbd5e1; --acento: #0071e3; --rojo: #c8102e; --verde: #16a34a; --fondo: #f8fafc; }
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      html, body { height: 100%; }
+      body { font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: var(--tinta); display: flex; background: var(--fondo); }
+
+      #lado { width: 340px; flex-shrink: 0; height: 100%; overflow-y: auto; padding: 16px 14px; border-right: 1px solid var(--borde); background: #fff; display: flex; flex-direction: column; gap: 14px; }
+      #mapa { flex: 1; height: 100%; background: #1e293b; }
+      h1 { font-size: 1.15rem; }
+      h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--gris); margin-bottom: 6px; }
+      p, li { font-size: 0.84rem; line-height: 1.45; color: var(--gris); }
+      ol { padding-left: 18px; }
+      .herramientas { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+      button, select, input[type="text"] { font: inherit; font-size: 0.84rem; border-radius: 10px; border: 1px solid var(--borde); background: #fff; color: var(--tinta); padding: 8px 10px; }
+      button { font-weight: 700; cursor: pointer; text-align: left; }
+      button:hover { border-color: var(--acento); }
+      button.activo { background: var(--acento); border-color: var(--acento); color: #fff; }
+      button.principal { background: var(--verde); border-color: var(--verde); color: #fff; text-align: center; }
+      button.suave { text-align: center; color: var(--gris); }
+      button:disabled { opacity: 0.45; cursor: default; }
+      .caja { border: 1px solid var(--borde); border-radius: 12px; padding: 10px; background: var(--fondo); display: flex; flex-direction: column; gap: 7px; }
+      .caja label { font-size: 0.74rem; font-weight: 700; color: var(--gris); display: flex; flex-direction: column; gap: 3px; }
+      .caja label.linea { flex-direction: row; align-items: center; gap: 6px; font-size: 0.84rem; color: var(--tinta); }
+      #ayudaModo { font-size: 0.84rem; color: var(--tinta); background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 10px; padding: 8px 10px; }
+      #resumen, #rutaTexto, #avisos { font-size: 0.82rem; color: var(--tinta); }
+      #avisos { color: #b45309; }
+      .fila { display: flex; gap: 6px; }
+      .fila > * { flex: 1; min-width: 0; }
+
+      /* Puntos sobre el mapa */
+      .punto { width: 16px; height: 16px; border-radius: 50%; border: 2px solid #fff; background: #64748b; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.55); position: relative; }
+      .punto b { position: absolute; left: 17px; top: -4px; font: 700 11px/1.1 "Segoe UI", Arial, sans-serif; color: #fff; text-shadow: 0 0 3px #000, 0 0 3px #000, 0 0 2px #000; white-space: nowrap; pointer-events: none; }
+      .punto.cruce { width: 11px; height: 11px; margin: 2.5px; background: #fde047; }
+      .punto.cruce b { left: 12px; font-weight: 600; font-size: 10px; opacity: 0.85; }
+      .punto.acceso { background: #16a34a; }
+      .punto.academico { background: #0071e3; }
+      .punto.cafeteria { background: #f97316; }
+      .punto.deportes { background: #a855f7; }
+      .punto.referencia { background: #94a3b8; }
+      .punto.pasillo { background: #facc15; }
+      .punto.escaleras::after { content: "🪜"; position: absolute; left: -3px; top: -17px; font-size: 13px; }
+      .punto.elegido { box-shadow: 0 0 0 3px #ef4444, 0 0 0 5px #fff; }
+      .punto.pendiente { box-shadow: 0 0 0 3px #22d3ee, 0 0 0 5px #fff; }
+      .leaflet-container.modo-trazar, .leaflet-container.modo-lugar { cursor: crosshair; }
+    </style>
+  </head>
+  <body>
+    <aside id="lado">
+      <div>
+        <h1>Editor de caminos ARGOS</h1>
+        <p>Aquí dibujas por dónde se camina de verdad. Las rutas de la app salen de estas líneas amarillas.</p>
+      </div>
+
+      <div>
+        <h2>1. Herramienta</h2>
+        <div class="herramientas">
+          <button type="button" data-modo="mover">✋ Mover / editar</button>
+          <button type="button" data-modo="trazar">✏️ Trazar camino</button>
+          <button type="button" data-modo="lugar">📍 Lugar nuevo</button>
+          <button type="button" data-modo="borrar">✂️ Borrar</button>
+        </div>
+        <p id="ayudaModo" style="margin-top:8px;"></p>
+        <div class="fila" style="margin-top:8px;">
+          <button type="button" id="btnDeshacer" class="suave">↶ Deshacer</button>
+          <label class="linea" style="display:flex;align-items:center;gap:6px;font-size:0.84rem;"><input type="checkbox" id="chkNombres" /> Ver nombres</label>
+        </div>
+      </div>
+
+      <div id="panelPunto" class="caja" hidden>
+        <h2 id="puntoTitulo">Punto</h2>
+        <label>Nombre <input type="text" id="puntoNombre" maxlength="60" /></label>
+        <label>Tipo
+          <select id="puntoTipo">
+            <option value="Cruce">Cruce de camino (no aparece como destino)</option>
+            <option value="Pasillo QR">Punto de pasillo con QR</option>
+            <option value="Académico">Edificio o salón</option>
+            <option value="Cafetería">Cafetería o restaurante</option>
+            <option value="Acceso">Puerta de acceso</option>
+            <option value="Deportes">Deportes</option>
+            <option value="Referencia">Otro lugar</option>
+          </select>
+        </label>
+        <label class="linea"><input type="checkbox" id="puntoEscaleras" /> 🪜 Aquí hay escaleras</label>
+        <p id="puntoCoords"></p>
+        <button type="button" id="btnBorrarPunto" class="suave">🗑️ Borrar este punto</button>
+      </div>
+
+      <div class="caja">
+        <h2>2. Probar una ruta</h2>
+        <div class="fila">
+          <select id="rutaDe" aria-label="Desde"></select>
+          <select id="rutaA" aria-label="Hasta"></select>
+        </div>
+        <p id="rutaTexto">Elige dos lugares para ver por dónde te llevaría la app.</p>
+      </div>
+
+      <div class="caja">
+        <h2>3. Enviar los cambios</h2>
+        <p id="resumen"></p>
+        <p id="avisos"></p>
+        <button type="button" id="btnDescargar" class="principal">💾 Descargar mis cambios</button>
+        <div class="fila">
+          <button type="button" id="btnCopiar" class="suave">📋 Copiar</button>
+          <button type="button" id="btnDescartar" class="suave">🗑️ Descartar todo</button>
+        </div>
+        <p>El archivo <strong>argos_mapa.json</strong> queda en tu carpeta Descargas. Pásalo a la carpeta ARGOS y avisa a Claude para que lo aplique a la app.</p>
+      </div>
+    </aside>
+    <div id="mapa"></div>
+
+    <script src="campus_data.js"></script>
+    <script src="vendor/leaflet/leaflet.js"></script>
+    <script>
+      (() => {
+        const fuente = window.ARGOS_CAMPUS_DATA;
+        const LAT0 = fuente.origen.lat, LON0 = fuente.origen.lon, R = 6378137, RAD = Math.PI / 180;
+        const aMetros = (lat, lon) => ({ x: R * (lon - LON0) * RAD * Math.cos(LAT0 * RAD), z: R * (lat - LAT0) * RAD });
+        const distancia = (a, b) => { const p = aMetros(a.lat, a.lon), q = aMetros(b.lat, b.lon); return Math.hypot(p.x - q.x, p.z - q.z); };
+        const clave = (a, b) => (a < b ? `${a}|${b}` : `${b}|${a}`);
+        const $ = (id) => document.getElementById(id);
+
+        // ---------- Estado ----------
+        const copiaNodo = (n) => ({ id: n.id, nombre: n.nombre, categoria: n.categoria, lat: n.lat, lon: n.lon, piso: n.piso || "PB", desc: n.desc || "", escaleras: !!n.escaleras });
+        const original = {
+          nodos: new Map(fuente.nodos.map((n) => [n.id, copiaNodo(n)])),
+          aristas: new Set(fuente.aristas.map(([a, b]) => clave(a, b)))
+        };
+        let nodos = new Map([...original.nodos].map(([id, n]) => [id, { ...n }]));
+        let aristas = new Set(original.aristas);
+        let modo = "mover";
+        let elegido = null;    // id del punto que se está editando
+        let pendiente = null;  // id del último punto del camino que se está trazando
+        const historial = [];
+
+        // Lo que llevas hecho se guarda solo en este navegador, por si cierras la pestaña
+        const CLAVE = "argos_editor_v1";
+        const firma = (() => { let h = 5381; const s = JSON.stringify([fuente.nodos.map((n) => [n.id, n.lat, n.lon, n.nombre]), fuente.aristas]); for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0; return String(h); })();
+        const empaquetar = () => ({ nodos: [...nodos.values()], aristas: [...aristas].map((k) => k.split("|")) });
+        function desempaquetar(e) {
+          nodos = new Map(e.nodos.map((n) => [n.id, copiaNodo(n)]));
+          aristas = new Set(e.aristas.map(([a, b]) => clave(a, b)).filter((k) => k.split("|").every((id) => nodos.has(id))));
+        }
+        function guardarLocal() { try { localStorage.setItem(CLAVE, JSON.stringify({ firma, estado: empaquetar() })); } catch (_) {} }
+        try {
+          const g = JSON.parse(localStorage.getItem(CLAVE) || "null");
+          if (g && g.estado) {
+            if (g.firma === firma) desempaquetar(g.estado);
+            else if (!window.confirm("El mapa publicado cambió desde la última vez que editaste.\n\nAceptar = empezar desde el mapa nuevo (lo normal si ya enviaste tu archivo).\nCancelar = seguir con tus cambios guardados.")) desempaquetar(g.estado);
+          }
+        } catch (_) {}
+
+        function recordar() { historial.push(JSON.stringify(empaquetar())); if (historial.length > 80) historial.shift(); }
+        function deshacer() {
+          if (!historial.length) return;
+          desempaquetar(JSON.parse(historial.pop()));
+          if (elegido && !nodos.has(elegido)) elegido = null;
+          if (pendiente && !nodos.has(pendiente)) pendiente = null;
+          cambio(false);
+        }
+        function idLibre() {
+          for (let n = 65; n < 1000; n++) { const id = "N" + String(n).padStart(2, "0"); if (!nodos.has(id) && !original.nodos.has(id)) return id; }
+          return null;
+        }
+
+        // ---------- Mapa ----------
+        const mapa = L.map("mapa", { maxZoom: 22, zoomSnap: 0.5, doubleClickZoom: false }).setView([19.3706, -99.2637], 18);
+        const satelite = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", { maxNativeZoom: 19, maxZoom: 22, attribution: "Imágenes © Esri, Maxar, Earthstar Geographics" }).addTo(mapa);
+        const calles = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxNativeZoom: 19, maxZoom: 22, attribution: "© OpenStreetMap" });
+        L.control.layers({ "Foto satelital": satelite, "Mapa de calles": calles }, null, { collapsed: false }).addTo(mapa);
+        L.control.scale({ imperial: false }).addTo(mapa);
+        const capaRuta = L.layerGroup().addTo(mapa);
+        const capaAristas = L.layerGroup().addTo(mapa);
+        const capaPuntos = L.layerGroup().addTo(mapa);
+        const marcadores = new Map();
+
+        const claseDe = (n) => ({ "Cruce": "cruce", "Acceso": "acceso", "Académico": "academico", "Cafetería": "cafeteria", "Deportes": "deportes", "Pasillo QR": "pasillo" }[n.categoria] || "referencia");
+        function icono(n) {
+          const verNombre = $("chkNombres").checked && n.categoria !== "Cruce";
+          const clases = ["punto", claseDe(n), n.escaleras ? "escaleras" : "", n.id === elegido ? "elegido" : "", n.id === pendiente ? "pendiente" : ""].join(" ");
+          const etiqueta = n.categoria === "Cruce" && !$("chkNombres").checked ? "" : `<b>${n.id}${verNombre ? " " + n.nombre.replace(/[<>&]/g, "") : ""}</b>`;
+          return L.divIcon({ className: "", html: `<div class="${clases}" title="${n.id} ${n.nombre.replace(/["<>&]/g, "")}">${etiqueta}</div>`, iconSize: [16, 16], iconAnchor: [8, 8] });
+        }
+
+        function dibujarAristas() {
+          capaAristas.clearLayers();
+          aristas.forEach((k) => {
+            const [a, b] = k.split("|").map((id) => nodos.get(id));
+            if (!a || !b) return;
+            const pts = [[a.lat, a.lon], [b.lat, b.lon]];
+            L.polyline(pts, { color: "#111827", weight: 6, opacity: 0.55, interactive: false }).addTo(capaAristas);
+            const visible = L.polyline(pts, { color: "#fde047", weight: 3.5, opacity: 1, interactive: false }).addTo(capaAristas);
+            const toque = L.polyline(pts, { color: "#000", weight: 18, opacity: 0 }).addTo(capaAristas);
+            toque.on("mouseover", () => visible.setStyle({ color: modo === "borrar" ? "#ef4444" : "#22d3ee" }));
+            toque.on("mouseout", () => visible.setStyle({ color: "#fde047" }));
+            toque.on("click", (e) => { L.DomEvent.stopPropagation(e); tocarArista(a.id, b.id, e.latlng); });
+          });
+        }
+
+        function dibujarPuntos() {
+          capaPuntos.clearLayers();
+          marcadores.clear();
+          nodos.forEach((n) => {
+            const m = L.marker([n.lat, n.lon], { icon: icono(n), draggable: modo === "mover", keyboard: false, zIndexOffset: n.categoria === "Cruce" ? 0 : 500 }).addTo(capaPuntos);
+            m.on("click", (e) => { L.DomEvent.stopPropagation(e); tocarPunto(n.id); });
+            m.on("dragstart", recordar);
+            m.on("drag", () => { const p = m.getLatLng(); n.lat = +p.lat.toFixed(7); n.lon = +p.lng.toFixed(7); dibujarAristas(); });
+            m.on("dragend", () => { elegido = n.id; cambio(false); });
+            marcadores.set(n.id, m);
+          });
+        }
+
+        // ---------- Ruta de prueba (el mismo cálculo que hace la app) ----------
+        function rutaMasCorta(desde, hasta) {
+          const vecinos = new Map([...nodos.keys()].map((id) => [id, []]));
+          aristas.forEach((k) => { const [a, b] = k.split("|"); if (nodos.has(a) && nodos.has(b)) { const d = distancia(nodos.get(a), nodos.get(b)); vecinos.get(a).push([b, d]); vecinos.get(b).push([a, d]); } });
+          const dist = new Map([[desde, 0]]), previo = new Map(), vistos = new Set();
+          while (true) {
+            let u = null;
+            dist.forEach((d, id) => { if (!vistos.has(id) && (u === null || d < dist.get(u))) u = id; });
+            if (u === null || u === hasta) break;
+            vistos.add(u);
+            vecinos.get(u).forEach(([v, d]) => { const nd = dist.get(u) + d; if (!dist.has(v) || nd < dist.get(v)) { dist.set(v, nd); previo.set(v, u); } });
+          }
+          if (!dist.has(hasta)) return null;
+          const ids = [hasta];
+          while (previo.has(ids[0])) ids.unshift(previo.get(ids[0]));
+          return { ids, metros: dist.get(hasta) };
+        }
+        function dibujarRuta() {
+          capaRuta.clearLayers();
+          const de = $("rutaDe").value, a = $("rutaA").value;
+          if (!de || !a || de === a || !nodos.has(de) || !nodos.has(a)) { $("rutaTexto").textContent = "Elige dos lugares para ver por dónde te llevaría la app."; return; }
+          const r = rutaMasCorta(de, a);
+          if (!r) { $("rutaTexto").textContent = "⚠️ No hay camino dibujado entre esos dos lugares."; return; }
+          L.polyline(r.ids.map((id) => [nodos.get(id).lat, nodos.get(id).lon]), { color: "#0ea5e9", weight: 13, opacity: 0.75, interactive: false }).addTo(capaRuta);
+          const escaleras = r.ids.filter((id) => nodos.get(id).escaleras).length;
+          $("rutaTexto").textContent = `Ruta de ${Math.round(r.metros)} m (≈ ${Math.max(1, Math.round(r.metros / 75))} min) por ${r.ids.length} puntos${escaleras ? " · 🪜 con escaleras" : ""}: ${r.ids.join(" → ")}`;
+        }
+        function llenarSelects() {
+          [$("rutaDe"), $("rutaA")].forEach((sel, i) => {
+            const antes = sel.value;
+            sel.innerHTML = `<option value="">${i ? "Hasta…" : "Desde…"}</option>`;
+            [...nodos.values()].filter((n) => n.categoria !== "Cruce").sort((p, q) => p.nombre.localeCompare(q.nombre, "es")).forEach((n) => {
+              const o = document.createElement("option"); o.value = n.id; o.textContent = `${n.nombre} (${n.id})`; sel.appendChild(o);
+            });
+            if (nodos.has(antes)) sel.value = antes;
+          });
+        }
+
+        // ---------- Resumen de cambios y avisos ----------
+        function resumenCambios() {
+          let nuevos = 0, movidos = 0, editados = 0, borrados = 0;
+          nodos.forEach((n, id) => {
+            const o = original.nodos.get(id);
+            if (!o) { nuevos++; return; }
+            if (distancia(n, o) > 0.5) movidos++;
+            else if (n.nombre !== o.nombre || n.categoria !== o.categoria || n.escaleras !== o.escaleras) editados++;
+          });
+          original.nodos.forEach((_, id) => { if (!nodos.has(id)) borrados++; });
+          let caminosNuevos = 0, caminosBorrados = 0;
+          aristas.forEach((k) => { if (!original.aristas.has(k)) caminosNuevos++; });
+          original.aristas.forEach((k) => { if (!aristas.has(k)) caminosBorrados++; });
+          return { nuevos, movidos, editados, borrados, caminosNuevos, caminosBorrados, total: nuevos + movidos + editados + borrados + caminosNuevos + caminosBorrados };
+        }
+        function pintarResumen() {
+          const c = resumenCambios();
+          $("resumen").textContent = c.total === 0
+            ? "Todavía no has cambiado nada."
+            : `Llevas: ${c.nuevos} puntos nuevos, ${c.movidos} movidos, ${c.editados} editados, ${c.borrados} borrados · ${c.caminosNuevos} caminos nuevos, ${c.caminosBorrados} borrados.`;
+          $("btnDescargar").disabled = $("btnCopiar").disabled = c.total === 0;
+          $("btnDeshacer").disabled = historial.length === 0;
+          const conCamino = new Set();
+          aristas.forEach((k) => k.split("|").forEach((id) => conCamino.add(id)));
+          const sueltos = [...nodos.values()].filter((n) => !conCamino.has(n.id));
+          $("avisos").textContent = sueltos.length ? `⚠️ ${sueltos.length} punto(s) sin camino (la app no puede llegar): ${sueltos.slice(0, 8).map((n) => n.id).join(", ")}${sueltos.length > 8 ? "…" : ""}` : "";
+        }
+
+        function pintarPanel() {
+          const n = elegido && nodos.get(elegido);
+          $("panelPunto").hidden = !n;
+          if (!n) return;
+          $("puntoTitulo").textContent = `Punto ${n.id}`;
+          if (document.activeElement !== $("puntoNombre")) $("puntoNombre").value = n.nombre;
+          $("puntoTipo").value = n.categoria;
+          if ($("puntoTipo").value !== n.categoria) { const o = document.createElement("option"); o.value = o.textContent = n.categoria; $("puntoTipo").appendChild(o); $("puntoTipo").value = n.categoria; }
+          $("puntoEscaleras").checked = n.escaleras;
+          const caminos = [...aristas].filter((k) => k.split("|").includes(n.id)).length;
+          $("puntoCoords").textContent = `${n.lat.toFixed(7)}, ${n.lon.toFixed(7)} · ${caminos} camino(s)`;
+        }
+
+        const AYUDA = {
+          mover: "Arrastra un punto para corregir su lugar. Tócalo para cambiarle el nombre, el tipo o marcar escaleras.",
+          trazar: "Toca el punto donde empieza el camino y luego ve tocando por donde se camina: cada toque en el mapa crea un cruce amarillo; tocar un punto que ya existe lo une. Tocar una línea la parte en dos. Esc o doble clic para terminar.",
+          lugar: "Toca el mapa donde está el lugar (edificio, cafetería, puerta) y escribe su nombre. Después únelo con ✏️ Trazar camino.",
+          borrar: "Toca una línea para quitar ese camino, o un punto para borrarlo junto con sus caminos."
+        };
+        function pintarModo() {
+          document.querySelectorAll("[data-modo]").forEach((b) => b.classList.toggle("activo", b.dataset.modo === modo));
+          let texto = AYUDA[modo];
+          if (modo === "trazar" && pendiente) texto = `Trazando desde ${pendiente}. Sigue tocando por donde va el camino. Esc o doble clic para terminar.`;
+          $("ayudaModo").textContent = texto;
+          const c = mapa.getContainer();
+          c.classList.toggle("modo-trazar", modo === "trazar");
+          c.classList.toggle("modo-lugar", modo === "lugar");
+        }
+
+        // Todo cambio pasa por aquí: redibuja, recalcula y guarda
+        function cambio(conHistorial) {
+          dibujarAristas(); dibujarPuntos(); llenarSelects(); dibujarRuta(); pintarResumen(); pintarPanel(); pintarModo(); guardarLocal();
+        }
+        function fijarModo(m) { modo = m; pendiente = null; if (m !== "mover") elegido = null; cambio(false); }
+
+        // ---------- Acciones ----------
+        function crearPunto(latlng, nombre, categoria) {
+          const id = idLibre();
+          if (!id) { window.alert("Ya no caben más puntos."); return null; }
+          nodos.set(id, { id, nombre: nombre || `Cruce ${id.slice(1)}`, categoria, lat: +latlng.lat.toFixed(7), lon: +latlng.lng.toFixed(7), piso: "PB", desc: "Agregado en el editor de caminos", escaleras: false });
+          return id;
+        }
+        function tocarPunto(id) {
+          if (modo === "mover") { elegido = elegido === id ? null : id; cambio(false); return; }
+          if (modo === "trazar") {
+            if (pendiente === id) { pendiente = null; }
+            else if (pendiente) { if (!aristas.has(clave(pendiente, id))) { recordar(); aristas.add(clave(pendiente, id)); } pendiente = id; }
+            else pendiente = id;
+            cambio(false);
+            return;
+          }
+          if (modo === "borrar") {
+            const n = nodos.get(id);
+            const caminos = [...aristas].filter((k) => k.split("|").includes(id));
+            if (n.categoria !== "Cruce" && !window.confirm(`¿Borrar "${n.nombre}" (${id}) y sus ${caminos.length} camino(s)?`)) return;
+            recordar();
+            caminos.forEach((k) => aristas.delete(k));
+            nodos.delete(id);
+            cambio(false);
+          }
+        }
+        function tocarArista(a, b, latlng) {
+          if (modo === "borrar") { recordar(); aristas.delete(clave(a, b)); cambio(false); return; }
+          if (modo === "trazar") { // parte el camino en dos con un cruce nuevo
+            recordar();
+            const id = crearPunto(latlng, "", "Cruce");
+            if (!id) return;
+            aristas.delete(clave(a, b)); aristas.add(clave(a, id)); aristas.add(clave(id, b));
+            if (pendiente && pendiente !== id) aristas.add(clave(pendiente, id));
+            pendiente = id;
+            cambio(false);
+          }
+        }
+        mapa.on("click", (e) => {
+          if (modo === "trazar") {
+            recordar();
+            const id = crearPunto(e.latlng, "", "Cruce");
+            if (!id) return;
+            if (pendiente) aristas.add(clave(pendiente, id));
+            pendiente = id;
+            cambio(false);
+          } else if (modo === "lugar") {
+            const nombre = (window.prompt("Nombre del lugar (ej. Cafetería Capeltic):") || "").trim().replace(/[",]/g, " ");
+            if (!nombre) return;
+            recordar();
+            const id = crearPunto(e.latlng, nombre, "Referencia");
+            if (!id) return;
+            modo = "mover"; elegido = id;
+            cambio(false);
+          } else if (modo === "mover" && elegido) { elegido = null; cambio(false); }
+        });
+        mapa.on("dblclick", () => { if (modo === "trazar" && pendiente) { pendiente = null; cambio(false); } });
+        document.addEventListener("keydown", (e) => {
+          if (e.key === "Escape") { if (pendiente) { pendiente = null; cambio(false); } else if (elegido) { elegido = null; cambio(false); } }
+          if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z" && e.target.tagName !== "INPUT") { e.preventDefault(); deshacer(); }
+        });
+
+        document.querySelectorAll("[data-modo]").forEach((b) => b.addEventListener("click", () => fijarModo(b.dataset.modo)));
+        $("btnDeshacer").addEventListener("click", deshacer);
+        $("chkNombres").addEventListener("change", dibujarPuntos);
+        $("rutaDe").addEventListener("change", dibujarRuta);
+        $("rutaA").addEventListener("change", dibujarRuta);
+
+        let nombreRecordado = false;
+        $("puntoNombre").addEventListener("focus", () => { nombreRecordado = false; });
+        $("puntoNombre").addEventListener("input", () => {
+          const n = nodos.get(elegido); if (!n) return;
+          if (!nombreRecordado) { recordar(); nombreRecordado = true; }
+          n.nombre = $("puntoNombre").value.replace(/[",]/g, " ").trim() || n.id;
+          cambio(false);
+        });
+        $("puntoTipo").addEventListener("change", () => { const n = nodos.get(elegido); if (!n) return; recordar(); n.categoria = $("puntoTipo").value; cambio(false); });
+        $("puntoEscaleras").addEventListener("change", () => { const n = nodos.get(elegido); if (!n) return; recordar(); n.escaleras = $("puntoEscaleras").checked; cambio(false); });
+        $("btnBorrarPunto").addEventListener("click", () => { if (!elegido) return; const id = elegido; const m = modo; modo = "borrar"; tocarPunto(id); modo = m; if (!nodos.has(id)) elegido = null; cambio(false); });
+
+        // ---------- Enviar ----------
+        function textoArchivo() {
+          return JSON.stringify({ argos_mapa: 1, fecha: new Date().toISOString(), cambios: resumenCambios(), ...empaquetar() }, null, 1);
+        }
+        window.ARGOS_EDITOR = { texto: textoArchivo, estado: () => ({ modo, elegido, pendiente, nodos: nodos.size, aristas: aristas.size, cambios: resumenCambios() }), mapa };
+        $("btnDescargar").addEventListener("click", () => {
+          const a = document.createElement("a");
+          a.href = URL.createObjectURL(new Blob([textoArchivo()], { type: "application/json" }));
+          a.download = "argos_mapa.json";
+          document.body.appendChild(a); a.click(); a.remove();
+          setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+        });
+        $("btnCopiar").addEventListener("click", async () => {
+          try { await navigator.clipboard.writeText(textoArchivo()); $("btnCopiar").textContent = "✅ Copiado"; }
+          catch (_) { window.prompt("Copia este texto:", textoArchivo()); }
+          setTimeout(() => { $("btnCopiar").textContent = "📋 Copiar"; }, 2000);
+        });
+        $("btnDescartar").addEventListener("click", () => {
+          if (!window.confirm("¿Descartar TODOS tus cambios y volver al mapa publicado?")) return;
+          recordar();
+          nodos = new Map([...original.nodos].map(([id, n]) => [id, { ...n }]));
+          aristas = new Set(original.aristas);
+          elegido = pendiente = null;
+          cambio(false);
+        });
+
+        // Encadre inicial: todos los puntos a la vista
+        mapa.fitBounds(L.latLngBounds([...nodos.values()].map((n) => [n.lat, n.lon])).pad(0.08));
+        cambio(false);
+      })();
+    </script>
+  </body>
+</html>
