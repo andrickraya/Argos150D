@@ -147,7 +147,7 @@ const C = {
   calle: "#fbf6ec",
   ciudad: "#d9d0c2",
   arboles: ["#6e9a59", "#81a866", "#5b8a4c", "#8fb071"],
-  ruta: "#0071e3"
+  ruta: "#C8102E"
 };
 
 const capas = { suelo: [], verdes: [], calles: [], ciudad: [], ibero: [], arboles: [], ruta: [] };

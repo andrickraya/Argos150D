@@ -42,7 +42,7 @@ const enPagina = (CFG) => {
   // Punto "tú": avanza en la punta de la ruta
   const ns = "http://www.w3.org/2000/svg";
   const yo = document.createElementNS(ns, "g");
-  yo.innerHTML = '<circle r="5" fill="#0071e3" opacity=".22"/><circle r="2.2" fill="#fff" stroke="#0071e3" stroke-width="1.2"/>';
+  yo.innerHTML = '<circle r="5" fill="#C8102E" opacity=".22"/><circle r="2.2" fill="#fff" stroke="#C8102E" stroke-width="1.2"/>';
   ruta.parentNode.appendChild(yo);
   fin.style.opacity = 0;
 

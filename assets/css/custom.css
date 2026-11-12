@@ -20,9 +20,9 @@
   --text-tertiary: #86868b;
   --border:        #d2d2d7;
   --border-light:  #e8e8ed;
-  --accent:        #0066cc;
-  --accent-hover:  #004fa3;
-  --accent-tint:   rgba(0, 102, 204, 0.08);
+  --accent:        #DC0235;
+  --accent-hover:  #B0002A;
+  --accent-tint:   rgba(220, 2, 53, 0.08);
   --radius-sm: 10px;
   --radius-md: 16px;
   --radius-lg: 22px;
@@ -161,11 +161,11 @@ body {
 :root { --link-color: var(--accent); }
 .main-content a, .main-content a:visited {
   color: var(--accent) !important;
-  text-decoration-color: rgba(0,102,204,0.35);
+  text-decoration-color: rgba(220, 2, 53,0.35);
 }
 .main-content a:hover {
   color: var(--accent-hover) !important;
-  text-decoration-color: rgba(0,79,163,0.6);
+  text-decoration-color: rgba(160,13,36,0.6);
 }
 
 /* ---------- 8) Tipografía de contenido ---------- */
@@ -266,7 +266,7 @@ body {
   background-color: var(--accent) !important;
   color: #ffffff !important;
 }
-.btn-primary:hover { background-color: var(--accent-hover) !important; box-shadow: 0 6px 18px rgba(0,102,204,.35); }
+.btn-primary:hover { background-color: var(--accent-hover) !important; box-shadow: 0 6px 18px rgba(220, 2, 53,.35); }
 
 .btn-secondary {
   background-color: var(--bg-elevated) !important;

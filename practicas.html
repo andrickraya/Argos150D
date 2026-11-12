@@ -8,7 +8,7 @@
       name="description"
       content="Prácticas del proyecto Argos: navegación en realidad mixta, Unity, colisiones, interfaces y conectividad IoT."
     />
-    <link rel="icon" href="data:;base64,iVBORw0KGgo=" />
+    <link rel="icon" type="image/svg+xml" href="assets/img/argos-icon.svg" />
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
@@ -18,9 +18,9 @@
               primary: {
                 DEFAULT: '#0f172a',
                 light: '#0b1220',
-                accent: '#06b6d4'
+                accent: '#DC0235'
               },
-              accent: '#06b6d4',
+              accent: '#DC0235',
               glass: 'rgba(255,255,255,0.06)'
             },
             fontFamily: {
@@ -30,7 +30,7 @@
         }
       }
     </script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&family=Montserrat:wght@600;700;800&display=swap" rel="stylesheet">
     <style>
       html { scroll-behavior: smooth; }
       body {
@@ -51,6 +51,7 @@
         box-shadow: 0 16px 38px rgba(15, 23, 42, 0.08);
       }
     </style>
+    <style>h1,h2,h3{font-family:'Montserrat','Inter',sans-serif;letter-spacing:-0.03em}</style>
   </head>
 
   <body class="antialiased">
@@ -58,10 +59,7 @@
       <nav class="mx-auto max-w-7xl px-6 lg:px-8">
         <div class="flex h-16 items-center justify-between">
           <a href="index.html" class="flex items-center gap-3">
-            <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-sky-500 to-indigo-600 text-lg font-bold text-white shadow">
-              A
-            </div>
-            <span class="text-lg font-semibold text-slate-900">Argos</span>
+            <img src="assets/img/argos-logo-rojo.svg" alt="ARGOS" class="h-5 w-auto">
           </a>
 
           <div class="hidden items-center gap-8 md:flex">
@@ -98,7 +96,7 @@
       <section class="py-16 md:py-20">
         <div class="mx-auto max-w-7xl px-6 lg:px-8">
           <div class="mx-auto max-w-3xl text-center">
-            <p class="text-sm font-semibold uppercase tracking-[0.2em] text-indigo-600">Argos</p>
+            <p class="text-sm font-semibold uppercase tracking-[0.2em] text-[#DC0235]">Argos</p>
             <h1 class="mt-4 text-4xl font-black tracking-tight text-slate-900 sm:text-5xl lg:text-6xl">
               Prácticas de desarrollo interactivo
             </h1>
@@ -208,7 +206,7 @@
     <footer class="border-t border-slate-200 bg-white">
       <div class="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 px-6 py-8 md:flex-row lg:px-8">
         <div class="flex items-center gap-3">
-          <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-sky-500 to-indigo-600 text-white font-bold">A</div>
+          <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-[#DC0235] to-[#8A0021] text-white font-bold">A</div>
           <div>
             <div class="font-semibold text-slate-900">Argos</div>
             <div class="text-xs text-slate-500">Navegación en Realidad Mixta</div>

@@ -47,7 +47,7 @@ async function iniciar(raiz) {
   const C = {
     cielo: 0xf3ebde, suelo: 0xe9dfcd, recinto: 0xf1e2c8, calle: 0xfbf7ef, andador: 0xe2c3a6,
     pasto: 0xa9c48a, cancha: 0x8fbf86, ladrillo: 0xc4613f, ladrilloTecho: 0xd9a487,
-    vecino: 0xd8d0c4, vecinoTecho: 0xebe6de, ruta: 0x0071e3, tronco: 0x7a5a43,
+    vecino: 0xd8d0c4, vecinoTecho: 0xebe6de, ruta: 0xdc0235, tronco: 0x7a5a43,
     arboles: [0x6e9a59, 0x81a866, 0x5b8a4c, 0x8fb071]
   };
 

@@ -3,8 +3,8 @@
   --ss-bg: #0a0c0b;
   --ss-ink: #f2ede3;
   --ss-muted: rgba(242, 237, 227, 0.74);
-  --ss-accent: #8ef0cf;
-  --ss-glow: rgba(142, 240, 207, 0.38);
+  --ss-accent: #DC0235;
+  --ss-glow: rgba(220, 2, 53, 0.5);
   --ss-p: 0;
   position: relative;
   margin-top: -49px; /* alto de la cabecera; scroll-scrub.js lo ajusta al real */
@@ -88,7 +88,7 @@
   animation: ss-parpadeo 1.6s steps(2, start) infinite;
 }
 @keyframes ss-parpadeo { to { visibility: hidden; } }
-.ss__timecode { color: var(--ss-accent); }
+.ss__timecode { color: #ffffff; }
 
 /* Barra de progreso */
 .ss__progress {
@@ -188,25 +188,28 @@
 }
 .ss__kicker {
   margin: 0;
-  font: 600 11px/1 "Inter", system-ui, sans-serif;
-  letter-spacing: 0.3em;
-  text-transform: uppercase;
-  color: var(--ss-accent);
+  font: 700 12px/1 "Montserrat", system-ui, sans-serif;
+  letter-spacing: 0.02em;
+  display: inline-block;
+  padding: 6px 10px 6px 12px;
+  border-radius: 4px;
+  background: var(--ss-accent);
+  color: #ffffff;
 }
 .ss__title {
   margin: 0.28em 0 0.32em;
-  font-family: "Cormorant Garamond", "Times New Roman", serif;
-  font-weight: 500;
-  font-size: clamp(54px, 8.4vw, 124px);
-  line-height: 0.92;
-  letter-spacing: -0.01em;
+  font-family: "Montserrat", "Inter", system-ui, sans-serif;
+  font-weight: 800;
+  font-size: clamp(44px, 6.6vw, 104px);
+  line-height: 0.95;
+  letter-spacing: -0.035em;
   color: var(--ss-ink);
 }
 .ss__title em {
   display: block;
   font-style: normal;
-  color: var(--ss-accent);
-  text-shadow: 0 0 28px var(--ss-glow);
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.82);
 }
 .ss__body {
   margin: 0;
@@ -246,7 +249,7 @@
   text-shadow: none;
   transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
 }
-.ss__btn--1 { background: var(--ss-accent); color: #062018; box-shadow: 0 0 24px var(--ss-glow); }
+.ss__btn--1 { background: var(--ss-accent); color: #ffffff; box-shadow: 0 0 24px var(--ss-glow); }
 .ss__btn--2 { border: 1px solid rgba(242, 237, 227, 0.45); color: var(--ss-ink); background: rgba(10, 12, 11, 0.3); }
 .ss__btn:hover { transform: translateY(-1px); }
 .ss__btn:focus-visible { outline: 2px solid var(--ss-ink); outline-offset: 3px; }

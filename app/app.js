@@ -1163,11 +1163,11 @@
       arCtx.lineTo(bD.sx, bD.sy);
       arCtx.lineTo(bI.sx, bI.sy);
       arCtx.closePath();
-      arCtx.fillStyle = enDestino ? `rgba(52, 199, 89, ${alfa})` : `rgba(0, 150, 255, ${alfa})`;
+      arCtx.fillStyle = enDestino ? `rgba(255, 255, 255, ${alfa})` : `rgba(220, 2, 53, ${alfa})`;
       arCtx.fill();
     }
     // Rieles laterales luminosos (se cortan donde un punto no es visible)
-    arCtx.strokeStyle = enDestino ? "#4ade80" : "#38bdf8";
+    arCtx.strokeStyle = enDestino ? "#DC0235" : "#ffffff";
     arCtx.lineWidth = 3;
     [bordeIzq, bordeDer].forEach((borde) => {
       arCtx.beginPath();
@@ -1203,12 +1203,12 @@
       vertices.forEach((v, k) => (k === 0 ? arCtx.moveTo(v.sx, v.sy) : arCtx.lineTo(v.sx, v.sy)));
       arCtx.closePath();
       if (enDestino) {
-        arCtx.fillStyle = `rgba(74, 222, 128, ${alpha})`;
-        arCtx.strokeStyle = "#ffffff";
+        arCtx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+        arCtx.strokeStyle = "#DC0235";
       } else {
-        const r = Math.round(pulso * 90);
-        const g = Math.round(205 + pulso * 50);
-        arCtx.fillStyle = `rgba(${r}, ${g}, 255, ${alpha})`;
+        const r = Math.round(200 + pulso * 55);
+        const g = Math.round(16 + pulso * 70);
+        arCtx.fillStyle = `rgba(${r}, ${g}, ${g + 30}, ${alpha})`;
         arCtx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
       }
       arCtx.lineWidth = Math.max(1.2, 3 - s * 0.15);
@@ -1231,7 +1231,7 @@
       const radioAnillo = limitar(0.5 * pPinBase.escala, 6, 60);
       arCtx.beginPath();
       arCtx.ellipse(pPinBase.sx, pPinBase.sy, radioAnillo, radioAnillo * 0.35, 0, 0, Math.PI * 2);
-      arCtx.strokeStyle = enDestino ? "#4ade80" : "#38bdf8";
+      arCtx.strokeStyle = enDestino ? "#DC0235" : "#ffffff";
       arCtx.lineWidth = 3;
       arCtx.stroke();
 
@@ -1249,7 +1249,7 @@
       arCtx.lineTo(pPinAlto.sx, pPinAlto.sy + tamRombo);
       arCtx.lineTo(pPinAlto.sx - tamRombo * 0.8, pPinAlto.sy);
       arCtx.closePath();
-      arCtx.fillStyle = estado.indiceActual >= estado.ruta.length - 2 ? "#ef4444" : "#34c759";
+      arCtx.fillStyle = estado.indiceActual >= estado.ruta.length - 2 ? "#ef4444" : "#ffffff";
       arCtx.fill();
       arCtx.lineWidth = 2.5;
       arCtx.strokeStyle = "#ffffff";
@@ -1268,7 +1268,7 @@
         arCtx.rect(bx, by, tw + 20, 24);
       }
       arCtx.fill();
-      arCtx.strokeStyle = "#38bdf8";
+      arCtx.strokeStyle = "#DC0235";
       arCtx.lineWidth = 1.5;
       arCtx.stroke();
 
@@ -1343,14 +1343,14 @@
           estacionamiento: { fill: "rgba(100, 116, 139, 0.18)", stroke: "rgba(148, 163, 184, 0.25)" },
           cancha: { fill: "rgba(245, 158, 11, 0.16)", stroke: "rgba(251, 191, 36, 0.3)" },
           edificio: { fill: "rgba(148, 163, 184, 0.22)", stroke: "rgba(203, 213, 225, 0.35)" },
-          ibero: { fill: "rgba(200, 16, 46, 0.22)", stroke: "rgba(248, 113, 113, 0.42)" }
+          ibero: { fill: "rgba(220, 2, 53, 0.22)", stroke: "rgba(248, 113, 113, 0.42)" }
         }
       : {
           pasto: { fill: "rgba(187, 247, 208, 0.55)", stroke: "rgba(34, 197, 94, 0.35)" },
           estacionamiento: { fill: "rgba(226, 232, 240, 0.7)", stroke: "rgba(148, 163, 184, 0.45)" },
           cancha: { fill: "rgba(254, 243, 199, 0.75)", stroke: "rgba(217, 119, 6, 0.35)" },
           edificio: { fill: "rgba(203, 213, 225, 0.65)", stroke: "rgba(100, 116, 139, 0.45)" },
-          ibero: { fill: "rgba(225, 29, 72, 0.14)", stroke: "rgba(200, 16, 46, 0.38)" }
+          ibero: { fill: "rgba(225, 29, 72, 0.14)", stroke: "rgba(220, 2, 53, 0.38)" }
         };
 
     poligonos.forEach((pol) => {
@@ -1422,7 +1422,7 @@
     if (estado.ruta.length >= 2) {
       const posUsuario = mundoACanvas(estado.usuarioX, estado.usuarioZ);
 
-      ctx.strokeStyle = "rgba(0, 113, 227, 0.2)";
+      ctx.strokeStyle = "rgba(220, 2, 53, 0.2)";
       ctx.lineWidth = 14;
       ctx.lineJoin = "round";
       ctx.beginPath();
@@ -1433,7 +1433,7 @@
       }
       ctx.stroke();
 
-      ctx.strokeStyle = "#0071e3";
+      ctx.strokeStyle = "#DC0235";
       ctx.lineWidth = 6;
       ctx.beginPath();
       ctx.moveTo(posUsuario.cx, posUsuario.cy);
@@ -1476,15 +1476,15 @@
 
       if (esDestino) {
         radio = 11;
-        fill = "#c8102e";
+        fill = "#DC0235";
         stroke = "#ffffff";
       } else if (esOrigen) {
         radio = 9;
-        fill = "#34c759";
-        stroke = "#ffffff";
+        fill = "#ffffff";
+        stroke = "#DC0235";
       } else if (enRuta) {
         radio = cruce ? 4 : 8;
-        fill = "#0071e3";
+        fill = "#DC0235";
         stroke = "#ffffff";
       }
 
@@ -1502,7 +1502,7 @@
         const tw = ctx.measureText(texto).width;
         ctx.fillStyle = "rgba(255, 255, 255, 0.92)";
         ctx.fillRect(cx - tw / 2 - 6, cy - radio - 24, tw + 12, 18);
-        ctx.fillStyle = esDestino ? "#c8102e" : enRuta ? "#0071e3" : "#1c1c1e";
+        ctx.fillStyle = esDestino ? "#DC0235" : enRuta ? "#DC0235" : "#1c1c1e";
         ctx.textAlign = "center";
         ctx.fillText(texto, cx, cy - radio - 11);
       }
@@ -1518,7 +1518,7 @@
     ctx.save();
     ctx.translate(posU.cx, posU.cy);
     ctx.rotate(radCanvas);
-    ctx.fillStyle = "rgba(52, 199, 89, 0.28)";
+    ctx.fillStyle = "rgba(220, 2, 53, 0.28)";
     ctx.beginPath();
     ctx.moveTo(0, 0);
     ctx.arc(0, 0, 38, -0.45, 0.45);
@@ -1528,19 +1528,19 @@
 
     ctx.beginPath();
     ctx.arc(posU.cx, posU.cy, 16, 0, Math.PI * 2);
-    ctx.fillStyle = "rgba(52, 199, 89, 0.28)";
+    ctx.fillStyle = "rgba(220, 2, 53, 0.28)";
     ctx.fill();
 
     ctx.beginPath();
     ctx.arc(posU.cx, posU.cy, 9, 0, Math.PI * 2);
-    ctx.fillStyle = "#34c759";
+    ctx.fillStyle = "#DC0235";
     ctx.fill();
     ctx.lineWidth = 3;
     ctx.strokeStyle = "#ffffff";
     ctx.stroke();
 
     ctx.font = "800 11px Inter, sans-serif";
-    ctx.fillStyle = "#065f46";
+    ctx.fillStyle = "#8A0021";
     ctx.textAlign = "center";
     ctx.fillText("TÚ", posU.cx, posU.cy + 24);
   }
@@ -1592,7 +1592,7 @@
     });
 
     if (estado.ruta.length >= 2) {
-      miniCtx.strokeStyle = "#38bdf8";
+      miniCtx.strokeStyle = "#DC0235";
       miniCtx.lineWidth = 4.5;
       miniCtx.lineCap = "round";
       miniCtx.beginPath();
@@ -1621,7 +1621,7 @@
     miniCtx.save();
     miniCtx.translate(w / 2, h / 2);
     miniCtx.rotate(radMini);
-    miniCtx.fillStyle = "rgba(56, 189, 248, 0.34)";
+    miniCtx.fillStyle = "rgba(220, 2, 53, 0.34)";
     miniCtx.beginPath();
     miniCtx.moveTo(0, 0);
     miniCtx.arc(0, 0, 34, -0.5, 0.5);
@@ -1631,10 +1631,10 @@
 
     miniCtx.beginPath();
     miniCtx.arc(w / 2, h / 2, 6.5, 0, Math.PI * 2);
-    miniCtx.fillStyle = "#34c759";
+    miniCtx.fillStyle = "#ffffff";
     miniCtx.fill();
     miniCtx.lineWidth = 2;
-    miniCtx.strokeStyle = "#ffffff";
+    miniCtx.strokeStyle = "#DC0235";
     miniCtx.stroke();
 
     // Indicador de Norte fijo arriba (el minimapa nunca gira)
