@@ -623,7 +623,7 @@
 
       <div class="header-actions">
         <button id="btnOpenQrModal" class="icon-btn" commandfor="dialogQrScanner" command="show-modal" title="Elegir nodo o escanear QR" type="button">QR</button>
-        <button id="btnOpenPrintModal" class="icon-btn" commandfor="dialogQrCards" command="show-modal" title="20 Códigos QR" type="button">🖨️</button>
+        <button id="btnOpenPrintModal" class="icon-btn" commandfor="dialogQrCards" command="show-modal" title="Códigos QR" type="button">🖨️</button>
         <button id="btnOpenHelpModal" class="icon-btn" commandfor="dialogHowItWorks" command="show-modal" title="Ayuda" type="button">?</button>
       </div>
     </header>
@@ -676,7 +676,7 @@
     <aside class="nav-bottom-sheet is-collapsed" id="bottomSheet">
       <button id="btnToggleSheet" class="sheet-toggle-bar" type="button" aria-expanded="false">
         <span class="sheet-handle-pill"></span>
-        <span id="sheetToggleLabel" class="sheet-toggle-text">🔼 Cambiar Origen / Destino (20 Nodos)</span>
+        <span id="sheetToggleLabel" class="sheet-toggle-text">🔼 Cambiar Origen / Destino</span>
       </button>
 
       <div class="sheet-summary">
@@ -752,7 +752,7 @@
           <h3 id="qrScannerDialogTitle">📍 ¿En qué nodo del campus estás?</h3>
           <button class="dialog-close-btn" commandfor="dialogQrScanner" command="close" type="button">✕</button>
         </div>
-        <p class="dialog-desc">Apunta a un QR o <strong>toca cualquiera de los 20 nodos abajo</strong> para fijar tu ubicación ahí:</p>
+        <p class="dialog-desc">Apunta a un QR o <strong>toca cualquiera de los lugares de abajo</strong> para fijar tu ubicación ahí:</p>
         <div class="scanner-feed-box">
           <video id="qrScannerVideo" playsinline autoplay muted></video>
           <span class="scanner-status">Cámara lista para escanear QR...</span>
@@ -765,9 +765,10 @@
     <dialog id="dialogQrCards" class="clean-dialog" closedby="any" aria-labelledby="qrCardsDialogTitle">
       <div class="dialog-card">
         <div class="dialog-top">
-          <h3 id="qrCardsDialogTitle">🏷️ 20 Nodos QR del Campus IBERO</h3>
+          <h3 id="qrCardsDialogTitle">🏷️ Códigos QR del Campus IBERO</h3>
           <button class="dialog-close-btn" commandfor="dialogQrCards" command="close" type="button">✕</button>
         </div>
+        <p class="dialog-desc">Para pegar en el campus usa las hojas grandes: <a href="qr.html" target="_blank" rel="noopener" style="font-weight:800;color:var(--accent);">🖨️ Abrir hojas QR para imprimir</a></p>
         <div id="qrCardsGrid" class="cards-grid"></div>
       </div>
     </dialog>
@@ -802,7 +803,8 @@
         <div style="font-size:0.84rem;line-height:1.5;display:flex;flex-direction:column;gap:8px;">
           <p><strong>1. Flechas 3D en Realidad Aumentada:</strong> En la vista <em>🥽 Cámara AR</em> ves la alfombra azul y las 7 flechas 3D animadas sobre el piso frente a ti.</p>
           <p><strong>2. Botón verde "▶️ Caminar":</strong> Tócalo y camina con el celular al frente: la app cuenta <strong>tus pasos reales</strong> y te avanza en la ruta. Para presentar sin caminar usa <em>🎬 Demo</em> en el menú.</p>
-          <p><strong>3. Puntos QR (N01 a N20):</strong> Toca el botón <em>QR</em> arriba a la derecha para ubicarte en cualquiera de los 20 edificios/accesos del campus.</p>
+          <p><strong>3. Puntos QR:</strong> Apunta la cámara a una hoja QR pegada en el campus y la app te ubica ahí. Sin hoja a la mano, toca el botón <em>QR</em> arriba a la derecha y elige el lugar.</p>
+          <p><strong>4. GPS:</strong> En el menú, <em>🛰️ Activar GPS Real</em> te coloca en el pasillo más cercano y va corrigiendo tu avance. Funciona mejor al aire libre; bajo techo usa los QR.</p>
         </div>
       </div>
     </dialog>

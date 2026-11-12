@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Hojas QR</title>
+    <style>
+      :root { --tinta: #111827; --gris: #475569; --borde: #cbd5e1; --acento: #0071e3; --rojo: #c8102e; --fondo: #eef2f7; }
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body { font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: var(--tinta); background: var(--fondo); }
+
+      .panel { max-width: 900px; margin: 0 auto; padding: 20px 16px 8px; }
+      .panel h1 { font-size: 1.35rem; margin-bottom: 6px; }
+      .panel p { color: var(--gris); font-size: 0.92rem; line-height: 1.45; margin-bottom: 10px; }
+      .fila { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; align-items: center; }
+      button, select { font: inherit; font-weight: 700; font-size: 0.86rem; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--borde); background: #fff; color: var(--tinta); cursor: pointer; }
+      button.principal { background: var(--acento); border-color: var(--acento); color: #fff; }
+      .lista { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 4px 12px; background: #fff; border: 1px solid var(--borde); border-radius: 14px; padding: 12px; max-height: 240px; overflow: auto; }
+      .lista label { font-size: 0.82rem; display: flex; gap: 6px; align-items: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      #conteo { font-weight: 700; font-size: 0.86rem; }
+
+      #hojas { display: flex; flex-wrap: wrap; justify-content: center; gap: 16px; padding: 16px; }
+      .hoja { background: #fff; border: 1px solid var(--borde); border-radius: 6px; width: 8.5in; height: 10.4in; padding: 0.5in; display: flex; flex-direction: column; align-items: center; justify-content: space-between; text-align: center; }
+      .hoja .marca { font-weight: 800; letter-spacing: 0.04em; font-size: 15pt; color: var(--rojo); }
+      .hoja .marca span { color: var(--gris); font-weight: 600; letter-spacing: 0; }
+      .hoja canvas { width: 5.6in; height: 5.6in; image-rendering: pixelated; }
+      .hoja .nombre { font-size: 30pt; font-weight: 800; line-height: 1.1; }
+      .hoja .id { font-size: 15pt; font-weight: 700; color: var(--gris); margin-top: 4px; }
+      .hoja .como { font-size: 13pt; color: var(--tinta); font-weight: 600; }
+      .hoja .pegar { font-size: 9.5pt; color: var(--gris); margin-top: 6px; max-width: 6.5in; }
+
+      body.cuatro .hoja { width: 4.1in; height: 5.1in; padding: 0.22in; }
+      body.cuatro .hoja canvas { width: 2.7in; height: 2.7in; }
+      body.cuatro .hoja .marca { font-size: 9pt; }
+      body.cuatro .hoja .nombre { font-size: 15pt; }
+      body.cuatro .hoja .id { font-size: 9pt; }
+      body.cuatro .hoja .como { font-size: 8pt; }
+      body.cuatro .hoja .pegar { display: none; }
+
+      @page { size: letter portrait; margin: 0.3in; }
+      @media print {
+        body { background: #fff; }
+        .panel { display: none; }
+        #hojas { display: block; padding: 0; }
+        .hoja { border: none; border-radius: 0; margin: 0 auto; page-break-after: always; break-after: page; }
+        .hoja:last-child { page-break-after: auto; break-after: auto; }
+        body.cuatro #hojas { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
+        body.cuatro .hoja { border: 1px dashed var(--borde); page-break-after: auto; break-after: auto; break-inside: avoid; width: 3.9in; height: 5.1in; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="panel">
+      <h1>Hojas QR de ARGOS para imprimir</h1>
+      <p>Cada hoja se pega en el lugar que dice su nombre. Al escanearla con la cámara normal del celular se abre ARGOS ya ubicado en ese punto; si la app ya está abierta, basta con apuntarle a la hoja.</p>
+      <div class="fila">
+        <button type="button" data-grupo="N01,N03,N60,N61,N07,N10">Ruta Puerta 3 → Salón C → El Cubo</button>
+        <button type="button" data-grupo="*">Todos</button>
+        <button type="button" data-grupo="">Ninguno</button>
+        <select id="tamano" aria-label="Tamaño">
+          <option value="uno">1 QR por hoja (recomendado)</option>
+          <option value="cuatro">4 QR por hoja</option>
+        </select>
+        <button type="button" class="principal" id="btnImprimir">🖨️ Imprimir o guardar PDF</button>
+        <span id="conteo"></span>
+      </div>
+      <div class="lista" id="lista"></div>
+    </div>
+    <div id="hojas"></div>
+
+    <script src="campus_data.js"></script>
+    <script src="vendor/qrcode-generator.js"></script>
+    <script>
+      (() => {
+        const datos = window.ARGOS_CAMPUS_DATA;
+        const nodos = datos.nodos;
+        const params = new URLSearchParams(location.search);
+        // Link que lleva cada QR. Se puede cambiar con ?base=... si la app se publica en otra dirección.
+        const BASE = params.get("base") || "https://andrickraya.github.io/Argos150D/app/";
+        const lista = document.getElementById("lista");
+        const hojas = document.getElementById("hojas");
+        const conteo = document.getElementById("conteo");
+        const tamano = document.getElementById("tamano");
+        const RUTA_DEMO = "N01,N03,N60,N61,N07,N10";
+
+        const elegidos = new Set((params.get("solo") || RUTA_DEMO).split(",").map((s) => s.trim().toUpperCase()));
+        if (params.get("solo") === "*") nodos.forEach((n) => elegidos.add(n.id));
+        if (params.get("tam") === "cuatro") tamano.value = "cuatro";
+
+        function dibujarQR(canvas, texto) {
+          const qr = qrcode(0, "M"); // tamaño automático, corrección de errores media
+          qr.addData(texto);
+          qr.make();
+          const n = qr.getModuleCount();
+          const margen = 4;           // zona blanca obligatoria alrededor
+          const px = 12;              // pixeles por cuadrito
+          canvas.width = canvas.height = (n + margen * 2) * px;
+          const c = canvas.getContext("2d");
+          c.fillStyle = "#fff";
+          c.fillRect(0, 0, canvas.width, canvas.height);
+          c.fillStyle = "#000";
+          for (let f = 0; f < n; f++) for (let k = 0; k < n; k++) if (qr.isDark(f, k)) c.fillRect((k + margen) * px, (f + margen) * px, px, px);
+        }
+
+        function pintar() {
+          document.body.classList.toggle("cuatro", tamano.value === "cuatro");
+          hojas.innerHTML = "";
+          nodos.filter((n) => elegidos.has(n.id)).forEach((n) => {
+            const link = `${BASE}?qr=${n.id}`;
+            const hoja = document.createElement("section");
+            hoja.className = "hoja";
+            hoja.dataset.id = n.id;
+            hoja.dataset.link = link;
+            hoja.innerHTML = `
+              <div class="marca">ARGOS <span>· Navegación en el campus IBERO</span></div>
+              <canvas></canvas>
+              <div>
+                <div class="nombre"></div>
+                <div class="id"></div>
+              </div>
+              <div>
+                <div class="como">📷 Escanéame con la cámara de tu celular</div>
+                <div class="pegar"></div>
+              </div>`;
+            hoja.querySelector(".nombre").textContent = n.nombre;
+            hoja.querySelector(".id").textContent = `Punto ${n.id}`;
+            hoja.querySelector(".pegar").textContent = `Pegar en: ${n.nombre} (${n.lat}, ${n.lon}), a la altura de los ojos`;
+            dibujarQR(hoja.querySelector("canvas"), link);
+            hojas.appendChild(hoja);
+          });
+          conteo.textContent = `${elegidos.size} hoja${elegidos.size === 1 ? "" : "s"} elegida${elegidos.size === 1 ? "" : "s"}`;
+        }
+
+        nodos.forEach((n) => {
+          const lab = document.createElement("label");
+          const chk = document.createElement("input");
+          chk.type = "checkbox";
+          chk.value = n.id;
+          chk.checked = elegidos.has(n.id);
+          chk.addEventListener("change", () => { if (chk.checked) elegidos.add(n.id); else elegidos.delete(n.id); pintar(); });
+          lab.appendChild(chk);
+          lab.appendChild(document.createTextNode(`${n.id} — ${n.nombre}`));
+          lista.appendChild(lab);
+        });
+
+        document.querySelectorAll("[data-grupo]").forEach((b) => b.addEventListener("click", () => {
+          const g = b.dataset.grupo;
+          elegidos.clear();
+          if (g === "*") nodos.forEach((n) => elegidos.add(n.id));
+          else g.split(",").filter(Boolean).forEach((id) => elegidos.add(id));
+          lista.querySelectorAll("input").forEach((c) => { c.checked = elegidos.has(c.value); });
+          pintar();
+        }));
+        tamano.addEventListener("change", pintar);
+        document.getElementById("btnImprimir").addEventListener("click", () => window.print());
+        pintar();
+      })();
+    </script>
+  </body>
+</html>
