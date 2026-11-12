@@ -25,6 +25,47 @@ const entre = (a, b, t, lado = 0) => { // punto a la fracción t del pasillo a�
   return { x: N[a].x + dx * t + (dz / L) * lado, z: N[a].z + dz * t - (dx / L) * lado };
 };
 
+// Ruta más corta según los datos (el mismo cálculo que la app), para no fijar aquí los nodos de un mapa concreto
+function rutaDatos(desde, hasta) {
+  const ady = new Map(D.nodos.map((n) => [n.id, []]));
+  D.aristas.forEach(([a, b]) => { const m = Math.hypot(N[a].x - N[b].x, N[a].z - N[b].z); ady.get(a).push([b, m]); ady.get(b).push([a, m]); });
+  const dist = new Map([[desde, 0]]), prev = new Map(), vistos = new Set();
+  for (;;) {
+    let u = null;
+    dist.forEach((x, id) => { if (!vistos.has(id) && (u === null || x < dist.get(u))) u = id; });
+    if (u === null || u === hasta) break;
+    vistos.add(u);
+    ady.get(u).forEach(([v, m]) => { const nd = dist.get(u) + m; if (!dist.has(v) || nd < dist.get(v)) { dist.set(v, nd); prev.set(v, u); } });
+  }
+  const ids = [hasta];
+  while (prev.has(ids[0])) ids.unshift(prev.get(ids[0]));
+  return ids;
+}
+const largo = (a, b) => Math.hypot(N[b].x - N[a].x, N[b].z - N[a].z);
+const distSeg = (p, a, b) => { const dx = b.x - a.x, dz = b.z - a.z; const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.z - a.z) * dz) / (dx * dx + dz * dz))); return Math.hypot(p.x - a.x - dx * t, p.z - a.z - dz * t); };
+// Punto a "metros" del inicio de la ruta, desplazado "lado" metros a la derecha; k = tramo donde cae
+function sobreRuta(ids, metros, lado = 0) {
+  let k = 0;
+  for (; k < ids.length - 2 && metros > largo(ids[k], ids[k + 1]); k++) metros -= largo(ids[k], ids[k + 1]);
+  return { ...entre(ids[k], ids[k + 1], Math.min(1, metros / largo(ids[k], ids[k + 1])), lado), k };
+}
+const RUTA = rutaDatos("N01", "N07");
+// Tramo para la prueba de GPS: el de la ruta donde un punto a 5 m de lado queda más claramente junto a ESE
+// tramo y no junto a otro camino, y con al menos 45 m de ruta por delante.
+let kE = -1, metrosE = 0;
+{
+  const total = RUTA.slice(1).reduce((s, id, i) => s + largo(RUTA[i], id), 0);
+  let acum = 0, mejor = -Infinity;
+  for (let k = 0; k < RUTA.length - 1; k++) {
+    const L = largo(RUTA[k], RUTA[k + 1]), pt = entre(RUTA[k], RUTA[k + 1], 0.5, 5);
+    const otros = D.aristas.filter(([u, v]) => !((u === RUTA[k] && v === RUTA[k + 1]) || (v === RUTA[k] && u === RUTA[k + 1])));
+    const margen = Math.min(...otros.map(([u, v]) => distSeg(pt, N[u], N[v]))) - 5;
+    if (L >= 6 && acum + L / 2 + 45 <= total && margen > mejor) { mejor = margen; kE = k; metrosE = acum + L / 2; }
+    acum += L;
+  }
+}
+const EA = RUTA[kE], EB = RUTA[kE + 1];
+
 (async () => {
   const b = await puppeteer.launch({ executablePath: "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe", headless: "new",
     args: ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream"] });
@@ -65,7 +106,7 @@ const entre = (a, b, t, lado = 0) => { // punto a la fracción t del pasillo a�
   await elegir(p, "selectOrigen", "N01"); await elegir(p, "selectDestino", "N07");
   await clic(p, "btnDemo"); await espera(9000); await clic(p, "btnDemo"); await espera(900);
   let antes = await dbg(p);
-  ok(antes.indice === 0 && antes.progreso > 0.1 && antes.progreso < 0.5, "B1 la demo avanzó unos metros por el primer pasillo", `${(antes.progreso * 100).toFixed(0)} %`);
+  ok((antes.indice > 0 || antes.progreso > 0.1) && antes.indice < antes.ruta.length - 2, "B1 la demo avanzó unos metros y sigue a media ruta", `tramo ${antes.indice} de ${antes.ruta.length - 1}, ${(antes.progreso * 100).toFixed(0)} %`);
   await elegir(p, "selectDestino", "N10");
   d = await dbg(p);
   ok(Math.hypot(d.x - antes.x, d.z - antes.z) < 0.3, "B2 al cambiar destino a media ruta NO regresa al origen", `se movió ${Math.hypot(d.x - antes.x, d.z - antes.z).toFixed(2)} m`);
@@ -96,7 +137,7 @@ const entre = (a, b, t, lado = 0) => { // punto a la fracción t del pasillo a�
   d = await dbg(p);
   ok(d.origen === "N60" && d.destino === "N15", "D3 al abrir otro QR se conserva el destino elegido", `origen ${d.origen}, destino ${d.destino}`);
   await p.close();
-  p = await abrir("?qr=N99"); // QR que no existe
+  p = await abrir("?qr=N998"); // QR que no existe
   d = await dbg(p);
   ok(d.origen === "N07" && p.errs.length === 0, "D4 un QR desconocido no rompe nada", d.origen);
   await p.close();
@@ -104,21 +145,21 @@ const entre = (a, b, t, lado = 0) => { // punto a la fracción t del pasillo a�
   // ---- E. GPS simulado ----
   p = await abrir();
   await elegir(p, "selectOrigen", "N01"); await elegir(p, "selectDestino", "N07");
-  await p.setGeolocation({ ...aLatLon(entre("N60", "N61", 0.5, 5).x, entre("N60", "N61", 0.5, 5).z), accuracy: 6 });
+  await p.setGeolocation({ ...aLatLon(entre(EA, EB, 0.5, 5).x, entre(EA, EB, 0.5, 5).z), accuracy: 6 });
   await clic(p, "btnToggleGps"); await espera(900);
   d = await dbg(p);
-  const medio = entre("N60", "N61", 0.5);
-  ok(d.punto && [d.punto.a, d.punto.b].sort().join() === "N60,N61", "E1 el GPS te coloca sobre el pasillo más cercano (N60–N61)", JSON.stringify(d.punto && [d.punto.a, d.punto.b]));
+  const medio = entre(EA, EB, 0.5);
+  ok(d.punto && [d.punto.a, d.punto.b].sort().join() === [EA, EB].sort().join(), `E1 el GPS te coloca sobre el pasillo más cercano (${EA}–${EB})`, JSON.stringify(d.punto && [d.punto.a, d.punto.b]));
   ok(Math.hypot(d.x - medio.x, d.z - medio.z) < 1, "E2 a 5 m del pasillo, quedas pegado al pasillo", `${Math.hypot(d.x - medio.x, d.z - medio.z).toFixed(1)} m`);
-  ok(d.ruta.join(">") === "📍>N61>N07", "E3 la ruta sigue desde ahí", d.ruta.join(">"));
+  ok(d.ruta.join(">") === ["📍", ...RUTA.slice(kE + 1)].join(">"), "E3 la ruta sigue desde ahí", d.ruta.join(">"));
 
-  // avanzar con puro GPS: 30 m adelante sobre N61→N07
-  const adelante = entre("N61", "N07", 30 / Math.hypot(N.N07.x - N.N61.x, N.N07.z - N.N61.z), -4);
+  // avanzar con puro GPS: 30 m adelante sobre la ruta
+  const adelante = sobreRuta(RUTA, metrosE + 30, -4);
   for (let i = 0; i < 8; i++) { await gps(p, { x: adelante.x + (i % 2 ? 0.4 : -0.4), z: adelante.z }); await espera(500); } // ~1 lectura por segundo
   await espera(2500);
   d = await dbg(p);
   const dReal = Math.hypot(d.x - adelante.x, d.z - adelante.z);
-  ok(d.ruta[d.indice] === "N61" && dReal < 9, "E4 al moverse el GPS, la app avanza sobre la ruta (dentro del margen del GPS)", `quedó a ${dReal.toFixed(1)} m de la lectura`);
+  ok(Math.abs(RUTA.indexOf(d.ruta[d.indice]) - adelante.k) <= 1 && dReal < 9, "E4 al moverse el GPS, la app avanza sobre la ruta (dentro del margen del GPS)", `quedó a ${dReal.toFixed(1)} m de la lectura, en el tramo de ${d.ruta[d.indice]} (esperado ${RUTA[adelante.k]})`);
 
   // temblor del GPS (±2 m) estando quieto: no debe mover al usuario
   await espera(2500); antes = await dbg(p);

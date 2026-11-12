@@ -68,7 +68,9 @@
   })();
   function crearLugarNuevo(nombre, categoria, lat, lon, acc) {
     const lista = leerLugaresNuevos();
-    let num = 1;
+    // N01–N44 son del mapa base: los lugares dados de alta en campo empiezan en N45.
+    // (Si empezara en 1, reutilizaría el número de un lugar borrado en el editor, p. ej. N16.)
+    let num = 45;
     const usados = new Set(datos.nodes.map((x) => x.id).concat(lista.map((x) => x.id)));
     while (usados.has("N" + String(num).padStart(2, "0"))) num++;
     const id = "N" + String(num).padStart(2, "0");
@@ -82,6 +84,31 @@
   // 1. GRAFO DE LOS 20 NODOS CAMINABLES DEL CAMPUS IBERO (DIJKSTRA)
   // ============================================================================
   const nodosPorId = new Map(datos.nodes.map((n) => [n.id, n]));
+
+  // "Cruce" = punto de paso trazado en el editor de caminos (app/editor.html). Sirve para que la ruta
+  // siga el camino real, pero NO es un lugar: no sale como destino, ni como QR, ni lo anuncia Iñaki.
+  // También cuenta como cruce el punto que conserva su nombre automático ("Cruce 113") con otro tipo.
+  const esCruce = (n) => !!n && (/^cruce$/i.test(n.category || "") || /^Cruce \d+$/.test(n.name || ""));
+  const lugares = () => datos.nodes.filter((n) => !esCruce(n));
+  // Un cruce no le dice nada a quien camina: en las indicaciones se nombra el siguiente lugar de la ruta.
+  function nombreHacia(nodo) {
+    if (!esCruce(nodo)) return nodo.name;
+    const ruta = estado.ruta || [];
+    const i = ruta.findIndex((n) => n.id === nodo.id);
+    if (i >= 0) for (let k = i + 1; k < ruta.length; k++) if (!esCruce(ruta[k])) return ruta[k].name;
+    return ruta.length ? ruta[ruta.length - 1].name : "tu destino";
+  }
+  const etiquetaNodo = (n, inicial) => esCruce(n) ? `${inicial ? "Camino" : "el camino"} a ${nombreHacia(n)}` : `${n.id} · ${n.name}`;
+  // El selector de origen sólo lista lugares; si quedas parado en un cruce se muestra una opción temporal.
+  function fijarSelectOrigen(id) {
+    let o = selectOrigen.querySelector("option[data-cruce]");
+    if (esCruce(nodosPorId.get(id))) {
+      if (!o) { o = document.createElement("option"); o.dataset.cruce = "1"; selectOrigen.insertBefore(o, selectOrigen.firstChild); }
+      o.value = id;
+      o.textContent = "📍 Donde estás (sobre el camino)";
+    } else if (o) o.remove();
+    selectOrigen.value = id;
+  }
   const adyacencia = new Map();
 
   function distanciaMetros(a, b) {
@@ -113,12 +140,14 @@
   try { localStorage.removeItem("argos_pines_v1"); } catch (_) {}
   // 2026-11-11: Puerta 3, Escultura de Lobos y Salón C se recolocaron con los puntos reales de la ruta.
   // Un pin viejo guardado en el celular los regresaría a su lugar anterior: se borra UNA sola vez.
+  // 2026-11-12: lo mismo con los puntos que Andrick recolocó en el editor de caminos (app/editor.html).
   try {
-    if (localStorage.getItem("argos_limpieza_pines") !== "2026-11-11") {
+    if (localStorage.getItem("argos_limpieza_pines") !== "2026-11-12") {
       const guardados = JSON.parse(localStorage.getItem(CLAVE_PINES) || "{}") || {};
-      ["N01", "N03", "N07"].forEach((id) => { delete guardados[id]; });
+      ["N01", "N02", "N03", "N04", "N05", "N07", "N11", "N12", "N13", "N14", "N15", "N20", "N29", "N30", "N31", "N37", "N38", "N40"]
+        .forEach((id) => { delete guardados[id]; });
       localStorage.setItem(CLAVE_PINES, JSON.stringify(guardados));
-      localStorage.setItem("argos_limpieza_pines", "2026-11-11");
+      localStorage.setItem("argos_limpieza_pines", "2026-11-12");
     }
   } catch (_) {}
   function leerPines() {
@@ -788,34 +817,34 @@
     if (absDesfase > 135) {
       if (arSignTurnIcon) arSignTurnIcon.textContent = "🔄";
       if (arSignTitle) arSignTitle.textContent = `Da media vuelta (${absDesfase}°)`;
-      if (arSignDist) arSignDist.textContent = `El nodo ${siguiente.id} (${siguiente.name}) está detrás de ti a ${mTramo} m`;
-      hudInstruction.textContent = `🔄 Da media vuelta hacia ${siguiente.name}`;
+      if (arSignDist) arSignDist.textContent = `${esCruce(siguiente) ? etiquetaNodo(siguiente, true) : `El nodo ${siguiente.id} (${siguiente.name})`} está detrás de ti a ${mTramo} m`;
+      hudInstruction.textContent = `🔄 Da media vuelta hacia ${nombreHacia(siguiente)}`;
     } else if (desfase < -18) {
       if (arSignTurnIcon) arSignTurnIcon.textContent = "➡️";
       if (arSignTitle) arSignTitle.textContent = `Gira a la derecha (${absDesfase}°)`;
-      if (arSignDist) arSignDist.textContent = `Apunta hacia ${siguiente.id} · ${siguiente.name} (${mTramo} m)`;
-      hudInstruction.textContent = `➡️ Gira a la derecha (${absDesfase}°) hacia ${siguiente.name}`;
+      if (arSignDist) arSignDist.textContent = `Apunta hacia ${etiquetaNodo(siguiente)} (${mTramo} m)`;
+      hudInstruction.textContent = `➡️ Gira a la derecha (${absDesfase}°) hacia ${nombreHacia(siguiente)}`;
     } else if (desfase > 18) {
       if (arSignTurnIcon) arSignTurnIcon.textContent = "⬅️";
       if (arSignTitle) arSignTitle.textContent = `Gira a la izquierda (${absDesfase}°)`;
-      if (arSignDist) arSignDist.textContent = `Apunta hacia ${siguiente.id} · ${siguiente.name} (${mTramo} m)`;
-      hudInstruction.textContent = `⬅️ Gira a la izquierda (${absDesfase}°) hacia ${siguiente.name}`;
+      if (arSignDist) arSignDist.textContent = `Apunta hacia ${etiquetaNodo(siguiente)} (${mTramo} m)`;
+      hudInstruction.textContent = `⬅️ Gira a la izquierda (${absDesfase}°) hacia ${nombreHacia(siguiente)}`;
     } else {
       // El usuario ya está alineado mirando al nodo quieto frente a él
       if (proximoGiro && distRestanteTramo <= 8) {
         if (arSignTurnIcon) arSignTurnIcon.textContent = proximoGiro.icono;
         if (arSignTitle) arSignTitle.textContent = `En ${mTramo} m: ${proximoGiro.textoCorto}`;
-        if (arSignDist) arSignDist.textContent = `Al llegar a ${siguiente.name}, dobla hacia ${proximoGiro.nodoSiguiente.name}`;
-        hudInstruction.textContent = `${proximoGiro.textoCorto} en ${siguiente.name}`;
+        if (arSignDist) arSignDist.textContent = `${esCruce(siguiente) ? "En el cruce" : `Al llegar a ${siguiente.name}`}, dobla hacia ${nombreHacia(proximoGiro.nodoSiguiente)}`;
+        hudInstruction.textContent = `${proximoGiro.textoCorto} en ${esCruce(siguiente) ? "el cruce" : siguiente.name}`;
       } else {
         if (arSignTurnIcon) arSignTurnIcon.textContent = "⬆️";
-        if (arSignTitle) arSignTitle.textContent = `Camina de frente hacia ${siguiente.name}`;
+        if (arSignTitle) arSignTitle.textContent = `Camina de frente hacia ${nombreHacia(siguiente)}`;
         if (arSignDist) {
           arSignDist.textContent = proximoGiro
-            ? `${mTramo} m de frente · En ${siguiente.id}: ${proximoGiro.textoCorto}`
+            ? `${mTramo} m de frente · ${esCruce(siguiente) ? "En el cruce" : "En " + siguiente.id}: ${proximoGiro.textoCorto}`
             : `${mTramo} m de frente (${cardinal}) · El nodo está fijo frente a ti`;
         }
-        hudInstruction.textContent = `⬆️ Camina ${mTramo} m de frente hacia ${siguiente.name}`;
+        hudInstruction.textContent = `⬆️ Camina ${mTramo} m de frente hacia ${nombreHacia(siguiente)}`;
       }
     }
 
@@ -862,7 +891,7 @@
     const tramo = obtenerTramoActivo();
     const giro = obtenerGiroEnSiguienteNodo();
     const destino = estado.ruta[estado.ruta.length - 1];
-    const cerca = datos.nodes
+    const cerca = lugares()
       .map((n) => ({ n, d: Math.hypot(n.x - estado.usuarioX, n.z - estado.usuarioZ) }))
       .filter((c) => c.d <= 40)
       .sort((a, b) => a.d - b.d)
@@ -872,7 +901,7 @@
       origen: estado.ruta[0] ? estado.ruta[0].name : null,
       destino: destino ? destino.name : null,
       nodoActual: tramo.actual.name,
-      siguienteNodo: tramo.siguiente.name,
+      siguienteNodo: nombreHacia(tramo.siguiente),
       metrosAlSiguiente: Math.round(tramo.distRestanteTramo),
       metrosAlDestino: Math.round(calcularDistanciaTotalRestante()),
       giroEnSiguienteNodo: giro ? giro.textoCorto.replace(/[^\p{L}\p{N} ()°]/gu, "").trim() : "ninguno",
@@ -973,8 +1002,14 @@
     if (estado.indiceActual !== inaki.indice) {
       inaki.indice = estado.indiceActual;
       const giro = obtenerGiroEnSiguienteNodo();
+      const donde = esCruce(tramo.siguiente) ? "en el cruce" : `al llegar a ${tramo.siguiente.name}`;
+      if (esCruce(tramo.actual)) {
+        // En un cruce Iñaki sólo habla si viene una vuelta (si no, hablaría cada pocos metros)
+        if (giro) decirInaki("nodo", `En ${Math.round(tramo.distRestanteTramo)} m, ${donde}: ${giro.textoCorto}.`);
+        return;
+      }
       decirInaki("nodo", giro
-        ? `Pasamos ${tramo.actual.name}. En ${Math.round(tramo.distRestanteTramo)} m, al llegar a ${tramo.siguiente.name}: ${giro.textoCorto}.`
+        ? `Pasamos ${tramo.actual.name}. En ${Math.round(tramo.distRestanteTramo)} m, ${donde}: ${giro.textoCorto}.`
         : `Pasamos ${tramo.actual.name}. Faltan ${Math.round(restante)} m para ${destino.name}.`);
       return;
     }
@@ -1092,8 +1127,8 @@
         arTurnHint.hidden = false;
         arTurnHintText.textContent =
           estado.desfaseMiradaGrados < 0
-            ? `➡️ Gira a la derecha (${absD}°) hacia ${tramoVista.siguiente.name}`
-            : `⬅️ Gira a la izquierda (${absD}°) hacia ${tramoVista.siguiente.name}`;
+            ? `➡️ Gira a la derecha (${absD}°) hacia ${nombreHacia(tramoVista.siguiente)}`
+            : `⬅️ Gira a la izquierda (${absD}°) hacia ${nombreHacia(tramoVista.siguiente)}`;
       } else {
         arTurnHint.hidden = true;
       }
@@ -1220,7 +1255,7 @@
       arCtx.strokeStyle = "#ffffff";
       arCtx.stroke();
 
-      const textoPin = `${siguiente.id} · ${siguiente.name} (${Math.round(distRestanteTramo)} m)`;
+      const textoPin = `${etiquetaNodo(siguiente, true)} (${Math.round(distRestanteTramo)} m)`;
       arCtx.font = "800 12px Inter, -apple-system, sans-serif";
       const tw = arCtx.measureText(textoPin).width;
       const bx = limitar(pPinAlto.sx - tw / 2 - 10, 6, w - tw - 26);
@@ -1249,7 +1284,7 @@
       const etiquetaGiro = haciaDerecha
         ? `Gira a la derecha (${absGrados}°) ➡️`
         : `⬅️ Gira a la izquierda (${absGrados}°)`;
-      const subEtiqueta = `${siguiente.id} · ${siguiente.name} (${Math.round(distRestanteTramo)} m)`;
+      const subEtiqueta = `${etiquetaNodo(siguiente, true)} (${Math.round(distRestanteTramo)} m)`;
 
       arCtx.font = "800 14px Inter, -apple-system, sans-serif";
       const w1 = arCtx.measureText(etiquetaGiro).width;
@@ -1434,7 +1469,8 @@
       const esDestino = nodo.id === estado.destinoId;
       const enRuta = idsEnRuta.has(nodo.id);
 
-      let radio = 7;
+      const cruce = esCruce(nodo) && !esOrigen && !esDestino;
+      let radio = cruce ? 2.5 : 7;
       let fill = "#ffffff";
       let stroke = "#94a3b8";
 
@@ -1447,7 +1483,7 @@
         fill = "#34c759";
         stroke = "#ffffff";
       } else if (enRuta) {
-        radio = 8;
+        radio = cruce ? 4 : 8;
         fill = "#0071e3";
         stroke = "#ffffff";
       }
@@ -1460,7 +1496,7 @@
       ctx.strokeStyle = stroke;
       ctx.stroke();
 
-      if (estado.mostrarEtiquetas || enRuta) {
+      if ((estado.mostrarEtiquetas || enRuta) && !cruce) {
         const texto = `${nodo.id} · ${nodo.name}`;
         ctx.font = enRuta ? "700 12px Inter, sans-serif" : "600 11px Inter, sans-serif";
         const tw = ctx.measureText(texto).width;
@@ -1568,7 +1604,7 @@
       miniCtx.stroke();
     }
 
-    datos.nodes.forEach((n) => {
+    lugares().forEach((n) => {
       const p = aMini(n.x, n.z);
       if (p.mx < -10 || p.mx > w + 10 || p.my < -10 || p.my > h + 10) return;
       miniCtx.beginPath();
@@ -1626,7 +1662,7 @@
 
     let mejorNodo = null;
     let mejorDist = 26;
-    datos.nodes.forEach((nodo) => {
+    lugares().forEach((nodo) => {
       const { cx, cy } = mundoACanvas(nodo.x, nodo.z);
       const d = Math.hypot(cx - clickX, cy - clickY);
       if (d < mejorDist) {
@@ -1674,7 +1710,7 @@
     const minutos = Math.max(0.2, distTotalRestante / 80).toFixed(1);
 
     const nodoDestinoFinal = nodosPorId.get(estado.destinoId);
-    hudStepBadge.textContent = `${actual.id} ${actual.name} ➔ ${nodoDestinoFinal ? nodoDestinoFinal.name : estado.destinoId}`;
+    hudStepBadge.textContent = `${esCruce(actual) ? "En camino" : actual.id + " " + actual.name} ➔ ${nodoDestinoFinal ? nodoDestinoFinal.name : estado.destinoId}`;
 
     if (actual.id === siguiente.id || distTotalRestante < 0.8) {
       hudInstruction.textContent = `🎉 ¡Llegaste a ${actual.name}!`;
@@ -1694,15 +1730,25 @@
     kpiDistanceMeters.textContent = `${Math.round(estado.distanciaTotal)} m totales`;
 
     stepsList.innerHTML = "";
+    let metrosAcumulados = 0;
     estado.ruta.forEach((nodo, idx) => {
+      if (idx > 0) metrosAcumulados += distanciaMetros(estado.ruta[idx - 1], nodo);
+      if (esCruce(nodo) && idx > 0 && idx < estado.ruta.length - 1 && idx !== estado.indiceActual) {
+        const vuelta = diferenciaAngularGrados(
+          calcularRumboGrados(nodo.x, nodo.z, estado.ruta[idx + 1].x, estado.ruta[idx + 1].z),
+          calcularRumboGrados(estado.ruta[idx - 1].x, estado.ruta[idx - 1].z, nodo.x, nodo.z));
+        if (Math.abs(vuelta) < 20) return;
+      }
+      const metrosDesdeAnterior = Math.round(metrosAcumulados);
+      metrosAcumulados = 0;
       const li = document.createElement("li");
       li.className = `itinerary-item ${idx === estado.indiceActual ? "is-current" : ""}`;
       let detalle = "📍 Origen";
       if (idx === estado.ruta.length - 1) {
-        const dFin = idx > 0 ? Math.round(distanciaMetros(estado.ruta[idx - 1], nodo)) : 0;
+        const dFin = idx > 0 ? metrosDesdeAnterior : 0;
         detalle = dFin > 0 ? `+${dFin} m · 🎯 Destino` : "🎯 Destino";
       } else if (idx > 0) {
-        const d = Math.round(distanciaMetros(estado.ruta[idx - 1], nodo));
+        const d = metrosDesdeAnterior;
         const rEnt = calcularRumboGrados(estado.ruta[idx - 1].x, estado.ruta[idx - 1].z, nodo.x, nodo.z);
         const rSal = calcularRumboGrados(nodo.x, nodo.z, estado.ruta[idx + 1].x, estado.ruta[idx + 1].z);
         const giro = diferenciaAngularGrados(rSal, rEnt);
@@ -1713,7 +1759,7 @@
       }
       if (nodo.escaleras) detalle += " · 🪜 Escaleras";
       li.innerHTML = `
-        <div><span class="itinerary-code">${nodo.id}</span><span>${nodo.name}</span></div>
+        <div><span class="itinerary-code">${esCruce(nodo) ? "↪" : nodo.id}</span><span>${esCruce(nodo) ? "Cruce del camino" : nodo.name}</span></div>
         <span>${detalle}</span>
       `;
       li.addEventListener("click", () => {
@@ -2054,7 +2100,7 @@
     detenerSimulacionCaminata();
     estado.puntoInicio = { x: p.x, z: p.z, a: p.a, b: p.b };
     estado.origenId = p.t < 0.5 ? p.a : p.b;
-    selectOrigen.value = estado.origenId;
+    fijarSelectOrigen(estado.origenId);
     recalcularRutaCompleta(true);
     return true;
   }
@@ -2080,7 +2126,7 @@
 
     if (!gpsUbicado) {
       gpsUbicado = ubicarConGPS(estado.gps);
-      if (gpsUbicado) locationModeBadge.textContent = `${precision} · junto a ${nodosPorId.get(estado.origenId).name}`;
+      if (gpsUbicado) locationModeBadge.textContent = `${precision} · ${esCruce(nodosPorId.get(estado.origenId)) ? "sobre el camino" : "junto a " + nodosPorId.get(estado.origenId).name}`;
       redibujar();
       return;
     }
@@ -2289,9 +2335,9 @@
     if (!nodosPorId.has(idNodo)) return;
     detenerSimulacionCaminata();
     estado.origenId = idNodo;
-    selectOrigen.value = idNodo;
+    fijarSelectOrigen(idNodo);
     const nodo = nodosPorId.get(idNodo);
-    locationModeBadge.textContent = `📍 ${fuente}: ${nodo.id} ${nodo.name}`;
+    locationModeBadge.textContent = `📍 ${fuente}: ${esCruce(nodo) ? "sobre el camino" : nodo.id + " " + nodo.name}`;
     if (estado.destinoId === idNodo) {
       // Estás parado en tu destino (p. ej. escaneaste su QR): llegaste. Antes aquí se cambiaba el destino solo.
       if (estado.navegando) detenerNavegacion("🏁 Llegaste a tu destino");
@@ -2341,7 +2387,7 @@
   // 10. SELECTORES, TARJETAS QR Y EVENTOS
   // ============================================================================
   function inicializarControles() {
-    datos.nodes.forEach((nodo) => {
+    lugares().forEach((nodo) => {
       const optO = document.createElement("option");
       optO.value = nodo.id;
       optO.textContent = `${nodo.id} — ${nodo.name}`;
@@ -2353,7 +2399,7 @@
       selectDestino.appendChild(optD);
     });
 
-    selectOrigen.value = estado.origenId;
+    fijarSelectOrigen(estado.origenId);
     selectDestino.value = estado.destinoId;
 
     selectOrigen.addEventListener("change", () => {
@@ -2363,7 +2409,7 @@
     selectDestino.addEventListener("change", () => {
       // El nuevo destino se calcula desde donde ESTÁS (ya caminaste o ya llegaste), no desde el origen viejo
       tomarPosicionActualComoInicio();
-      selectOrigen.value = estado.origenId;
+      fijarSelectOrigen(estado.origenId);
       estado.destinoId = selectDestino.value;
       guardarDestino();
       recalcularRutaCompleta(true);
@@ -2379,7 +2425,7 @@
       const temp = estado.origenId;
       estado.origenId = estado.destinoId;
       estado.destinoId = temp;
-      selectOrigen.value = estado.origenId;
+      fijarSelectOrigen(estado.origenId);
       selectDestino.value = estado.destinoId;
       guardarDestino();
       recalcularRutaCompleta();
@@ -2412,7 +2458,7 @@
         const [o, d] = btn.dataset.preset.split(",");
         estado.origenId = o;
         estado.destinoId = d;
-        selectOrigen.value = o;
+        fijarSelectOrigen(o);
         selectDestino.value = d;
         guardarDestino();
         recalcularRutaCompleta();
@@ -2448,7 +2494,7 @@
     });
 
     const chipsContainer = document.getElementById("simulatedQrChips");
-    datos.nodes.forEach((nodo) => {
+    lugares().forEach((nodo) => {
       const chip = document.createElement("button");
       chip.type = "button";
       chip.className = "preset-pill";
@@ -2574,7 +2620,7 @@
     }
 
     const qrGrid = document.getElementById("qrCardsGrid");
-    datos.nodes.forEach((nodo) => {
+    lugares().forEach((nodo) => {
       const card = document.createElement("div");
       card.className = "qr-card-item";
       const qrBox = document.createElement("div");
@@ -2624,7 +2670,7 @@
     const btnBorrar = document.getElementById("btnBorrarPines");
     const SEGUNDOS = 20;
 
-    datos.nodes.forEach((n) => {
+    lugares().forEach((n) => {
       const o = document.createElement("option");
       o.value = n.id;
       o.textContent = `${n.id} — ${n.name}`;
@@ -2678,7 +2724,7 @@
         li.textContent = `✅ ${n.id} ${n.name} · ±${p.acc} m · se movió ${Math.round(movidoMetros(n.id))} m`;
         lista.appendChild(li);
       });
-      btnEnviar.textContent = `📤 Enviar resultados (${cuantos}/${datos.nodes.length})`;
+      btnEnviar.textContent = `📤 Enviar resultados (${cuantos}/${lugares().length})`;
     }
 
     let idWatch = null;
@@ -2834,7 +2880,7 @@
     function textoCSV() {
       const pines = leerPines();
       const filas = ["nombre,lat,lon,tipo,id,precision_m,fuente"];
-      datos.nodes.forEach((n) => {
+      lugares().forEach((n) => {
         const p = pines[n.id];
         const o = posicionOriginal.get(n.id);
         const lat = p ? p.lat : o.lat;

@@ -73,7 +73,8 @@
     <script>
       (() => {
         const datos = window.ARGOS_CAMPUS_DATA;
-        const nodos = datos.nodos;
+        // Los cruces del editor de caminos son puntos de paso: no llevan QR
+        const nodos = datos.nodos.filter((n) => n.categoria !== "Cruce" && !/^Cruce d+$/.test(n.nombre));
         const params = new URLSearchParams(location.search);
         // Link que lleva cada QR. Se puede cambiar con ?base=... si la app se publica en otra dirección.
         const BASE = params.get("base") || "https://andrickraya.github.io/Argos150D/app/";

@@ -53,7 +53,7 @@ const espera = (ms) => new Promise((r) => setTimeout(r, ms));
     sd.value = "N45"; sd.dispatchEvent(new Event("change", { bubbles: true }));
     return [...document.querySelectorAll("li")].map((l) => l.innerText.replace(/\s+/g, " ").trim()).filter((x) => /^N\d\d/.test(x)).map((x) => x.slice(0, 3)).join(">");
   });
-  ok(/^N01>.*N09>N45$/.test(ruta), "6 ruta Puerta 3 → lugar nuevo termina en su nodo más cercano (Patio El Cubo)", ruta);
+  ok(/^N01>.*>N45$/.test(ruta), "6 hay ruta de Puerta 3 al lugar nuevo (queda unido a su punto más cercano)", ruta);
 
   // CSV que se comparte: se captura sobrescribiendo navigator.share
   const csv = await p.evaluate(async () => {

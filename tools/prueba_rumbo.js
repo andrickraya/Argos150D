@@ -1,5 +1,5 @@
 // Uso: node prueba.js <carpeta app>
-const http = require("http"), fs = require("fs"), path = require("path");
+const http = require("http"), fs = require("fs"), path = require("path"), vm = require("vm");
 const puppeteer = require("puppeteer-core");
 const dir = process.argv[2];
 const srv = http.createServer((q, r) => {
@@ -8,6 +8,30 @@ const srv = http.createServer((q, r) => {
 }).listen(0);
 let fallos = 0;
 const ok = (c, m, extra) => { if (!c) fallos++; console.log((c ? "OK   " : "FALLO") + " " + m + (extra ? "  → " + extra : "")); };
+
+// Rumbo real del primer tramo de N01→N07 según los datos (antes la prueba suponía 90°, "al Este")
+const w = {};
+vm.runInNewContext(fs.readFileSync(path.join(dir, "campus_data.js"), "utf8"), { window: w });
+const D = w.ARGOS_CAMPUS_DATA;
+const N = Object.fromEntries(D.nodos.map((n) => [n.id, n]));
+// Ruta más corta según los datos (el mismo cálculo que la app), para no fijar aquí los nodos de un mapa concreto
+function rutaDatos(desde, hasta) {
+  const ady = new Map(D.nodos.map((n) => [n.id, []]));
+  D.aristas.forEach(([a, b]) => { const m = Math.hypot(N[a].x - N[b].x, N[a].z - N[b].z); ady.get(a).push([b, m]); ady.get(b).push([a, m]); });
+  const dist = new Map([[desde, 0]]), prev = new Map(), vistos = new Set();
+  for (;;) {
+    let u = null;
+    dist.forEach((x, id) => { if (!vistos.has(id) && (u === null || x < dist.get(u))) u = id; });
+    if (u === null || u === hasta) break;
+    vistos.add(u);
+    ady.get(u).forEach(([v, m]) => { const nd = dist.get(u) + m; if (!dist.has(v) || nd < dist.get(v)) { dist.set(v, nd); prev.set(v, u); } });
+  }
+  const ids = [hasta];
+  while (prev.has(ids[0])) ids.unshift(prev.get(ids[0]));
+  return ids;
+}
+const R1 = rutaDatos("N01", "N07");
+const E = Math.round(((Math.atan2(N[R1[1]].x - N[R1[0]].x, N[R1[1]].z - N[R1[0]].z) * 180 / Math.PI) + 360) % 360);
 
 (async () => {
   const b = await puppeteer.launch({ executablePath: "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe", headless: "new",
@@ -65,16 +89,16 @@ const ok = (c, m, extra) => { if (!c) fallos++; console.log((c ? "OK   " : "FALL
   ok(p.errs.length === 0, "A6 sin errores JS", p.errs.join(" | "));
   await p.close();
 
-  // ---- B. iPhone: brújula automática. Tramo N01→N03 va al Este (≈90°) ----
+  // ---- B. iPhone: brújula automática. El primer tramo de N01→N07 va con rumbo E (calculado arriba) ----
   p = await nueva("N01", "N07");
-  await p.evaluate(() => window.__girar(["ios"], 0, 0, (r) => (r + 356) % 360)); t = await leer(p);
-  ok(/Gira (8[5-9]|9[0-6])° a la derecha/.test(t.rumbo), "B1 mirando al Norte: camino (Este) a la derecha, sin centrar", t.rumbo);
-  await p.evaluate(() => window.__girar(["ios"], 0, 90, (r) => (r + 356) % 360)); t = await leer(p);
-  ok(/De frente/.test(t.rumbo), "B2 girar al Este → de frente", t.rumbo);
+  await p.evaluate((E) => window.__girar(["ios"], E - 90, E - 90, (r) => (r + 356) % 360), E); t = await leer(p);
+  ok(/Gira (8[5-9]|9[0-6])° a la derecha/.test(t.rumbo), "B1 mirando 90° a la izquierda del camino: queda a la derecha, sin centrar", t.rumbo);
+  await p.evaluate((E) => window.__girar(["ios"], E - 90, E, (r) => (r + 356) % 360), E); t = await leer(p);
+  ok(/De frente/.test(t.rumbo), "B2 girar hacia el camino → de frente", t.rumbo);
   // Brújula mala (fierros: marca 40° de más). El usuario mira al Este de verdad y centra.
-  await p.evaluate(() => { for (let i = 0; i < 300; i++) window.__ev("ios", 90, 130); }); t = await leer(p);
+  await p.evaluate((E) => { for (let i = 0; i < 300; i++) window.__ev("ios", E, E + 40); }, E); t = await leer(p);
   ok(/Gira/.test(t.rumbo), "B3 brújula con error de 40° desvía las flechas (esperado antes de centrar)", t.rumbo);
-  await p.evaluate(() => window.__girar(["ios"], 90, 0, (r) => (r + 356) % 360)); t = await leer(p);
+  await p.evaluate((E) => window.__girar(["ios"], E, E - 90, (r) => (r + 356) % 360), E); t = await leer(p);
   const antes = t.rumbo;
   const oculto = await p.evaluate(() => getComputedStyle(document.getElementById("btnAlignArrows")).display === "none");
   ok(oculto, "B4 con brújula el botón Centrar flechas está oculto");
@@ -85,14 +109,14 @@ const ok = (c, m, extra) => { if (!c) fallos++; console.log((c ? "OK   " : "FALL
 
   // ---- C. Android con ambos eventos (rel + abs) y sólo abs ----
   p = await nueva("N01", "N07");
-  await p.evaluate(() => window.__girar(["rel", "abs"], 86, 86)); t = await leer(p);
-  ok(/De frente/.test(t.rumbo), "C1 Android mirando al Este → de frente", t.rumbo);
-  await p.evaluate(() => window.__girar(["rel", "abs"], 86, 176)); t = await leer(p);
+  await p.evaluate((E) => window.__girar(["rel", "abs"], E - 4, E - 4), E); t = await leer(p);
+  ok(/De frente/.test(t.rumbo), "C1 Android mirando hacia el camino → de frente", t.rumbo);
+  await p.evaluate((E) => window.__girar(["rel", "abs"], E - 4, E + 86), E); t = await leer(p);
   ok(/Gira (8[5-9]|9[0-6])° a la izquierda/.test(t.rumbo), "C2 rel+abs: giro 90° se cuenta UNA vez", t.rumbo);
   await p.close();
   p = await nueva("N01", "N07");
-  await p.evaluate(() => window.__girar(["abs"], 86, 86));
-  await p.evaluate(() => window.__girar(["abs"], 86, 176)); t = await leer(p);
+  await p.evaluate((E) => window.__girar(["abs"], E - 4, E - 4), E);
+  await p.evaluate((E) => window.__girar(["abs"], E - 4, E + 86), E); t = await leer(p);
   ok(/Gira (8[5-9]|9[0-6])° a la izquierda/.test(t.rumbo), "C3 sólo abs: giro 90°", t.rumbo);
   await p.evaluate(() => document.getElementById("btnAlignArrows").click()); t = await leer(p);
   ok(/Gira (8[5-9]|9[0-6])° a la izquierda/.test(t.rumbo), "C4 Android con brújula: el toque NO mueve las flechas", t.rumbo);

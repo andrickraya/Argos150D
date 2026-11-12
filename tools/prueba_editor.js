@@ -21,7 +21,8 @@ const espera = (ms) => new Promise((r) => setTimeout(r, ms));
   await p.setViewport({ width: 1400, height: 900 });
   const errs = []; p.on("pageerror", (e) => errs.push(e.message));
   let avisos = 0; p.on("dialog", (d) => { avisos++; d.type() === "prompt" ? d.accept("Cafetería Prueba") : d.accept(); });
-  await p.goto(`http://localhost:${srv.address().port}/editor.html`, { waitUntil: "load" });
+  // domcontentloaded: no esperar a que bajen las fotos satelitales (dependen de la red)
+  await p.goto(`http://localhost:${srv.address().port}/editor.html`, { waitUntil: "domcontentloaded" });
   await espera(600);
 
   const est = () => p.evaluate(() => window.ARGOS_EDITOR.estado());
@@ -42,6 +43,7 @@ const espera = (ms) => new Promise((r) => setTimeout(r, ms));
   await espera(500);
 
   // 2. Trazar: de la Explanada (N61) → dos cruces nuevos → El Cubo (N10)
+  const idsAntes = new Set((await datos()).nodos.map((n) => n.id)); // el mapa publicado ya puede traer cruces
   await modo("trazar");
   await clicNodo("N61");
   await clicEn(19.37108, -99.26355);
@@ -51,8 +53,9 @@ const espera = (ms) => new Promise((r) => setTimeout(r, ms));
   e = await est();
   ok(e.nodos === n0 + 2 && e.aristas === a0 + 3 && e.pendiente === null, "2 trazar un camino crea 2 cruces y 3 tramos", `${e.nodos} puntos, ${e.aristas} caminos`);
   let d = await datos();
-  const cruces = d.nodos.filter((n) => n.categoria === "Cruce").map((n) => n.id);
-  ok(cruces.length === 2 && cruces.every((id) => Number(id.slice(1)) >= 65), "3 los cruces nuevos usan ids desde N65", cruces.join(", "));
+  const cruces = d.nodos.filter((n) => !idsAntes.has(n.id)).map((n) => n.id);
+  ok(cruces.length === 2 && cruces.every((id) => Number(id.slice(1)) >= 65) && d.nodos.filter((n) => cruces.includes(n.id)).every((n) => n.categoria === "Cruce"),
+    "3 los cruces nuevos usan ids libres desde N65", cruces.join(", "));
 
   // 4. Ruta de prueba: ahora Explanada → El Cubo va directo por el camino nuevo
   await p.select("#rutaDe", "N61"); await p.select("#rutaA", "N10");
@@ -73,8 +76,19 @@ const espera = (ms) => new Promise((r) => setTimeout(r, ms));
   ok(e.nodos === n0 + 2 && e.aristas === a0 + 3, "6 deshacer quita el último cambio", `${e.nodos} puntos, ${e.aristas} caminos`);
 
   // 7. Lugar nuevo con nombre
+  // Se toca un hueco del mapa: el punto de la vista más alejado de todo punto y camino existente
+  d = await datos();
+  const porId = Object.fromEntries(d.nodos.map((n) => [n.id, n]));
+  const ocupados = d.nodos.map((n) => [n.lat, n.lon]);
+  d.aristas.forEach(([a, b]) => { for (let i = 1; i < 8; i++) ocupados.push([porId[a].lat + (porId[b].lat - porId[a].lat) * i / 8, porId[a].lon + (porId[b].lon - porId[a].lon) * i / 8]); });
+  let hueco = null, mejorHueco = -1;
+  for (let i = -8; i <= 8; i++) for (let j = -8; j <= 8; j++) {
+    const lat = 19.37115 + i * 0.00004, lon = -99.26345 + j * 0.00004;
+    const cerca = Math.min(...ocupados.map(([la, lo]) => Math.hypot(la - lat, lo - lon)));
+    if (cerca > mejorHueco) { mejorHueco = cerca; hueco = { lat, lon }; }
+  }
   await modo("lugar");
-  await clicEn(19.37128, -99.26375);
+  await clicEn(hueco.lat, hueco.lon);
   e = await est();
   d = await datos();
   const lugar = d.nodos.find((n) => n.nombre === "Cafetería Prueba");
@@ -98,18 +112,26 @@ const espera = (ms) => new Promise((r) => setTimeout(r, ms));
   // 10. Borrar un camino
   await p.keyboard.press("Escape");
   await modo("borrar");
-  const n62 = await nodo("N62"), n34 = await nodo("N34");
-  await clicEn((n62.lat + n34.lat) / 2, (n62.lon + n34.lon) / 2);
+  // Se borra el único camino de un punto del mapa publicado (el que tenga uno solo): debe quedar "sin camino"
+  d = await datos();
+  const grado = {};
+  d.aristas.forEach(([a, b]) => { grado[a] = (grado[a] || 0) + 1; grado[b] = (grado[b] || 0) + 1; });
+  const [hojaA, hojaB] = d.aristas.find(([a, b]) => [a, b].some((id) => grado[id] === 1 && idsAntes.has(id) && id !== "N64"));
+  const hoja = grado[hojaA] === 1 ? hojaA : hojaB;
+  const nA = await nodo(hojaA), nB = await nodo(hojaB);
+  await p.evaluate((la, lo) => window.ARGOS_EDITOR.mapa.setView([la, lo], 20.5, { animate: false }), (nA.lat + nB.lat) / 2, (nA.lon + nB.lon) / 2);
+  await espera(400);
+  await clicEn((nA.lat + nB.lat) / 2, (nA.lon + nB.lon) / 2);
   e = await est();
-  ok(e.aristas === a0 + 2 && e.cambios.caminosBorrados === 1, "10 borrar quita el camino tocado", JSON.stringify(e.cambios));
+  ok(e.aristas === a0 + 2 && e.cambios.caminosBorrados === 1, "10 borrar quita el camino tocado", `${hojaA}–${hojaB} ${JSON.stringify(e.cambios)}`);
   const aviso = await p.$eval("#avisos", (x) => x.textContent);
-  ok(/sin camino/.test(aviso) && /N62/.test(aviso), "11 avisa de los puntos que quedaron sin camino", aviso);
+  ok(/sin camino/.test(aviso) && aviso.includes(hoja), "11 avisa de los puntos que quedaron sin camino", aviso);
 
   if (captura) { await modo("mover"); await espera(1500); await p.screenshot({ path: captura }); }
 
   // 12. Lo guardado sobrevive a recargar la página
   const texto = await p.evaluate(() => window.ARGOS_EDITOR.texto());
-  await p.reload({ waitUntil: "load" }); await espera(500);
+  await p.reload({ waitUntil: "domcontentloaded" }); await espera(500);
   e = await est();
   ok(e.nodos === n0 + 3 && e.cambios.total > 0, "12 al recargar la página siguen tus cambios", JSON.stringify(e.cambios));
 
@@ -127,7 +149,7 @@ const espera = (ms) => new Promise((r) => setTimeout(r, ms));
   const w0 = {}; vm.runInNewContext(fs.readFileSync(path.join(dir, "campus_data.js"), "utf8"), { window: w0 });
   const n01b = w0.ARGOS_CAMPUS_DATA.nodos.find((n) => n.id === "N01");
   ok(n01a.x === n01b.x && n01a.z === n01b.z && n01a.desc === n01b.desc && D.poligonos.length === w0.ARGOS_CAMPUS_DATA.poligonos.length, "14 lo que no tocaste queda idéntico (N01, polígonos)");
-  ok(/no conectados/.test(salida) && /N62/.test(salida), "15 aplicar_mapa.js también avisa de puntos sin conexión");
+  ok(/no conectados/.test(salida) && salida.includes(hoja), "15 aplicar_mapa.js también avisa de puntos sin conexión");
   ok(errs.length === 0, "16 sin errores JS en el editor", errs.join(" | "));
 
   await b.close(); srv.close();

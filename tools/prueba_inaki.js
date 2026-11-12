@@ -56,9 +56,15 @@ const espera = (ms) => new Promise((r) => setTimeout(r, ms));
   ok(t.includes("🐺"), "A1 el lobo se dibuja sobre el camino");
   ok(/Soy Iñaki/.test(t) && /Cafetería El Cubo/.test(t), "A2 saluda y dice el destino", t.replace(/🐺/g, "").replace(/\s+/g, " ").slice(0, 110));
   await ruta(p, "N01", "N07"); await espera(1500);
-  await p.evaluate(() => document.getElementById("btnNextNode").click()); await espera(1600);
-  t = await dibujado(p);
-  ok(/Pasamos Escultura de Lobos/.test(t) && /Gira/.test(t), "A3 al pasar un nodo avisa el giro que sigue", t.replace(/🐺/g, "").replace(/\s+/g, " ").slice(0, 140));
+  // Entre Puerta 3 y la Escultura de Lobos hay cruces del editor de caminos: Iñaki no los nombra
+  let nombroCruce = false;
+  for (let i = 0; i < 20; i++) {
+    await p.evaluate(() => document.getElementById("btnNextNode").click()); await espera(1300);
+    t = await dibujado(p);
+    if (/Pasamos Cruce/.test(t)) nombroCruce = true;
+    if (/Pasamos Escultura de Lobos/.test(t)) break;
+  }
+  ok(/Pasamos Escultura de Lobos/.test(t) && /Gira|Faltan/.test(t) && !nombroCruce, "A3 al pasar un lugar lo dice (y no nombra los cruces)", t.replace(/🐺/g, "").replace(/\s+/g, " ").slice(0, 140));
   ok(p.errs.length === 0, "A4 sin errores JS", p.errs.join(" | "));
   await p.close();
 
@@ -97,9 +103,11 @@ const espera = (ms) => new Promise((r) => setTimeout(r, ms));
   await p.evaluate(() => document.getElementById("btnVozInaki").click()); await espera(200);
   voz = await p.evaluate(() => window.__voz.slice());
   ok(voz.length === 1 && /^es-MX\|.*Soy Iñaki/.test(voz[0]), "E2 al encender dice la frase actual en es-MX", voz[0]);
-  await p.evaluate(() => document.getElementById("btnNextNode").click()); await espera(1600);
-  voz = await p.evaluate(() => window.__voz.slice());
-  ok(voz.length === 2 && /Gira a la (derecha|izquierda)/.test(voz[1]) && !/[\u{1F300}-\u{1FAFF}\u{2190}-\u{21FF}\u{2B00}-\u{2BFF}]/u.test(voz[1]), "E3 al pasar un nodo dice el giro, sin emojis ni flechas", voz[1]);
+  for (let i = 0; i < 34 && voz.length < 2; i++) { // avanza hasta la primera frase nueva (en un cruce sin vuelta no dice nada)
+    await p.evaluate(() => document.getElementById("btnNextNode").click()); await espera(1300);
+    voz = await p.evaluate(() => window.__voz.slice());
+  }
+  ok(voz.length === 2 && /Gira a la (derecha|izquierda)|Pasamos/.test(voz[1]) && !/[\u{1F300}-\u{1FAFF}\u{2190}-\u{21FF}\u{2B00}-\u{2BFF}]/u.test(voz[1]), "E3 al avanzar dice la siguiente indicación, sin emojis ni flechas", voz[1]);
   ok(p.errs.length === 0, "E4 sin errores JS", p.errs.join(" | "));
 
   await b.close(); srv.close(); ollama.close();
