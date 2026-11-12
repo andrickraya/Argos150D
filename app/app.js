@@ -240,6 +240,24 @@
     };
   }
 
+  // Metros por los caminos desde un nodo a TODOS los demás (los que no tienen camino no aparecen).
+  // Sirve para decidir a qué punto de la red conviene ir cuando el usuario anda fuera de los caminos trazados.
+  function distanciasDesde(origenId) {
+    const dist = new Map([[origenId, 0]]);
+    const vistos = new Set();
+    for (;;) {
+      let actual = null, mejor = Infinity;
+      dist.forEach((d, id) => { if (!vistos.has(id) && d < mejor) { mejor = d; actual = id; } });
+      if (actual === null) break;
+      vistos.add(actual);
+      for (const arista of adyacencia.get(actual) || []) {
+        const nuevo = mejor + arista.Peso;
+        if (!dist.has(arista.Vecino) || nuevo < dist.get(arista.Vecino)) dist.set(arista.Vecino, nuevo);
+      }
+    }
+    return dist;
+  }
+
   function calcularRumboGrados(ax, az, bx, bz) {
     const dx = bx - ax;
     const dz = bz - az;
@@ -985,6 +1003,15 @@
     const restante = calcularDistanciaTotalRestante();
     const tramo = obtenerTramoActivo();
 
+    if (inaki.recalculo) {
+      // La ruta cambió porque tomaste otro camino (GPS): no es un saludo nuevo
+      inaki.recalculo = false;
+      inaki.claveRuta = clave;
+      inaki.indice = estado.indiceActual;
+      inaki.llego = false;
+      decirInaki("recalculo", `Cambiaste de camino, no pasa nada. Por aquí también llegamos a ${destino.name}: faltan ${Math.round(restante)} m.`);
+      return;
+    }
     if (clave !== inaki.claveRuta) {
       inaki.claveRuta = clave;
       inaki.indice = estado.indiceActual;
@@ -1013,6 +1040,8 @@
         : `Pasamos ${tramo.actual.name}. Faltan ${Math.round(restante)} m para ${destino.name}.`);
       return;
     }
+    // Un restaurante cercano no interrumpe lo que Iñaki acaba de decir (saludo, vuelta): espera 6 s
+    if (performance.now() - inaki.textoMs < 6000) return;
     const comida = datos.nodes.find((n) =>
       /cafeter|restaur|comida/i.test(n.category || "") && n.id !== destino.id && !inaki.avisados.has(n.id) &&
       Math.hypot(n.x - estado.usuarioX, n.z - estado.usuarioZ) <= 25);
@@ -1086,7 +1115,7 @@
     x: estado.usuarioX, z: estado.usuarioZ, cola: colaAvanceMetros, pasos: estado.pasosDetectados,
     origen: estado.origenId, destino: estado.destinoId, indice: estado.indiceActual, progreso: estado.progresoTramo,
     ruta: estado.ruta.map((n) => n.id), total: estado.distanciaTotal, arco: estado.ruta.length > 1 ? arcoActual() : 0,
-    punto: estado.puntoInicio, gps: estado.gps, navegando: estado.navegando
+    punto: estado.puntoInicio, gps: estado.gps, navegando: estado.navegando, gpsActivo: estado.gpsActivo, ajuste: ajuste.objetivoId
   });
   let ultimoCuadroMs = 0;
   function renderizarBucleAR(tiempoMs) {
@@ -1276,6 +1305,9 @@
       arCtx.textAlign = "center";
       arCtx.fillText(textoPin, bx + (tw + 20) / 2, by + 16);
     }
+
+    // 3b. Ajuste fino: el punto del camino que se está moviendo, en amarillo
+    if (ajuste.activo) dibujarObjetivoAjuste(P);
 
     // 4. Indicador lateral grande cuando el nodo quieto queda a tu derecha o izquierda
     if (!enDestino && (!pinDentroDePantalla || Math.abs(estado.desfaseMiradaGrados) > 22)) {
@@ -1807,6 +1839,7 @@
   function iniciarSimulacionCaminata() {
     if (estado.caminandoSim) return;
     if (estado.navegando) detenerNavegacion();
+    if (estado.gpsActivo) apagarGPS(); // la demo es simulada: el GPS real la regresaría a donde estás
     reiniciarSiYaLlego();
     fijarEstadoMenu(true);
     estado.caminandoSim = true;
@@ -1848,6 +1881,8 @@
     btnWalkSim.classList.add("is-walking");
     btnWalkSimText.textContent = "⏸️ Pausar";
     locationModeBadge.textContent = "👣 Camina con el celular al frente";
+    // El GPS se enciende solo: corrige el avance y recalcula la ruta si tomas otro camino (como Google Maps).
+    if (GPS_AUTOMATICO && !gpsNegado) encenderGPS(false);
   }
 
   function detenerNavegacion(mensaje) {
@@ -2069,9 +2104,18 @@
   //   3. Si te sales de la ruta (4 lecturas seguidas lejos), vuelve a ubicarte y recalcula.
   // Los QR siguen mandando: escanear uno te coloca exacto en ese nodo.
   const GPS_PRECISION_MAX = 35;   // lecturas peores que ±35 m se ignoran
+  // Desvío: si el GPS te pone a más de estos metros de la ruta (o 2 veces su precisión) durante 3 lecturas
+  // seguidas, tomaste otro camino → la ruta se recalcula desde donde estás. Ajustable en campo: ?desvio=15
+  // (más chico = recalcula antes; más grande = aguanta más el error del GPS entre edificios).
+  const DESVIO_METROS = limitar(Number(parametrosURL.get("desvio")) || 12, 6, 40);
+  const GPS_AUTOMATICO = parametrosURL.get("gps") !== "0"; // "Caminar" enciende el GPS (con ?gps=0 no)
+  const RADIO_ATAJO = 45;         // fuera de los caminos: sólo se te manda directo a puntos a menos de 45 m
+  const COSTO_FUERA_DE_CAMINO = 1.4; // un metro sin camino trazado cuenta 1.4 (no cortar por un rodeo mínimo)
   estado.gps = null;              // última lectura { x, z, acc, ms }
   let gpsUbicado = false;
   let gpsFueraDeRuta = 0;
+  let gpsFueraDesdeMs = 0;
+  let gpsNegado = false;          // el usuario negó la ubicación: no se le vuelve a pedir sola
 
   // Punto de la ruta activa más cercano a (px, pz). Prefiere los tramos cercanos a donde ya vas.
   function proyectarEnRuta(px, pz) {
@@ -2093,13 +2137,33 @@
   function ubicarConGPS(g) {
     const p = puntoMasCercanoEnGrafo(g.x, g.z);
     if (!p) return false;
-    if (p.d > Math.max(40, 2.5 * g.acc)) {
-      locationModeBadge.textContent = `🛰️ Estás a ${Math.round(p.d)} m de los caminos: usa QR`;
-      return false;
+    let punto, origen;
+    if (p.d <= Math.max(6, g.acc)) {
+      // Estás sobre un camino trazado (dentro del error del GPS): quedas pegado a él
+      punto = { x: p.x, z: p.z, a: p.a, b: p.b };
+      origen = p.t < 0.5 ? p.a : p.b;
+    } else {
+      // Vas por donde no hay camino trazado (un atajo por la explanada, un jardín…): la ruta sale de donde
+      // estás, en línea recta al punto de la red desde el que llegas antes a tu destino.
+      const alDestino = distanciasDesde(estado.destinoId);
+      let mejor = null;
+      datos.nodes.forEach((n) => {
+        const resto = alDestino.get(n.id);
+        const d = Math.hypot(n.x - g.x, n.z - g.z);
+        if (resto === undefined || d > RADIO_ATAJO) return;
+        const costo = COSTO_FUERA_DE_CAMINO * d + resto;
+        if (!mejor || costo < mejor.costo) mejor = { id: n.id, costo };
+      });
+      if (!mejor) {
+        locationModeBadge.textContent = `🛰️ Estás a ${Math.round(p.d)} m de los caminos: usa QR`;
+        return false;
+      }
+      punto = { x: g.x, z: g.z, a: mejor.id, b: mejor.id };
+      origen = mejor.id;
     }
     detenerSimulacionCaminata();
-    estado.puntoInicio = { x: p.x, z: p.z, a: p.a, b: p.b };
-    estado.origenId = p.t < 0.5 ? p.a : p.b;
+    estado.puntoInicio = punto;
+    estado.origenId = origen;
     fijarSelectOrigen(estado.origenId);
     recalcularRutaCompleta(true);
     return true;
@@ -2114,7 +2178,7 @@
     const redibujar = () => { dibujarMapa2D(); dibujarMinimapa(); };
     const b = datos.bounds;
     if (m.x < b.minX - 150 || m.x > b.maxX + 150 || m.z < b.minZ - 150 || m.z > b.maxZ + 150) {
-      locationModeBadge.textContent = "📍 Fuera de IBERO (usa QR)";
+      if (!estado.navegando) locationModeBadge.textContent = "📍 Fuera de IBERO (usa QR)";
       return;
     }
     if (acc > GPS_PRECISION_MAX) {
@@ -2123,6 +2187,8 @@
       return;
     }
     const precision = `🛰️ GPS ±${Math.round(acc)} m`;
+    // El estado rutinario del GPS no tapa un aviso importante (p. ej. "ruta recalculada") durante sus 6 s
+    const estadoGPS = (texto) => { if (performance.now() > avisoProtegidoHastaMs) locationModeBadge.textContent = texto; };
 
     if (!gpsUbicado) {
       gpsUbicado = ubicarConGPS(estado.gps);
@@ -2133,18 +2199,25 @@
 
     const ultimo = estado.ruta.length - 1;
     if (ultimo < 1 || estado.indiceActual >= ultimo) { // sin ruta o ya llegaste: nada que corregir
-      locationModeBadge.textContent = precision;
+      estadoGPS(precision);
       redibujar();
       return;
     }
 
     const pr = proyectarEnRuta(m.x, m.z);
-    if (pr.d > Math.max(30, 2.5 * acc)) {
+    if (pr.d > Math.max(DESVIO_METROS, 2 * acc)) {
+      const ahoraMs = performance.now();
+      if (gpsFueraDeRuta === 0) gpsFueraDesdeMs = ahoraMs;
       gpsFueraDeRuta += 1;
-      locationModeBadge.textContent = `${precision} · a ${Math.round(pr.d)} m de la ruta`;
-      if (gpsFueraDeRuta >= 4) {
+      estadoGPS(`${precision} · a ${Math.round(pr.d)} m de la ruta`);
+      // 3 lecturas seguidas y al menos 2 s: una sola lectura mala del GPS no cambia la ruta
+      if (gpsFueraDeRuta >= 3 && ahoraMs - gpsFueraDesdeMs >= 2000) {
         gpsFueraDeRuta = 0;
-        if (ubicarConGPS(estado.gps)) locationModeBadge.textContent = "🔄 Ruta recalculada con GPS";
+        if (ubicarConGPS(estado.gps)) {
+          inaki.recalculo = true;
+          avisarImportante("🔄 Tomaste otro camino: ruta recalculada");
+          if (navigator.vibrate) navigator.vibrate([80, 60, 80]);
+        }
       }
       redibujar();
       return;
@@ -2162,7 +2235,7 @@
     if (Math.hypot(m.x - destino.x, m.z - destino.z) < Math.max(5, acc * 0.6)) {
       colaAvanceMetros = Math.max(colaAvanceMetros, pr.total - arcoActual() + 0.2); // +0.2: que el redondeo no te deje a un pelo
     }
-    locationModeBadge.textContent = estado.navegando ? `${precision} · ${estado.pasosDetectados} pasos` : precision;
+    estadoGPS(estado.navegando ? `${precision} · ${estado.pasosDetectados} pasos` : precision);
     redibujar();
   }
 
@@ -2176,6 +2249,30 @@
     dibujarMinimapa();
   }
 
+  // aMano = true: lo encendió el usuario con el botón; false: se encendió solo al tocar "Caminar"
+  function encenderGPS(aMano) {
+    if (estado.gpsActivo || !("geolocation" in navigator)) return;
+    estado.gpsActivo = true;
+    gpsFueraDeRuta = 0;
+    // Si ya vas caminando una ruta, el GPS sólo la corrige; si no, primero te ubica.
+    gpsUbicado = estado.navegando || estado.indiceActual > 0 || estado.progresoTramo > 0.02;
+    btnToggleGps.textContent = "🛰️ GPS Activo (Apagar)";
+    estado.gpsWatchId = navigator.geolocation.watchPosition(
+      manejarLecturaGPS,
+      (err) => {
+        if (err && err.code === 1) {
+          // Sin permiso: se sigue con QR + pasos, y "Caminar" no vuelve a pedirlo solo
+          gpsNegado = true;
+          apagarGPS();
+          locationModeBadge.textContent = aMano ? "📍 Permite la ubicación en Ajustes" : "📍 Sin permiso de ubicación: sigues con QR + pasos";
+          return;
+        }
+        if ((aMano || !estado.navegando) && performance.now() > avisoProtegidoHastaMs) locationModeBadge.textContent = "📍 Sin señal GPS (usa QR)";
+      },
+      { enableHighAccuracy: true, maximumAge: 1000, timeout: 30000 }
+    );
+  }
+
   btnToggleGps.addEventListener("click", () => {
     if (!("geolocation" in navigator)) {
       alert("Tu navegador no soporta geolocalización GPS.");
@@ -2186,24 +2283,10 @@
       locationModeBadge.textContent = "📍 Modo: QR + Pasos";
       return;
     }
-
-    estado.gpsActivo = true;
-    gpsFueraDeRuta = 0;
-    // Si ya vas caminando una ruta, el GPS sólo la corrige; si no, primero te ubica.
-    gpsUbicado = estado.navegando || estado.indiceActual > 0 || estado.progresoTramo > 0.02;
-    btnToggleGps.textContent = "🛰️ GPS Activo (Apagar)";
+    gpsNegado = false;
     locationModeBadge.textContent = "🛰️ Buscando GPS...";
     fijarEstadoMenu(true);
-
-    estado.gpsWatchId = navigator.geolocation.watchPosition(
-      manejarLecturaGPS,
-      (err) => {
-        locationModeBadge.textContent = err && err.code === 1
-          ? "📍 Permite la ubicación en Ajustes"
-          : "📍 Sin señal GPS (usa QR)";
-      },
-      { enableHighAccuracy: true, maximumAge: 1000, timeout: 30000 }
-    );
+    encenderGPS(true);
   });
 
   // ============================================================================
@@ -2655,6 +2738,142 @@
   }
 
   // ============================================================================
+  // 10a. AJUSTE FINO EN CAMPO: mover medio metro a la izquierda/derecha el siguiente punto del camino
+  //      Para cuando las flechas quedan "cargadas" a un lado del andador real. Te paras en el centro del
+  //      andador, miras hacia adelante y mueves el punto amarillo hasta que quede en el centro.
+  //      Se guarda como pin en este celular (igual que los pines GPS) y viaja en "📤 Enviar resultados"
+  //      con fuente=ajuste; tools/aplicar_pines.js lo pasa a campus_data.js para todos los celulares.
+  // ============================================================================
+  const AJUSTE_PASO_METROS = 0.5;
+  const ajuste = { activo: false, objetivoId: null, pila: [] };
+
+  // Primer punto real de la ruta que queda al menos 3 m adelante (más cerca, medio metro sería un giro enorme)
+  function nodoPorAjustar() {
+    const desde = estado.indiceActual + 1;
+    const fijo = estado.ruta.findIndex((n, i) => i >= desde && n.id === ajuste.objetivoId);
+    if (fijo >= 0) return estado.ruta[fijo]; // mientras siga adelante, se sigue moviendo el mismo punto
+    for (let i = desde; i < estado.ruta.length; i++) {
+      const n = estado.ruta[i];
+      if (!n.virtual && Math.hypot(n.x - estado.usuarioX, n.z - estado.usuarioZ) >= 3) return n;
+    }
+    return null;
+  }
+
+  function dibujarObjetivoAjuste(P) {
+    const n = nodoPorAjustar();
+    ajuste.objetivoId = n ? n.id : null;
+    if (!n) return;
+    const th = (obtenerTramoActivo().rumboTramo * Math.PI) / 180;
+    const dE = n.x - estado.usuarioX, dN = n.z - estado.usuarioZ;
+    const x = dE * Math.cos(th) - dN * Math.sin(th), z = dE * Math.sin(th) + dN * Math.cos(th);
+    const base = P(x, 0, z), alto = P(x, 1.1, z);
+    if (!base || !alto) return;
+    const r = limitar(0.6 * base.escala, 8, 70);
+    arCtx.beginPath();
+    arCtx.ellipse(base.sx, base.sy, r, r * 0.35, 0, 0, Math.PI * 2);
+    arCtx.fillStyle = "rgba(251, 191, 36, 0.35)";
+    arCtx.fill();
+    arCtx.strokeStyle = "#fbbf24";
+    arCtx.lineWidth = 4;
+    arCtx.stroke();
+    arCtx.beginPath();
+    arCtx.moveTo(base.sx, base.sy);
+    arCtx.lineTo(alto.sx, alto.sy);
+    arCtx.stroke();
+    arCtx.beginPath();
+    arCtx.arc(alto.sx, alto.sy, limitar(0.16 * alto.escala, 6, 22), 0, Math.PI * 2);
+    arCtx.fillStyle = "#fbbf24";
+    arCtx.fill();
+  }
+
+  (function configurarAjusteFino() {
+    const btnAbrir = document.getElementById("btnAjustar");
+    if (!btnAbrir) return;
+    const barra = document.createElement("div");
+    barra.id = "arAjuste";
+    barra.style.cssText = "display:none;position:fixed;left:50%;bottom:138px;transform:translateX(-50%);z-index:30;" +
+      "flex-direction:column;align-items:center;gap:6px;width:min(94vw,360px);padding:8px 10px;border-radius:16px;" +
+      "background:rgba(15,23,42,0.92);border:2px solid #fbbf24;color:#fff;font-size:0.76rem;font-weight:700;text-align:center;";
+    const texto = document.createElement("div");
+    texto.id = "arAjusteTexto";
+    const fila = document.createElement("div");
+    fila.style.cssText = "display:flex;gap:5px;justify-content:center;";
+    const boton = (id, etiqueta, alHacerClic) => {
+      const b = document.createElement("button");
+      b.id = id;
+      b.type = "button";
+      b.textContent = etiqueta;
+      b.style.cssText = "padding:9px 10px;border-radius:12px;border:1px solid #fbbf24;background:#1e293b;color:#fff;font-size:0.8rem;font-weight:800;white-space:nowrap;";
+      b.addEventListener("click", alHacerClic);
+      fila.appendChild(b);
+      return b;
+    };
+    const movidoMetros = (n) => { const o = posicionOriginal.get(n.id); return o ? Math.hypot(n.x - o.x, n.z - o.z) : 0; };
+    const nombreCorto = (n) => (esCruce(n) ? `punto ${n.id}` : `${n.id} ${n.name}`);
+    function pintar(mensaje) {
+      const n = nodoPorAjustar();
+      texto.textContent = mensaje || (n
+        ? `🟡 Párate en el centro del andador y mueve el punto amarillo (${nombreCorto(n)}, a ${Math.round(Math.hypot(n.x - estado.usuarioX, n.z - estado.usuarioZ))} m) hasta que quede centrado.`
+        : "No hay un punto del camino adelante de ti (¿ya llegaste?).");
+    }
+    function refrescar() {
+      aplicarPines();
+      reconstruirGrafo();
+      // No se recalcula la ruta (eso te regresaría al inicio): la ruta usa los mismos nodos, ya movidos
+      sincronizarCoordenadasUsuarioConProgreso();
+      actualizarHUD();
+      dibujarMapa2D();
+      dibujarMinimapa();
+    }
+    function mover(metrosALaDerecha) {
+      const n = nodoPorAjustar();
+      if (!n) { pintar(); return; }
+      ajuste.objetivoId = n.id;
+      const dx = n.x - estado.usuarioX, dz = n.z - estado.usuarioZ;
+      const largo = Math.hypot(dx, dz);
+      // A la derecha de quien mira hacia el punto: (dz, -dx)
+      const ll = metrosALatLon(n.x + (dz / largo) * metrosALaDerecha, n.z - (dx / largo) * metrosALaDerecha);
+      const pines = leerPines();
+      ajuste.pila.push({ id: n.id, antes: pines[n.id] || null });
+      pines[n.id] = { lat: ll.lat, lon: ll.lon, acc: 0, n: 1, t: new Date().toISOString(), ajuste: true };
+      guardarPinesLocal(pines);
+      refrescar();
+      pintar(`🟡 ${nombreCorto(n)}: lleva ${movidoMetros(n).toFixed(1)} m movido respecto al mapa. Sigue hasta que quede centrado.`);
+    }
+    boton("btnAjIzq", "⬅️ 0.5 m", () => mover(-AJUSTE_PASO_METROS));
+    boton("btnAjDer", "0.5 m ➡️", () => mover(AJUSTE_PASO_METROS));
+    boton("btnAjDeshacer", "↩️", () => {
+      const ultimo = ajuste.pila.pop();
+      if (!ultimo) { pintar("No hay nada que deshacer."); return; }
+      const pines = leerPines();
+      if (ultimo.antes) pines[ultimo.id] = ultimo.antes; else delete pines[ultimo.id];
+      guardarPinesLocal(pines);
+      refrescar();
+      pintar(`↩️ Deshecho el último movimiento de ${ultimo.id}.`);
+    });
+    boton("btnAjListo", "✔ Listo", () => {
+      const cuantos = new Set(ajuste.pila.map((m) => m.id)).size;
+      ajuste.activo = false;
+      ajuste.objetivoId = null;
+      ajuste.pila = [];
+      barra.style.display = "none";
+      if (cuantos) avisarImportante(`✅ ${cuantos} punto(s) ajustado(s). Mándalos: 📍 Poner pines › 📤 Enviar`);
+    });
+    barra.appendChild(texto);
+    barra.appendChild(fila);
+    viewAR.appendChild(barra);
+
+    btnAbrir.addEventListener("click", () => {
+      ajuste.activo = true;
+      ajuste.objetivoId = null;
+      barra.style.display = "flex";
+      if (estado.modoVista !== "ar") tabAR.click();
+      fijarEstadoMenu(true);
+      pintar();
+    });
+  })();
+
+  // ============================================================================
   // 10b. PONER PINES CON GPS: corregir en campo la posición real de cada nodo
   //      Se promedian ~20 s de lecturas GPS (pesadas por precisión) y se guardan en el celular.
   //      "Enviar resultados" genera el CSV con el formato de proyecto/tools/lugares_propios.csv.
@@ -2721,7 +2940,9 @@
         cuantos++;
         const li = document.createElement("li");
         li.style.padding = "3px 0";
-        li.textContent = `✅ ${n.id} ${n.name} · ±${p.acc} m · se movió ${Math.round(movidoMetros(n.id))} m`;
+        li.textContent = p.ajuste
+          ? `↔️ ${n.id} ${n.name} · ajustado a mano · se movió ${movidoMetros(n.id).toFixed(1)} m`
+          : `✅ ${n.id} ${n.name} · ±${p.acc} m · se movió ${Math.round(movidoMetros(n.id))} m`;
         lista.appendChild(li);
       });
       btnEnviar.textContent = `📤 Enviar resultados (${cuantos}/${lugares().length})`;
@@ -2886,7 +3107,12 @@
         const lat = p ? p.lat : o.lat;
         const lon = p ? p.lon : o.lon;
         if (n.nuevo) { filas.push(`${n.name},${lat},${lon},${n.category},${n.id},${p ? p.acc : (n.acc || "")},nuevo`); return; }
-        filas.push(`${n.name},${lat},${lon},destino,${n.id},${p ? p.acc : ""},${p ? "gps" : "mapa"}`);
+        filas.push(`${n.name},${lat},${lon},destino,${n.id},${p && !p.ajuste ? p.acc : ""},${p ? (p.ajuste ? "ajuste" : "gps") : "mapa"}`);
+      });
+      // Puntos de paso del camino movidos con "↔️ Ajustar camino aquí"
+      datos.nodes.filter(esCruce).forEach((n) => {
+        const p = pines[n.id];
+        if (p) filas.push(`${n.name},${p.lat},${p.lon},cruce,${n.id},,ajuste`);
       });
       return filas.join("\n");
     }

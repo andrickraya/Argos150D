@@ -6,7 +6,8 @@
 //   node tools/aplicar_pines.js pines.csv --unity "<ruta>/Assets/campus/campus_pois.json" --csv "<ruta>/lugares_propios.csv"
 //   después:  node tools/build_app.js   (regenera index.html y ar.html)
 //
-// El CSV trae: nombre,lat,lon,tipo,id,precision_m,fuente. Solo se aplican las filas con fuente=gps.
+// El CSV trae: nombre,lat,lon,tipo,id,precision_m,fuente. Se aplican las filas con fuente=gps (pin GPS),
+// fuente=ajuste (punto movido a mano con "↔️ Ajustar camino aquí") y fuente=nuevo (lugar dado de alta en campo).
 // x/z se recalculan con la misma proyección que app.js (latLonAMetros) y osm_a_unity.py.
 // --unity y --csv dejan una copia .bak antes de escribir (esa carpeta no tiene git).
 const fs = require("fs");
@@ -38,13 +39,13 @@ leer(rutaPines).split(/\r?\n/).slice(1).forEach((linea, i) => {
   if (c.length < 7) { console.warn(`Línea ${i + 2} ignorada (columnas incompletas): ${linea}`); return; }
   const [lat, lon, tipo, id, prec, fuente] = c.slice(-6).map((s) => s.trim());
   const nombre = c.slice(0, -6).join(",").trim();
-  if (fuente !== "gps" && fuente !== "nuevo") return;
-  if (!/^N\d{2}$/.test(id) || !Number.isFinite(+lat) || !Number.isFinite(+lon)) {
+  if (fuente !== "gps" && fuente !== "nuevo" && fuente !== "ajuste") return;
+  if (!/^N\d{2,3}$/.test(id) || !Number.isFinite(+lat) || !Number.isFinite(+lon)) {
     console.warn(`Línea ${i + 2} ignorada (id o coordenadas inválidas): ${linea}`); return;
   }
   pines.push({ id, nombre, lat: +lat, lon: +lon, prec: prec === "" ? null : +prec, nuevo: fuente === "nuevo", categoria: tipo });
 });
-if (!pines.length) { console.log("El CSV no trae ningún pin con fuente=gps. Nada que hacer."); process.exit(0); }
+if (!pines.length) { console.log("El CSV no trae ningún pin con fuente=gps, ajuste o nuevo. Nada que hacer."); process.exit(0); }
 
 // --- web: app/campus_data.js (una línea por nodo: { id: "N01", ..., x: , z: , lat: , lon: , ... })
 const cambios = [];
@@ -54,7 +55,7 @@ for (const p of pines) {
   if (!m && p.nuevo) {
     // Lugar NUEVO dado de alta en campo: se agrega el nodo y una arista a su nodo más cercano
     const { x, z } = aMetros(p.lat, p.lon);
-    const existentes = [...datosTxt.matchAll(/\{ id: "(N\d{2})",[^\n]*?x: (-?[\d.]+), z: (-?[\d.]+)/g)].map((e) => ({ id: e[1], x: +e[2], z: +e[3] }));
+    const existentes = [...datosTxt.matchAll(/\{ id: "(N\d{2,3})",[^\n]*?x: (-?[\d.]+), z: (-?[\d.]+)/g)].map((e) => ({ id: e[1], x: +e[2], z: +e[3] }));
     const cerca = existentes.reduce((a, b) => (Math.hypot(b.x - x, b.z - z) < Math.hypot(a.x - x, a.z - z) ? b : a));
     const nombre = p.nombre.replace(/"/g, "'");
     const linea = `    { id: "${p.id}", nombre: "${nombre}", categoria: "${p.categoria || "Referencia"}", x: ${x.toFixed(2)}, z: ${z.toFixed(2)}, lat: ${p.lat.toFixed(7)}, lon: ${p.lon.toFixed(7)}, piso: "PB", desc: "Agregado en campo con pin (más cercano: ${cerca.id})" }`;

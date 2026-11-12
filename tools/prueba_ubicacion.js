@@ -170,9 +170,10 @@ const EA = RUTA[kE], EB = RUTA[kE + 1];
 
   // salirse de la ruta: caminar hacia el Cubo (N10) en vez del Salón C
   const fuera = entre("N10", "N11", 0.6, 0);
-  for (let i = 0; i < 5; i++) await gps(p, { x: fuera.x + i * 0.4, z: fuera.z });
+  for (let i = 0; i < 5; i++) { await gps(p, { x: fuera.x + i * 0.4, z: fuera.z }); await espera(600); } // ~1 lectura por segundo, como un GPS real
   await espera(600);
   d = await dbg(p);
+  ok(/otro camino/.test(await badge(p)), "E6b avisa que tomaste otro camino", await badge(p));
   ok(d.punto && [d.punto.a, d.punto.b].sort().join() === "N10,N11" && d.ruta[d.ruta.length - 1] === "N07", "E6 al salirte de la ruta, se recalcula desde donde estás", d.ruta.join(">"));
 
   // llegar: el GPS te pone en el Salón C
@@ -189,6 +190,104 @@ const EA = RUTA[kE], EB = RUTA[kE + 1];
   d = await dbg(p);
   ok(Math.hypot(d.x - antes.x, d.z - antes.z) < 0.3 && /impreciso/.test(await badge(p)), "E8 una lectura de ±80 m se ignora y se avisa", await badge(p));
   ok(p.errs.length === 0, "E9 sin errores JS", p.errs.join(" | "));
+  await p.close();
+
+  // ---- F. Atajo por donde NO hay camino trazado: la ruta sale de donde estás ----
+  // Se busca un punto a 14–30 m de la ruta que no quede junto a ningún camino del mapa.
+  let atajo = null;
+  {
+    const total = RUTA.slice(1).reduce((s, id, i) => s + largo(RUTA[i], id), 0);
+    for (let m = 20; m < total - 40 && !atajo; m += 4) {
+      for (const lado of [16, -16, 22, -22, 28, -28]) {
+        const pt = sobreRuta(RUTA, m, lado);
+        const aCaminos = Math.min(...D.aristas.map(([u, v]) => distSeg(pt, N[u], N[v])));
+        if (aCaminos > 13) { atajo = pt; break; }
+      }
+    }
+  }
+  ok(!!atajo, "F0 hay un punto de prueba lejos de todos los caminos", atajo && `${atajo.x.toFixed(1)}, ${atajo.z.toFixed(1)}`);
+  if (atajo) {
+    p = await abrir();
+    await elegir(p, "selectOrigen", "N01"); await elegir(p, "selectDestino", "N07");
+    await p.setGeolocation({ ...aLatLon(N.N01.x, N.N01.z), accuracy: 5 });
+    await clic(p, "btnWalkSim"); await espera(900);
+    d = await dbg(p);
+    ok(d.gpsActivo && d.gps && /GPS Activo/.test(await p.evaluate(() => document.getElementById("btnToggleGps").textContent)), "F1 al tocar Caminar el GPS se enciende solo");
+    ok(d.ruta[0] === "N01" && Math.hypot(d.x - N.N01.x, d.z - N.N01.z) < 1, "F2 encender el GPS parado en el origen no te mueve ni cambia la ruta", d.ruta.slice(0, 3).join(">"));
+    // una sola lectura lejos (error del GPS) NO recalcula
+    await gps(p, atajo, 5); await espera(300);
+    await gps(p, { x: N.N01.x + 1, z: N.N01.z }, 5); await espera(600);
+    d = await dbg(p);
+    ok(d.ruta[0] === "N01", "F3 una sola lectura mala del GPS no cambia la ruta", d.ruta.slice(0, 3).join(">"));
+    // ahora sí: varias lecturas seguidas fuera de todo camino
+    for (let i = 0; i < 5; i++) { await gps(p, { x: atajo.x + (i % 2 ? 0.5 : -0.5), z: atajo.z }, 5); await espera(600); }
+    d = await dbg(p);
+    ok(d.ruta[0] === "📍" && d.ruta[d.ruta.length - 1] === "N07", "F4 fuera de los caminos, la ruta se recalcula hasta el mismo destino", d.ruta.slice(0, 4).join(">") + "…");
+    ok(Math.hypot(d.x - atajo.x, d.z - atajo.z) < 1.5, "F5 la ruta nueva sale de donde estás de verdad (no te regresa a un camino)", `${Math.hypot(d.x - atajo.x, d.z - atajo.z).toFixed(1)} m de la lectura`);
+    const primero = N[d.ruta[1]];
+    ok(primero && Math.hypot(primero.x - atajo.x, primero.z - atajo.z) <= 45, "F6 te manda directo a un punto del camino a menos de 45 m", primero && `${d.ruta[1]} a ${Math.hypot(primero.x - atajo.x, primero.z - atajo.z).toFixed(0)} m`);
+    ok(d.navegando, "F7 sigues en modo Caminar después del recálculo");
+    // quieto en el mismo lugar: no vuelve a recalcular ni te mueve
+    const rutaAntes = d.ruta.join(">");
+    for (let i = 0; i < 4; i++) { await gps(p, { x: atajo.x + (i % 2 ? 1 : -1), z: atajo.z + 0.5 }, 5); await espera(600); }
+    d = await dbg(p);
+    ok(d.ruta.join(">") === rutaAntes && Math.hypot(d.x - atajo.x, d.z - atajo.z) < 3, "F8 quieto en el atajo, la ruta ya no cambia", `${Math.hypot(d.x - atajo.x, d.z - atajo.z).toFixed(1)} m`);
+    ok(p.errs.length === 0, "F9 sin errores JS", p.errs.join(" | "));
+    await p.close();
+  }
+  p = await abrir("?gps=0");
+  await elegir(p, "selectOrigen", "N01"); await elegir(p, "selectDestino", "N07");
+  await clic(p, "btnWalkSim"); await espera(600);
+  d = await dbg(p);
+  ok(!d.gpsActivo, "F10 con ?gps=0 Caminar no enciende el GPS");
+  await p.close();
+
+  // ---- G. Ajuste fino: mover medio metro el siguiente punto del camino ----
+  p = await abrir("?gps=0");
+  await elegir(p, "selectOrigen", "N01"); await elegir(p, "selectDestino", "N07");
+  await clic(p, "btnAjustar"); await espera(400);
+  d = await dbg(p);
+  const obj = RUTA.find((id, i) => i > 0 && largo("N01", id) >= 3);
+  ok(d.ajuste === obj, `G1 el punto por mover es el primero a 3 m o más (${obj})`, d.ajuste);
+  ok(await p.evaluate(() => getComputedStyle(document.getElementById("arAjuste")).display) === "flex", "G2 aparece la barra de ajuste");
+  const posPin = async (id) => {
+    const pin = await p.evaluate((i) => (JSON.parse(localStorage.getItem("argos_pines_v2") || "{}"))[i] || null, id);
+    if (!pin) return null;
+    return { x: R * (pin.lon - D.origen.lon) * rad * Math.cos(D.origen.lat * rad), z: R * (pin.lat - D.origen.lat) * rad, ajuste: pin.ajuste };
+  };
+  await clic(p, "btnAjDer"); await clic(p, "btnAjDer"); await espera(300);
+  let pin = await posPin(obj);
+  const dirX = (N[obj].x - N.N01.x) / largo("N01", obj), dirZ = (N[obj].z - N.N01.z) / largo("N01", obj);
+  const aLaDerecha = pin ? (pin.x - N[obj].x) * dirZ - (pin.z - N[obj].z) * dirX : 0;   // componente hacia la derecha
+  const alFrente = pin ? (pin.x - N[obj].x) * dirX + (pin.z - N[obj].z) * dirZ : 0;
+  ok(pin && pin.ajuste && Math.abs(aLaDerecha - 1) < 0.05 && Math.abs(alFrente) < 0.1, "G3 dos toques a la derecha lo mueven 1.0 m a la derecha de quien camina", pin && `derecha ${aLaDerecha.toFixed(2)} m, al frente ${alFrente.toFixed(2)} m`);
+  d = await dbg(p);
+  ok(d.indice === 0 && d.progreso < 0.01 && d.ruta.join(">") === RUTA.join(">"), "G4 mover el punto no reinicia ni cambia la ruta");
+  await clic(p, "btnAjDeshacer"); await espera(200);
+  pin = await posPin(obj);
+  ok(pin && Math.abs(Math.hypot(pin.x - N[obj].x, pin.z - N[obj].z) - 0.5) < 0.05, "G5 Deshacer regresa un toque (queda a 0.5 m)", pin && Math.hypot(pin.x - N[obj].x, pin.z - N[obj].z).toFixed(2));
+  await clic(p, "btnAjIzq"); await clic(p, "btnAjIzq"); await clic(p, "btnAjIzq"); await espera(200);
+  pin = await posPin(obj);
+  const izq = pin ? (pin.x - N[obj].x) * dirZ - (pin.z - N[obj].z) * dirX : 0;
+  ok(pin && Math.abs(izq + 1) < 0.06, "G6 tres toques a la izquierda lo dejan 1.0 m a la izquierda", izq.toFixed(2));
+  await clic(p, "btnAjListo"); await espera(200);
+  ok(await p.evaluate(() => getComputedStyle(document.getElementById("arAjuste")).display) === "none", "G7 Listo cierra la barra");
+  await p.evaluate(() => { navigator.share = async (o) => { window.__csv = o.text; }; });
+  await clic(p, "btnEnviarPines"); await espera(300);
+  const csv = (await p.evaluate(() => window.__csv)) || "";
+  const fila = csv.split("\n").find((l) => l.split(",").slice(-3)[0] === obj) || "";
+  ok(/,ajuste$/.test(fila), "G8 el punto ajustado sale en el CSV con fuente=ajuste", fila);
+  // recargar: el ajuste se conserva en el celular
+  await p.reload({ waitUntil: "load" }); await espera(400);
+  await elegir(p, "selectOrigen", "N01"); await elegir(p, "selectDestino", "N07");
+  await clic(p, "btnNextNode"); await espera(200);
+  d = await dbg(p);
+  const idx = RUTA.indexOf(obj);
+  for (let i = 1; i < idx; i++) { await clic(p, "btnNextNode"); }
+  d = await dbg(p);
+  ok(Math.hypot(d.x - pin.x, d.z - pin.z) < 0.05, "G9 al recargar, el punto sigue en su lugar ajustado", `${Math.hypot(d.x - pin.x, d.z - pin.z).toFixed(2)} m`);
+  ok(p.errs.length === 0, "G10 sin errores JS", p.errs.join(" | "));
+  if (process.env.ARGOS_CSV_SALIDA) fs.writeFileSync(process.env.ARGOS_CSV_SALIDA, csv, "utf8"); // para probar tools/aplicar_pines.js con este CSV
   await p.close();
 
   await b.close(); srv.close();

@@ -676,6 +676,7 @@ html, body {
   gap: 6px;
   overflow-x: auto;
   padding-bottom: 2px;
+  flex-shrink: 0;
   scrollbar-width: none;
 }
 .presets-scroll::-webkit-scrollbar { display: none; }
