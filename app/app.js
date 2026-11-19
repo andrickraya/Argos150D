@@ -141,13 +141,14 @@
   // 2026-11-11: Puerta 3, Escultura de Lobos y Salón C se recolocaron con los puntos reales de la ruta.
   // Un pin viejo guardado en el celular los regresaría a su lugar anterior: se borra UNA sola vez.
   // 2026-11-12: lo mismo con los puntos que Andrick recolocó en el editor de caminos (app/editor.html).
+  // 2026-11-18: sus ajustes de la Explanada ya están en campus_data.js; el pin de Puerta 3 movido por error se descarta.
   try {
-    if (localStorage.getItem("argos_limpieza_pines") !== "2026-11-12") {
+    if (localStorage.getItem("argos_limpieza_pines") !== "2026-11-18") {
       const guardados = JSON.parse(localStorage.getItem(CLAVE_PINES) || "{}") || {};
-      ["N01", "N02", "N03", "N04", "N05", "N07", "N11", "N12", "N13", "N14", "N15", "N20", "N29", "N30", "N31", "N37", "N38", "N40"]
+      ["N01", "N02", "N03", "N04", "N05", "N07", "N61", "N70", "N80", "N81", "N82", "N83", "N11", "N12", "N13", "N14", "N15", "N20", "N29", "N30", "N31", "N37", "N38", "N40"]
         .forEach((id) => { delete guardados[id]; });
       localStorage.setItem(CLAVE_PINES, JSON.stringify(guardados));
-      localStorage.setItem("argos_limpieza_pines", "2026-11-12");
+      localStorage.setItem("argos_limpieza_pines", "2026-11-18");
     }
   } catch (_) {}
   function leerPines() {
