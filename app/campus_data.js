@@ -57,7 +57,7 @@ window.ARGOS_CAMPUS_DATA = {
     { id: "N67", nombre: "Cruce 67", categoria: "Cruce", x: -37.74, z: 23.33, lat: 19.3704529, lon: -99.2645039, piso: "PB", desc: "Agregado en el editor de caminos" },
     { id: "N68", nombre: "Cruce 68", categoria: "Cruce", x: -33.45, z: 23.23, lat: 19.3704520, lon: -99.2644631, piso: "PB", desc: "Agregado en el editor de caminos" },
     { id: "N69", nombre: "Cruce 69", categoria: "Cruce", x: -24.39, z: 23.73, lat: 19.3704565, lon: -99.2643768, piso: "PB", desc: "Agregado en el editor de caminos" },
-    { id: "N70", nombre: "Cruce 70", categoria: "Cruce", x: -18.44, z: 24.62, lat: 19.3704645, lon: -99.2643201, piso: "PB", desc: "Agregado en el editor de caminos" },
+    { id: "N70", nombre: "Cruce 70", categoria: "Cruce", x: -18.70, z: 26.10, lat: 19.3704778, lon: -99.2643226, piso: "PB", desc: "Agregado en el editor de caminos" },
     { id: "N71", nombre: "Cruce 71", categoria: "Cruce", x: -14.04, z: 24.72, lat: 19.3704654, lon: -99.2642782, piso: "PB", desc: "Agregado en el editor de caminos" },
     { id: "N72", nombre: "Cruce 72", categoria: "Cruce", x: -10.35, z: 25.42, lat: 19.3704717, lon: -99.2642431, piso: "PB", desc: "Agregado en el editor de caminos" },
     { id: "N73", nombre: "Cruce 73", categoria: "Cruce", x: 3.08, z: 27.03, lat: 19.3704862, lon: -99.2641152, piso: "PB", desc: "Agregado en el editor de caminos" },
