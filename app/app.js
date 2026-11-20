@@ -1068,7 +1068,8 @@
   // Narración verificada de un lugar de app/inaki_contenido.js: una vez por ruta, sin interrumpir una
   // indicación reciente (6 s) ni una vuelta próxima (< 12 m). Es local: no gasta llamadas a Gemini.
   function narrarLugarCercano(tramo) {
-    if (performance.now() - inaki.textoMs < 6000) return false;
+    // Una respuesta del chat se deja leer completa; lo demás espera 6 s
+    if (performance.now() - inaki.textoMs < (inaki.ultimoEvento === "respuesta" ? inaki.textoDur : 6000)) return false;
     const giro = obtenerGiroEnSiguienteNodo();
     if (!inaki.llego && giro && tramo.distRestanteTramo < 12) return false;
     for (const id in CONTENIDO_INAKI.lugares) {
@@ -1086,6 +1087,122 @@
     return false;
   }
   setInterval(pensarInaki, 1000);
+
+  // ---- Chat con Iñaki: botón 💬 para escribir o dictar una pregunta (la contesta Gemini en el Worker) ----
+  const chatInaki = { historial: [], ocupado: false, log: null, estado: null };
+  const sinAcentos = (s) => String(s).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  // Sin servidor o sin red: contesta con el resumen del lugar que mencione la pregunta (nunca inventa)
+  function respuestaLocalInaki(pregunta) {
+    const q = sinAcentos(pregunta);
+    for (const id in CONTENIDO_INAKI.lugares) {
+      const l = CONTENIDO_INAKI.lugares[id];
+      if ((l.alias || []).some((a) => q.includes(sinAcentos(a)))) return l.globo;
+    }
+    return "Sin conexión no puedo contestar eso, pero te sigo guiando por la ruta.";
+  }
+  function pintarChatInaki(quien, texto) {
+    if (!chatInaki.log) return;
+    const d = document.createElement("div");
+    d.style.cssText = "margin:4px 0;" + (quien === "tu" ? "text-align:right;color:#cbd5e1" : "color:#fff");
+    d.textContent = (quien === "tu" ? "Tú: " : "🐺 Iñaki: ") + texto;
+    chatInaki.log.appendChild(d);
+    chatInaki.log.scrollTop = chatInaki.log.scrollHeight;
+  }
+  function preguntarInaki(pregunta) {
+    pregunta = String(pregunta || "").trim().slice(0, 300);
+    if (!pregunta || chatInaki.ocupado) return;
+    pintarChatInaki("tu", pregunta);
+    const responder = (texto, gesto) => {
+      chatInaki.historial.push({ rol: "usuario", texto: pregunta }, { rol: "inaki", texto });
+      chatInaki.historial = chatInaki.historial.slice(-6); // memoria: últimos 3 intercambios
+      pintarChatInaki("inaki", texto);
+      decirInaki("respuesta", texto, { soloLocal: true, dur: 15000, gesto: gesto || "ninguno" });
+    };
+    if (!inaki.servidor) { responder(respuestaLocalInaki(pregunta)); return; }
+    let contexto = {};
+    try { contexto = estado.ruta && estado.ruta.length > 1 ? contextoInaki() : {}; } catch (_) {}
+    chatInaki.ocupado = true;
+    if (chatInaki.estado) chatInaki.estado.textContent = "Iñaki está pensando…";
+    const ctl = typeof AbortController === "function" ? new AbortController() : null;
+    const corte = setTimeout(() => ctl && ctl.abort(), 8000);
+    fetch(inaki.servidor, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ evento: "pregunta", pregunta, contexto, historial: chatInaki.historial }),
+      signal: ctl ? ctl.signal : undefined
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => (j && typeof j.texto === "string" && j.texto.trim()
+        ? responder(j.texto.trim().slice(0, 220), j.gesto)
+        : responder(respuestaLocalInaki(pregunta))))
+      .catch(() => responder(respuestaLocalInaki(pregunta)))
+      .finally(() => {
+        clearTimeout(corte);
+        chatInaki.ocupado = false;
+        if (chatInaki.estado) chatInaki.estado.textContent = "";
+      });
+  }
+  (function crearChatInaki() {
+    if (!inaki.activo || !btnAlignArrows || !btnAlignArrows.parentNode) return;
+    const btn = document.createElement("button");
+    btn.id = "btnChatInaki";
+    btn.type = "button";
+    btn.className = btnAlignArrows.className;
+    btn.textContent = "💬 Pregúntale";
+    const panel = document.createElement("div");
+    panel.id = "panelChatInaki";
+    panel.style.cssText = "position:fixed;left:12px;right:12px;bottom:12px;max-width:520px;margin:0 auto;z-index:9999;" +
+      "background:rgba(15,23,42,0.94);color:#fff;border:1px solid rgba(255,255,255,0.4);border-radius:14px;padding:10px;" +
+      "font:15px/1.35 system-ui,-apple-system,sans-serif;display:none";
+    const estiloBtn = "padding:0 12px;border:0;border-radius:10px;font-size:18px;background:#334155;color:#fff;min-height:44px";
+    panel.innerHTML =
+      '<div id="chatInakiLog" style="max-height:38vh;overflow-y:auto"></div>' +
+      '<div id="chatInakiEstado" style="font-size:13px;color:#94a3b8;min-height:16px"></div>' +
+      '<form id="chatInakiForm" style="display:flex;gap:6px;margin-top:4px">' +
+      '<input id="chatInakiTexto" type="text" maxlength="300" autocomplete="off" placeholder="Pregúntale a Iñaki…" ' +
+      'style="flex:1;min-width:0;padding:10px;border:0;border-radius:10px;font-size:16px;color:#0f172a">' +
+      `<button type="button" id="chatInakiMic" title="Dictar" style="${estiloBtn}">🎤</button>` +
+      `<button type="submit" id="chatInakiEnviar" title="Enviar" style="${estiloBtn};background:#2563eb">➤</button>` +
+      `<button type="button" id="chatInakiCerrar" title="Cerrar" style="${estiloBtn}">✕</button>` +
+      "</form>";
+    document.body.appendChild(panel);
+    chatInaki.log = panel.querySelector("#chatInakiLog");
+    chatInaki.estado = panel.querySelector("#chatInakiEstado");
+    const entrada = panel.querySelector("#chatInakiTexto");
+    btn.addEventListener("click", () => {
+      const abrir = panel.style.display === "none";
+      panel.style.display = abrir ? "block" : "none";
+      if (abrir) {
+        if (!chatInaki.log.childElementCount) pintarChatInaki("inaki", "¡Hola! Pregúntame del campus: los Lobos, la Explanada, El Cubo, Camelia o el laboratorio PB03.");
+        entrada.focus();
+      }
+    });
+    panel.querySelector("#chatInakiCerrar").addEventListener("click", () => { panel.style.display = "none"; });
+    panel.querySelector("#chatInakiForm").addEventListener("submit", (e) => {
+      e.preventDefault();
+      preguntarInaki(entrada.value);
+      entrada.value = "";
+    });
+    // Dictado por voz (Chrome/Android y Safari lo traen; si no existe, se oculta el micrófono)
+    const Reconocer = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const mic = panel.querySelector("#chatInakiMic");
+    if (!Reconocer) mic.style.display = "none";
+    else mic.addEventListener("click", () => {
+      try {
+        const rec = new Reconocer();
+        rec.lang = "es-MX";
+        rec.interimResults = false;
+        rec.maxAlternatives = 1;
+        chatInaki.estado.textContent = "Te escucho…";
+        rec.onresult = (ev) => { chatInaki.estado.textContent = ""; preguntarInaki(ev.results[0][0].transcript); };
+        rec.onerror = () => { chatInaki.estado.textContent = "No te escuché. Intenta de nuevo o escribe."; };
+        rec.onend = () => { if (chatInaki.estado.textContent === "Te escucho…") chatInaki.estado.textContent = ""; };
+        rec.start();
+      } catch (_) { chatInaki.estado.textContent = "El dictado no está disponible; escribe tu pregunta."; }
+    });
+    const vecino = document.getElementById("btnVozInaki") || btnAlignArrows;
+    vecino.insertAdjacentElement("afterend", btn);
+  })();
 
   function dibujarGloboInaki(cx, yBase, w) {
     if (!inaki.texto || performance.now() - inaki.textoMs > inaki.textoDur) return;

@@ -7,6 +7,7 @@ const INAKI_CONTENIDO = {
   version: "2026-11-19",
   lugares: {
     N03: {
+      alias: ["lobo", "escultura"],
       nombre: "Escultura de Los Lobos",
       tipo: "lugar",
       radio: 12,
@@ -21,6 +22,7 @@ const INAKI_CONTENIDO = {
       fuente: "https://prensa.ibero.mx/es-MX/nota/los-lobos-de-la-ibero-simbolo-de-fuerza-y-apertura-la-historia-detras-de-la-escultura"
     },
     N61: {
+      alias: ["explanada"],
       nombre: "Explanada Central",
       tipo: "lugar",
       radio: 15,
@@ -36,6 +38,7 @@ const INAKI_CONTENIDO = {
       fuente: "Texto 'De la arquitectura jesuita a la IBERO: la historia de sus emblemáticos ladrillos'"
     },
     N10: {
+      alias: ["cubo", "comedor"],
       nombre: "El Cubo",
       tipo: "tienda",
       radio: 25,
@@ -51,6 +54,7 @@ const INAKI_CONTENIDO = {
       fuente: "https://portaladmin.ibero.mx/uploads/Intersuj_Guia_c515a36b41.pdf | https://prensa.ibero.mx/es-MX/nota/lasyloslobos-dan-su-opinion-sobre-el-nuevo-cubo-ibero"
     },
     N64: {
+      alias: ["camelia", "camellia"],
       nombre: "Camelia",
       tipo: "tienda",
       radio: 25,
@@ -64,6 +68,7 @@ const INAKI_CONTENIDO = {
       fuente: "https://portaladmin.ibero.mx/uploads/Intersuj_Guia_c515a36b41.pdf"
     },
     N07: {
+      alias: ["pb03", "laboratorio", "salon c", "edificio c"],
       nombre: "Salón C (Laboratorio PB03)",
       tipo: "lugar",
       radio: 12,

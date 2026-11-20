@@ -68,6 +68,11 @@ export default {
       : `EVENTO: ${evento}\nFRASE LOCAL SUGERIDA: ${sugerencia}\nCONTEXTO: ${contexto}\n` +
         `Di lo que Iñaki debe decir ahora. Puedes mejorar la frase sugerida, pero sin cambiar la indicación de navegación.`;
 
+    // Memoria corta del chat: últimos 6 mensajes (usuario / Iñaki)
+    const historial = (Array.isArray(cuerpo.historial) ? cuerpo.historial : []).slice(-6)
+      .filter((m) => m && typeof m.texto === "string" && m.texto.trim())
+      .map((m) => ({ role: m.rol === "inaki" ? "model" : "user", parts: [{ text: m.texto.slice(0, 300) }] }));
+
     const t0 = Date.now();
     // Primero el modelo principal; si está saturado (429/503) o tarda, el de respaldo. La app corta a los 8 s.
     const intentos = [[env.MODELO, 4500], [env.MODELO_RESPALDO, 3000]].filter(([m]) => m);
@@ -75,7 +80,7 @@ export default {
     for (const [modelo, limite] of intentos) {
       modeloUsado = modelo;
       try {
-        r = await llamarGemini(env, modelo, prompt, limite);
+        r = await llamarGemini(env, modelo, historial, prompt, limite);
       } catch (_) { r = null; continue; } // no respondió a tiempo
       if (r.ok || (r.status !== 429 && r.status !== 503)) break;
     }
@@ -100,14 +105,14 @@ export default {
   }
 };
 
-function llamarGemini(env, modelo, prompt, limiteMs) {
+function llamarGemini(env, modelo, historial, prompt, limiteMs) {
   return fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent`, {
         signal: AbortSignal.timeout(limiteMs),
         method: "POST",
         headers: { "Content-Type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: SISTEMA }] },
-          contents: [{ role: "user", parts: [{ text: prompt }] }],
+          contents: [...historial, { role: "user", parts: [{ text: prompt }] }],
           generationConfig: {
             temperature: 0.4,
             maxOutputTokens: 300,

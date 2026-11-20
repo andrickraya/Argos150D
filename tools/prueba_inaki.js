@@ -129,6 +129,51 @@ const espera = (ms) => new Promise((r) => setTimeout(r, ms));
   ok(voz.some((v) => /15 de enero de 2002/.test(v)), "F2 la voz dice la narración completa", voz[voz.length - 1]);
   ok(p.errs.length === 0, "F3 sin errores JS", p.errs.join(" | "));
 
+  await p.close();
+
+  // ---- G. Chat: pregunta escrita → Worker (de mentira) → respuesta en el panel, con memoria ----
+  let pedidoChat = null;
+  const worker = http.createServer((q, r) => {
+    const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "Content-Type", "Content-Type": "application/json" };
+    if (q.method === "OPTIONS") { r.writeHead(204, cors); r.end(); return; }
+    let c = ""; q.on("data", (d) => (c += d)); q.on("end", () => {
+      const j = JSON.parse(c);
+      r.writeHead(200, cors);
+      if (!j.pregunta) { r.end(JSON.stringify({ texto: j.sugerencia, gesto: "ninguno" })); return; } // avisos de la ruta
+      pedidoChat = j;
+      r.end(JSON.stringify({ texto: "RESP: " + j.pregunta + " | memoria " + j.historial.length, gesto: "pensar" }));
+    });
+  }).listen(0);
+  const preguntar = async (p, texto) => {
+    await p.evaluate((texto) => {
+      document.getElementById("chatInakiTexto").value = texto;
+      document.getElementById("chatInakiEnviar").click();
+    }, texto);
+    await espera(900);
+    return p.evaluate(() => document.getElementById("chatInakiLog").textContent);
+  };
+  p = await abrir("?inaki=" + encodeURIComponent(`http://localhost:${worker.address().port}/`));
+  await ruta(p, "N01", "N07"); await espera(1200);
+  await p.evaluate(() => document.getElementById("btnChatInaki").click());
+  ok(await p.evaluate(() => document.getElementById("panelChatInaki").style.display === "block"), "G1 el botón 💬 abre el panel");
+  let log = await preguntar(p, "¿Quién hizo los lobos?");
+  ok(/RESP: ¿Quién hizo los lobos\? \| memoria 0/.test(log) && pedidoChat.evento === "pregunta" && pedidoChat.contexto.destino === "Salón C",
+    "G2 manda la pregunta con el contexto y muestra la respuesta", log.slice(-70));
+  log = await preguntar(p, "¿y de qué material es?");
+  ok(/memoria 2/.test(log), "G3 la segunda pregunta lleva la memoria de la primera", log.slice(-50));
+  t = await dibujado(p);
+  ok(/RESP: ¿y de qué material/.test(t), "G4 la respuesta también sale en el globo de Iñaki");
+  ok(p.errs.length === 0, "G5 sin errores JS", p.errs.join(" | "));
+  await p.close();
+  p = await abrir("?inaki=off");
+  await p.evaluate(() => document.getElementById("btnChatInaki").click());
+  log = await preguntar(p, "¿Qué hay en Camellia?");
+  ok(/Camelia, entre los edificios C y D/.test(log), "G6 sin servidor contesta con el contenido local", log.slice(-80));
+  log = await preguntar(p, "¿Cuánto cuesta la colegiatura?");
+  ok(/Sin conexión no puedo contestar eso/.test(log), "G7 sin servidor no inventa lo que no sabe");
+  ok(p.errs.length === 0, "G8 sin errores JS", p.errs.join(" | "));
+  worker.close();
+
   await b.close(); srv.close(); ollama.close();
   console.log(fallos ? `\n${fallos} FALLOS` : "\nTODO OK");
   process.exit(fallos ? 1 : 0);
