@@ -110,6 +110,25 @@ const espera = (ms) => new Promise((r) => setTimeout(r, ms));
   ok(voz.length === 2 && /Gira a la (derecha|izquierda)|Pasamos/.test(voz[1]) && !/[\u{1F300}-\u{1FAFF}\u{2190}-\u{21FF}\u{2B00}-\u{2BFF}]/u.test(voz[1]), "E3 al avanzar dice la siguiente indicación, sin emojis ni flechas", voz[1]);
   ok(p.errs.length === 0, "E4 sin errores JS", p.errs.join(" | "));
 
+  await p.close();
+
+  // ---- F. Narración verificada (app/inaki_contenido.js) al llegar a la Escultura de Lobos ----
+  p = await abrir("");
+  // La prueba E dejó la voz guardada encendida en localStorage: solo se enciende si está apagada
+  await p.evaluate(() => { const bv = document.getElementById("btnVozInaki"); if (/🔇/.test(bv.textContent)) bv.click(); });
+  await ruta(p, "N01", "N07"); await espera(1500);
+  for (let i = 0; i < 25; i++) {
+    await p.evaluate(() => document.getElementById("btnNextNode").click()); await espera(900);
+    t = await dibujado(p);
+    if (/Pasamos Escultura de Lobos/.test(t)) break;
+  }
+  await espera(7500); // la narración espera 6 s de silencio
+  t = await dibujado(p);
+  voz = await p.evaluate(() => window.__voz.slice());
+  ok(/Pancho/.test(t), "F1 el globo muestra el dato verificado de Los Lobos", t.replace(/🐺/g, "").replace(/\s+/g, " ").slice(0, 120));
+  ok(voz.some((v) => /15 de enero de 2002/.test(v)), "F2 la voz dice la narración completa", voz[voz.length - 1]);
+  ok(p.errs.length === 0, "F3 sin errores JS", p.errs.join(" | "));
+
   await b.close(); srv.close(); ollama.close();
   console.log(fallos ? `\n${fallos} FALLOS` : "\nTODO OK");
   process.exit(fallos ? 1 : 0);

@@ -17,6 +17,7 @@ const inicioLinea = plantilla.lastIndexOf("\n", ini) + 1;
 const bloque =
   "    <!-- DATOS Y LÓGICA INTEGRADOS (generado por tools/build_app.js; no editar a mano) -->\n" +
   "    <script>\n" + leer("campus_data.js").trimEnd() + "\n</script>\n" +
+  "<script>\n" + leer("inaki_contenido.js").trimEnd() + "\n</script>\n" +
   "<script>\n" + leer("app.js").trimEnd() + "\n</script>\n  ";
 
 const salida = plantilla.slice(0, inicioLinea) + bloque + plantilla.slice(fin);

@@ -879,14 +879,19 @@
   // IÑAKI: el lobo guía. Camina sobre la ruta unos metros adelante de ti y te va hablando.
   //   - Sin configurar nada usa frases locales (funciona sin internet).
   //   - Con ?inaki=https://TU-SERVIDOR/inaki  manda el contexto (dónde estás, a dónde vas, qué hay cerca)
-  //     a tools/inaki_server.js, que le pregunta a un modelo local (Ollama) y regresa la frase.
+  //     al Worker de Cloudflare (worker/, Gemini) o a tools/inaki_server.js (Ollama local) y regresa la frase.
   //   - ?inaki=off borra el servidor guardado.  ?lobo=0 oculta a Iñaki.
+  //   - Al acercarte a un lugar de app/inaki_contenido.js dice su narración verificada (local, sin gastar llamadas).
   // ============================================================================
+  const CONTENIDO_INAKI = (typeof window !== "undefined" && window.INAKI_CONTENIDO) || { lugares: {} };
   const inaki = {
     activo: parametrosURL.get("lobo") !== "0",
     servidor: null,
     texto: "",
     textoMs: 0,
+    textoDur: 12000,
+    gesto: "ninguno",
+    narrados: new Set(),
     claveRuta: null,
     indice: -1,
     llego: false,
@@ -969,11 +974,15 @@
     btnAlignArrows.insertAdjacentElement("afterend", btn);
   })();
 
-  function decirInaki(evento, textoLocal) {
+  // op (opcional): { soloLocal: no preguntar al servidor, voz: texto largo para la voz, dur: ms del globo, gesto }
+  function decirInaki(evento, textoLocal, op) {
+    op = op || {};
     inaki.texto = textoLocal;
     inaki.textoMs = performance.now();
+    inaki.textoDur = op.dur || 12000;
+    inaki.gesto = op.gesto || "ninguno";
     inaki.ultimoEvento = evento;
-    if (!inaki.servidor) { hablarInaki(textoLocal); return; }
+    if (!inaki.servidor || op.soloLocal) { inaki.pedido++; hablarInaki(op.voz || textoLocal); return; }
     const miPedido = ++inaki.pedido;
     const ctl = typeof AbortController === "function" ? new AbortController() : null;
     const corte = setTimeout(() => ctl && ctl.abort(), 8000);
@@ -990,6 +999,7 @@
         if (!j || typeof j.texto !== "string" || !j.texto.trim()) { hablarInaki(textoLocal); return; }
         inaki.texto = j.texto.trim().slice(0, 220);
         inaki.textoMs = performance.now();
+        if (typeof j.gesto === "string") inaki.gesto = j.gesto;
         hablarInaki(inaki.texto);
       })
       .catch(() => { if (miPedido === inaki.pedido) hablarInaki(textoLocal); }) // sin servidor o sin red: se queda la frase local
@@ -1018,6 +1028,7 @@
       inaki.indice = estado.indiceActual;
       inaki.llego = false;
       inaki.avisados = new Set();
+      inaki.narrados = new Set();
       decirInaki("inicio", `¡Auuu! Soy Iñaki. Vamos a ${destino.name}: son ${Math.round(restante)} m. Sígueme.`);
       return;
     }
@@ -1026,6 +1037,7 @@
       decirInaki("llegada", `¡Llegamos a ${destino.name}! Bien hecho.`);
       return;
     }
+    if (narrarLugarCercano(tramo)) return;
     if (inaki.llego) return;
     if (estado.indiceActual !== inaki.indice) {
       inaki.indice = estado.indiceActual;
@@ -1045,16 +1057,38 @@
     if (performance.now() - inaki.textoMs < 6000) return;
     const comida = datos.nodes.find((n) =>
       /cafeter|restaur|comida/i.test(n.category || "") && n.id !== destino.id && !inaki.avisados.has(n.id) &&
+      !CONTENIDO_INAKI.lugares[n.id] && // las tiendas con contenido las presenta narrarLugarCercano
+
       Math.hypot(n.x - estado.usuarioX, n.z - estado.usuarioZ) <= 25);
     if (comida) {
       inaki.avisados.add(comida.id);
       decirInaki("restaurante", `Mira, aquí cerca está ${comida.name}. ¿Se te antoja algo?`);
     }
   }
+  // Narración verificada de un lugar de app/inaki_contenido.js: una vez por ruta, sin interrumpir una
+  // indicación reciente (6 s) ni una vuelta próxima (< 12 m). Es local: no gasta llamadas a Gemini.
+  function narrarLugarCercano(tramo) {
+    if (performance.now() - inaki.textoMs < 6000) return false;
+    const giro = obtenerGiroEnSiguienteNodo();
+    if (!inaki.llego && giro && tramo.distRestanteTramo < 12) return false;
+    for (const id in CONTENIDO_INAKI.lugares) {
+      if (inaki.narrados.has(id)) continue;
+      const lugar = CONTENIDO_INAKI.lugares[id];
+      const n = datos.nodes.find((x) => x.id === id);
+      if (!n || Math.hypot(n.x - estado.usuarioX, n.z - estado.usuarioZ) > (lugar.radio || 12)) continue;
+      inaki.narrados.add(id);
+      inaki.avisados.add(id);
+      // El globo dura lo que tarda la voz en decir la narración (~14 caracteres por segundo)
+      const dur = Math.max(12000, Math.round((lugar.narracion || "").length / 14 * 1000));
+      decirInaki("narracion", lugar.globo, { soloLocal: true, voz: lugar.narracion, dur, gesto: lugar.gesto });
+      return true;
+    }
+    return false;
+  }
   setInterval(pensarInaki, 1000);
 
   function dibujarGloboInaki(cx, yBase, w) {
-    if (!inaki.texto || performance.now() - inaki.textoMs > 12000) return;
+    if (!inaki.texto || performance.now() - inaki.textoMs > inaki.textoDur) return;
     arCtx.save();
     arCtx.font = "600 15px system-ui, -apple-system, sans-serif";
     const anchoMax = Math.min(w - 32, 300);

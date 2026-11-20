@@ -1,13 +1,15 @@
-﻿name = "argos-inaki"
+name = "argos-inaki"
 main = "src/index.js"
 compatibility_date = "2025-10-01"
 workers_dev = true
 preview_urls = false
 
 [vars]
-# Modelo de Gemini. Se cambia aquí sin tocar el código.
-# 3.8-flash daba 503 (saturado) en el plan gratuito; 3.5-flash responde en ~1 s.
+# Modelos de Gemini. Se cambian aquí sin tocar el código.
+# Principal: mejor calidad (~1.5 s). Respaldo: si el principal está saturado (429/503) o tarda (~0.8 s).
+# (gemini-3.8-flash daba 503 "high demand" en el plan gratuito el 2026-11-19.)
 MODELO = "gemini-3.5-flash"
+MODELO_RESPALDO = "gemini-3.5-flash-lite"
 
 # La API key NO va aquí: se guarda como secreto con
 #   npx wrangler secret put GEMINI_API_KEY

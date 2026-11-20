@@ -8,13 +8,27 @@ const CORS = {
   "Access-Control-Allow-Headers": "Content-Type"
 };
 
-const GESTOS = ["ninguno", "saludar", "señalar", "presentar", "celebrar", "pensar"];
+// Sin acentos: son los nombres de las animaciones del GLB de Iñaki
+const GESTOS = ["ninguno", "saludar", "senalar", "presentar", "celebrar", "pensar"];
 
-const SISTEMA = `Eres Iñaki, el guía de ARGOS en el campus Santa Fe de la Universidad Iberoamericana (IBERO), CDMX.
+import CONTENIDO from "../../app/inaki_contenido.js";
+
+// Base de conocimiento verificada (grounding): la misma que usa la app
+const CONOCIMIENTO = [
+  ...Object.entries(CONTENIDO.lugares).map(([id, l]) =>
+    `- ${l.nombre} (${id}, ${l.tipo}): ${l.datos.join(" ")}${l.tipo === "tienda" && !l.menu ? " Menú: AÚN NO DISPONIBLE." : ""}`),
+  ...CONTENIDO.generales.map((g) => `- ${g}`)
+].join("\n");
+
+const SISTEMA = `Eres Iñaki, el lobo guía de ARGOS en el campus Santa Fe de la Universidad Iberoamericana (IBERO), CDMX.
 Hablas en español de México, cálido y breve: máximo 2 frases y 200 caracteres.
-Usa SOLO los datos del CONTEXTO. Si algo no está ahí, dilo con honestidad; nunca inventes lugares, menús, precios ni horarios.
+Usa SOLO los datos de CONOCIMIENTO y del CONTEXTO. Si algo no está ahí, dilo con honestidad; nunca inventes lugares, menús, precios, horarios ni enlaces.
 La seguridad y la indicación de navegación van primero: si hay un giro próximo, menciónalo.
-Responde únicamente con el JSON pedido.`;
+Reglas: ${CONTENIDO.reglas.join(" ")}
+Responde únicamente con el JSON pedido.
+
+CONOCIMIENTO:
+${CONOCIMIENTO}`;
 
 const ESQUEMA = {
   type: "OBJECT",
@@ -48,32 +62,24 @@ export default {
     const sugerencia = String(cuerpo.sugerencia || "").slice(0, 300);
     const contexto = JSON.stringify(cuerpo.contexto || {}).slice(0, 4000);
 
-    const prompt = `EVENTO: ${evento}\nFRASE LOCAL SUGERIDA: ${sugerencia}\nCONTEXTO: ${contexto}\n` +
-      `Di lo que Iñaki debe decir ahora. Puedes mejorar la frase sugerida, pero sin cambiar la indicación de navegación.`;
+    const pregunta = String(cuerpo.pregunta || "").slice(0, 300);
+    const prompt = pregunta
+      ? `PREGUNTA DEL USUARIO: ${pregunta}\nCONTEXTO: ${contexto}\nContesta SOLO la pregunta como Iñaki, usando solo CONOCIMIENTO y CONTEXTO. No des indicaciones de navegación a menos que te pregunten cómo llegar.`
+      : `EVENTO: ${evento}\nFRASE LOCAL SUGERIDA: ${sugerencia}\nCONTEXTO: ${contexto}\n` +
+        `Di lo que Iñaki debe decir ahora. Puedes mejorar la frase sugerida, pero sin cambiar la indicación de navegación.`;
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${env.MODELO}:generateContent`;
     const t0 = Date.now();
-    let r;
-    try {
-      r = await fetch(url, {
-        signal: AbortSignal.timeout(7000), // la app corta a los 8 s y usa su frase local
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: SISTEMA }] },
-          contents: [{ role: "user", parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 0.4,
-            maxOutputTokens: 300,
-            responseMimeType: "application/json",
-            responseSchema: ESQUEMA,
-            thinkingConfig: { thinkingLevel: "low" } // frases cortas: poco "pensar" = respuesta rápida
-          }
-        })
-      });
-    } catch (e) {
-      return json({ error: "Gemini no respondió a tiempo", ms: Date.now() - t0 }, 504);
+    // Primero el modelo principal; si está saturado (429/503) o tarda, el de respaldo. La app corta a los 8 s.
+    const intentos = [[env.MODELO, 4500], [env.MODELO_RESPALDO, 3000]].filter(([m]) => m);
+    let r, modeloUsado;
+    for (const [modelo, limite] of intentos) {
+      modeloUsado = modelo;
+      try {
+        r = await llamarGemini(env, modelo, prompt, limite);
+      } catch (_) { r = null; continue; } // no respondió a tiempo
+      if (r.ok || (r.status !== 429 && r.status !== 503)) break;
     }
+    if (!r) return json({ error: "Gemini no respondió a tiempo", ms: Date.now() - t0 }, 504);
     if (!r.ok) {
       // 429 = se acabó la cuota gratuita del minuto/día. La app usa su frase local.
       return json({ error: "Gemini respondió " + r.status, detalle: (await r.text()).slice(0, 300) }, 502);
@@ -88,7 +94,27 @@ export default {
     return json({
       texto: salida.texto.trim().slice(0, 220),
       gesto: GESTOS.includes(salida.gesto) ? salida.gesto : "ninguno",
+      modelo: modeloUsado,
       ms: Date.now() - t0
     });
   }
 };
+
+function llamarGemini(env, modelo, prompt, limiteMs) {
+  return fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent`, {
+        signal: AbortSignal.timeout(limiteMs),
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: SISTEMA }] },
+          contents: [{ role: "user", parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.4,
+            maxOutputTokens: 300,
+            responseMimeType: "application/json",
+            responseSchema: ESQUEMA,
+            thinkingConfig: { thinkingLevel: "minimal" } // frases cortas: poco "pensar" = respuesta rápida
+          }
+        })
+      });
+}
