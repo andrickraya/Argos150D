@@ -6,6 +6,13 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
+    <!-- three.js para Iñaki 3D (assets/models/inaki.glb); misma versión que assets/js/campus3d.js -->
+    <script type="importmap">
+      { "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+      } }
+    </script>
     <title>ARGOS — Navegación AR Campus IBERO</title>
     <style>
       :root {
@@ -2081,6 +2088,7 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
     inaki.textoMs = performance.now();
     inaki.textoDur = op.dur || 12000;
     inaki.gesto = op.gesto || "ninguno";
+    gestoInaki3D(inaki.gesto);
     inaki.ultimoEvento = evento;
     // Los avisos de la ruta son locales (exactos y gratis): Gemini queda para las preguntas del chat,
     // porque el plan gratuito da pocas llamadas por minuto. Con &inakiruta=1 también los reescribe Gemini.
@@ -2101,7 +2109,7 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
         if (!j || typeof j.texto !== "string" || !j.texto.trim()) { hablarInaki(textoLocal); return; }
         inaki.texto = j.texto.trim().slice(0, 220);
         inaki.textoMs = performance.now();
-        if (typeof j.gesto === "string") inaki.gesto = j.gesto;
+        if (typeof j.gesto === "string") { inaki.gesto = j.gesto; gestoInaki3D(j.gesto); }
         hablarInaki(inaki.texto);
       })
       .catch(() => { if (miPedido === inaki.pedido) hablarInaki(textoLocal); }) // sin servidor o sin red: se queda la frase local
@@ -2131,12 +2139,12 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
       inaki.llego = false;
       inaki.avisados = new Set();
       inaki.narrados = new Set();
-      decirInaki("inicio", `¡Auuu! Soy Iñaki. Vamos a ${destino.name}: son ${Math.round(restante)} m. Sígueme.`);
+      decirInaki("inicio", `¡Auuu! Soy Iñaki. Vamos a ${destino.name}: son ${Math.round(restante)} m. Sígueme.`, { gesto: "saludar" });
       return;
     }
     if (!inaki.llego && (restante < 0.8 || tramo.actual.id === tramo.siguiente.id)) {
       inaki.llego = true;
-      decirInaki("llegada", `¡Llegamos a ${destino.name}! Bien hecho.`);
+      decirInaki("llegada", `¡Llegamos a ${destino.name}! Bien hecho.`, { gesto: "celebrar" });
       return;
     }
     if (narrarLugarCercano(tramo)) return;
@@ -2147,7 +2155,7 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
       const donde = esCruce(tramo.siguiente) ? "en el cruce" : `al llegar a ${tramo.siguiente.name}`;
       if (esCruce(tramo.actual)) {
         // En un cruce Iñaki sólo habla si viene una vuelta (si no, hablaría cada pocos metros)
-        if (giro) decirInaki("nodo", `En ${Math.round(tramo.distRestanteTramo)} m, ${donde}: ${giro.textoCorto}.`);
+        if (giro) decirInaki("nodo", `En ${Math.round(tramo.distRestanteTramo)} m, ${donde}: ${giro.textoCorto}.`, { gesto: "senalar" });
         return;
       }
       decirInaki("nodo", giro
@@ -2164,7 +2172,7 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
       Math.hypot(n.x - estado.usuarioX, n.z - estado.usuarioZ) <= 25);
     if (comida) {
       inaki.avisados.add(comida.id);
-      decirInaki("restaurante", `Mira, aquí cerca está ${comida.name}. ¿Se te antoja algo?`);
+      decirInaki("restaurante", `Mira, aquí cerca está ${comida.name}. ¿Se te antoja algo?`, { gesto: "senalar" });
     }
   }
   // Narración verificada de un lugar de app/inaki_contenido.js: una vez por ruta, sin interrumpir una
@@ -2345,17 +2353,133 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
   }
 
   // Dibuja a Iñaki parado sobre el camino, ~3 m adelante (fijo en el mundo igual que las flechas)
+  // ============================================================================
+  // IÑAKI 3D: modelo animado assets/models/inaki.glb (hecho con TRELLIS + Mixamo, ver assets/models/INAKI_MODELO.md).
+  // Se dibuja en un canvas WebGL pequeño aparte y ese cuadro se pega en el canvas AR donde iba el 🐺,
+  // así no se toca la proyección de las flechas. Si three.js o el GLB no cargan, se queda el 🐺.
+  // ?inaki3d=0 lo apaga.
+  // ============================================================================
+  const ALTO_INAKI_MUNDO = 1.1; // metros que mide Iñaki en el AR (el modelo mide 1.65 m; más chico no tapa el camino)
+  const inaki3d = { listo: false, error: null, animaciones: [], actual: null, base: "idle", ultimoGesto: null, yaw: 0, ultimoMs: 0, mov: { x: 0, z: 0, ms: 0 } };
+  async function cargarInaki3D() {
+    if (!inaki.activo || parametrosURL.get("inaki3d") === "0") return;
+    try {
+      const THREE = await import("three");
+      const { GLTFLoader } = await import("three/addons/loaders/GLTFLoader.js");
+      const ANCHO = 288, ALTO = 384;
+      const canvas = document.createElement("canvas");
+      canvas.width = ANCHO; canvas.height = ALTO;
+      // preserveDrawingBuffer: el cuadro sigue disponible para copiarlo con drawImage al canvas AR
+      const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true, preserveDrawingBuffer: true });
+      renderer.setPixelRatio(1);
+      renderer.setSize(ANCHO, ALTO, false);
+      renderer.setClearColor(0x000000, 0);
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+      const scene = new THREE.Scene();
+      scene.add(new THREE.HemisphereLight(0xffffff, 0x8a8a8a, 2.2));
+      const sol = new THREE.DirectionalLight(0xffffff, 1.6);
+      sol.position.set(1.5, 3, 2.5);
+      scene.add(sol);
+      // Cámara fija mirando a Iñaki: cubre ~2 m de alto para que quepan los gestos con los brazos arriba
+      const camera = new THREE.PerspectiveCamera(30, ANCHO / ALTO, 0.1, 20);
+      camera.position.set(0, 0.95, 3.9);
+      camera.lookAt(0, 0.9, 0);
+      const gltf = await new GLTFLoader().loadAsync(new URL("../assets/models/inaki.glb", location.href).href);
+      const modelo = gltf.scene;
+      scene.add(modelo);
+      const mixer = new THREE.AnimationMixer(modelo);
+      const acciones = {};
+      gltf.animations.forEach((clip) => { acciones[clip.name] = mixer.clipAction(clip); });
+      if (!acciones.idle) throw new Error("el GLB no trae la animación idle");
+      // Dónde caen los pies (y=0) y la cabeza (1.65 m) dentro del cuadro, en fracción de alto
+      const fraccionY = (y) => (1 - new THREE.Vector3(0, y, 0).project(camera).y) / 2;
+      Object.assign(inaki3d, {
+        THREE, renderer, scene, camera, modelo, mixer, acciones, canvas, ANCHO, ALTO,
+        pieFrac: fraccionY(0), cabezaFrac: fraccionY(1.65),
+        animaciones: Object.keys(acciones), listo: true
+      });
+      mixer.addEventListener("finished", () => ponerAnimacion3D(inaki3d.base, 0.35));
+      inaki3d.mov = { x: estado.usuarioX, z: estado.usuarioZ, ms: 0 };
+      ponerAnimacion3D("idle", 0);
+      // Si Iñaki ya había hablado mientras cargaba el modelo (p. ej. el saludo), hace ese gesto ahora
+      if (performance.now() - inaki.textoMs < 5000) gestoInaki3D(inaki.gesto);
+    } catch (e) {
+      inaki3d.error = String(e && e.message || e);
+      console.warn("ARGOS Iñaki 3D no cargó; se usa el 🐺:", inaki3d.error);
+    }
+  }
+  function ponerAnimacion3D(nombre, fundido) {
+    const a = inaki3d.acciones && inaki3d.acciones[nombre];
+    if (!a || inaki3d.actual === nombre) return;
+    const bucle = nombre === "idle" || nombre === "caminar";
+    a.reset();
+    a.setLoop(bucle ? inaki3d.THREE.LoopRepeat : inaki3d.THREE.LoopOnce, bucle ? Infinity : 1);
+    a.clampWhenFinished = !bucle;
+    const previa = inaki3d.actual && inaki3d.acciones[inaki3d.actual];
+    a.play();
+    if (previa && fundido > 0) previa.crossFadeTo(a, fundido, false);
+    else if (previa) previa.stop();
+    inaki3d.actual = nombre;
+  }
+  // Gesto pedido por decirInaki o por Gemini ("saludar", "senalar", "presentar", "celebrar", "pensar")
+  function gestoInaki3D(gesto) {
+    if (!inaki3d.listo || !gesto || gesto === "ninguno" || !inaki3d.acciones[gesto]) return;
+    inaki3d.ultimoGesto = gesto;
+    ponerAnimacion3D(gesto, 0.25);
+  }
+  // Dibuja el cuadro 3D con los pies en (sx, sy). escala = píxeles por metro a esa distancia.
+  function dibujarInaki3D(sx, sy, escala, h) {
+    const ahora = performance.now();
+    const dt = inaki3d.ultimoMs ? Math.min(0.1, (ahora - inaki3d.ultimoMs) / 1000) : 0;
+    inaki3d.ultimoMs = ahora;
+    // Camina si tú avanzaste en el último segundo y medio; si no, respira (idle)
+    if (Math.hypot(estado.usuarioX - inaki3d.mov.x, estado.usuarioZ - inaki3d.mov.z) > 0.15) {
+      inaki3d.mov = { x: estado.usuarioX, z: estado.usuarioZ, ms: ahora };
+    }
+    const hablando = ahora - inaki.textoMs < 4000;
+    inaki3d.base = !hablando && ahora - inaki3d.mov.ms < 1500 && inaki3d.acciones.caminar ? "caminar" : "idle";
+    const enGesto = inaki3d.actual && inaki3d.actual !== "idle" && inaki3d.actual !== "caminar";
+    if (!enGesto) ponerAnimacion3D(inaki3d.base, 0.3);
+    // De frente cuando te habla; de 3/4 de espaldas cuando camina delante de ti
+    const yawMeta = inaki3d.actual === "caminar" ? Math.PI * 0.8 : 0;
+    inaki3d.yaw += (yawMeta - inaki3d.yaw) * Math.min(1, dt * 4);
+    inaki3d.modelo.rotation.y = inaki3d.yaw; // el GLB mira hacia +Z (hacia la cámara): yaw 0 = de frente
+    inaki3d.mixer.update(dt);
+    inaki3d.renderer.render(inaki3d.scene, inaki3d.camera);
+    // Tamaño del cuadro para que Iñaki mida ALTO_INAKI_MUNDO metros a esa distancia
+    const altoInakiPx = limitar(escala * ALTO_INAKI_MUNDO, 50, h * 0.75);
+    const altoCuadro = altoInakiPx / (inaki3d.pieFrac - inaki3d.cabezaFrac);
+    const anchoCuadro = altoCuadro * (inaki3d.ANCHO / inaki3d.ALTO);
+    arCtx.drawImage(inaki3d.canvas, sx - anchoCuadro / 2, sy - inaki3d.pieFrac * altoCuadro, anchoCuadro, altoCuadro);
+    return altoInakiPx;
+  }
+  window.ARGOS_INAKI3D = () => ({ listo: inaki3d.listo, error: inaki3d.error, animaciones: inaki3d.animaciones.slice(), actual: inaki3d.actual, ultimoGesto: inaki3d.ultimoGesto, yaw: inaki3d.yaw });
+  window.ARGOS_INAKI3D_CUADRO = () => (inaki3d.listo ? inaki3d.canvas.toDataURL("image/png") : null); // para las pruebas
+  cargarInaki3D();
+
   function dibujarInaki(P, camino, largoVisible, t, enDestino, w, h) {
     if (!inaki.activo) return;
     const s = enDestino ? 1.6 : Math.min(3, Math.max(1.2, largoVisible - 0.5));
     const c = puntoEnCamino(camino.pts, s);
-    const salto = Math.abs(Math.sin(t * 5)) * (enDestino ? 0.22 : 0.07);
+    const salto = inaki3d.listo ? 0 : Math.abs(Math.sin(t * 5)) * (enDestino ? 0.22 : 0.07);
     const piso = P(c.x, 0.02, c.z);
     const cuerpo = P(c.x, 0.42 + salto, c.z);
     const visible = piso && cuerpo && cuerpo.sx > -40 && cuerpo.sx < w + 40 && cuerpo.sy > 0 && cuerpo.sy < h + 40;
     if (!visible) {
       // Iñaki quedó fuera de la pantalla (estás mirando a otro lado): su globo se queda abajo al centro
       dibujarGloboInaki(w / 2, h * 0.62, w);
+      return;
+    }
+    if (inaki3d.listo) {
+      arCtx.save();
+      arCtx.beginPath();
+      const sombra = limitar(0.35 * piso.escala, 14, 120);
+      arCtx.ellipse(piso.sx, piso.sy, sombra, sombra * 0.3, 0, 0, Math.PI * 2);
+      arCtx.fillStyle = "rgba(0, 0, 0, 0.35)";
+      arCtx.fill();
+      arCtx.restore();
+      const altoPx = dibujarInaki3D(piso.sx, piso.sy, piso.escala, h);
+      dibujarGloboInaki(piso.sx, piso.sy - altoPx - 8, w);
       return;
     }
     const tam = limitar(0.85 * cuerpo.escala, 22, 150);
