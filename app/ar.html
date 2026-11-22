@@ -2191,13 +2191,16 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
   const chatInaki = { historial: [], ocupado: false, log: null, estado: null };
   const sinAcentos = (s) => String(s).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
   // Sin servidor o sin red: contesta con el resumen del lugar que mencione la pregunta (nunca inventa)
-  function respuestaLocalInaki(pregunta) {
+  // fallo = sí hay servidor, pero esta vez no contestó (tardó, sin red o límite por minuto de Gemini)
+  function respuestaLocalInaki(pregunta, fallo) {
     const q = sinAcentos(pregunta);
     for (const id in CONTENIDO_INAKI.lugares) {
       const l = CONTENIDO_INAKI.lugares[id];
       if ((l.alias || []).some((a) => q.includes(sinAcentos(a)))) return l.globo;
     }
-    return "Sin conexión no puedo contestar eso, pero te sigo guiando por la ruta.";
+    return fallo
+      ? "Esta vez no pude consultar a Gemini (tardó o se llenó el límite por minuto). Pregúntame otra vez en unos segundos."
+      : "Sin conexión no puedo contestar eso, pero te sigo guiando por la ruta.";
   }
   function pintarChatInaki(quien, texto) {
     if (!chatInaki.log) return;
@@ -2233,8 +2236,8 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
       .then((r) => (r.ok ? r.json() : null))
       .then((j) => (j && typeof j.texto === "string" && j.texto.trim()
         ? responder(j.texto.trim().slice(0, 220), j.gesto)
-        : responder(respuestaLocalInaki(pregunta))))
-      .catch(() => responder(respuestaLocalInaki(pregunta)))
+        : responder(respuestaLocalInaki(pregunta, true))))
+      .catch(() => responder(respuestaLocalInaki(pregunta, true)))
       .finally(() => {
         clearTimeout(corte);
         chatInaki.ocupado = false;
@@ -2255,6 +2258,7 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
       "font:15px/1.35 system-ui,-apple-system,sans-serif;display:none";
     const estiloBtn = "padding:0 12px;border:0;border-radius:10px;font-size:18px;background:#334155;color:#fff;min-height:44px";
     panel.innerHTML =
+      '<div id="chatInakiModo" style="font-size:12px;color:#94a3b8;margin-bottom:4px"></div>' +
       '<div id="chatInakiLog" style="max-height:38vh;overflow-y:auto"></div>' +
       '<div id="chatInakiEstado" style="font-size:13px;color:#94a3b8;min-height:16px"></div>' +
       '<form id="chatInakiForm" style="display:flex;gap:6px;margin-top:4px">' +
@@ -2272,6 +2276,10 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
       const abrir = panel.style.display === "none";
       panel.style.display = abrir ? "block" : "none";
       if (abrir) {
+        // Para saber de un vistazo si las preguntas van a Gemini o solo a lo guardado
+        panel.querySelector("#chatInakiModo").textContent = inaki.servidor
+          ? "🟢 Conectado a Gemini"
+          : "⚪ Sin servidor: solo respuestas guardadas (abre la app con &inaki=…)";
         if (!chatInaki.log.childElementCount) pintarChatInaki("inaki", "¡Hola! Pregúntame del campus: los Lobos, la Explanada, El Cubo, Camelia o el laboratorio PB03.");
         entrada.focus();
       }

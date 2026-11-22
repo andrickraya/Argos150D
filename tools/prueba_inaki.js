@@ -172,6 +172,14 @@ const espera = (ms) => new Promise((r) => setTimeout(r, ms));
   log = await preguntar(p, "¿Cuánto cuesta la colegiatura?");
   ok(/Sin conexión no puedo contestar eso/.test(log), "G7 sin servidor no inventa lo que no sabe");
   ok(p.errs.length === 0, "G8 sin errores JS", p.errs.join(" | "));
+  ok(/Sin servidor/.test(await p.evaluate(() => document.getElementById("chatInakiModo").textContent)), "G9 el panel avisa que no hay servidor");
+  await p.close();
+  // Servidor configurado pero caído: no dice "sin conexión", dice que Gemini no contestó
+  p = await abrir("?inaki=" + encodeURIComponent("http://localhost:9/"));
+  await p.evaluate(() => document.getElementById("btnChatInaki").click());
+  ok(/Conectado a Gemini/.test(await p.evaluate(() => document.getElementById("chatInakiModo").textContent)), "G10 con servidor el panel dice Conectado a Gemini");
+  log = await preguntar(p, "¿Cuánto cuesta la colegiatura?");
+  ok(/no pude consultar a Gemini/.test(log), "G11 si el servidor falla lo dice claro", log.slice(-90));
   worker.close();
 
   await b.close(); srv.close(); ollama.close();

@@ -75,7 +75,8 @@ export default {
 
     const t0 = Date.now();
     // Primero el modelo principal; si está saturado (429/503) o tarda, el de respaldo. La app corta a los 8 s.
-    const intentos = [[env.MODELO, 4500], [env.MODELO_RESPALDO, 3000]].filter(([m]) => m);
+    // Suma < 7 s para que la app (que espera 8 s) siempre reciba respuesta
+    const intentos = [[env.MODELO, 4000], [env.MODELO_RESPALDO, 2800]].filter(([m]) => m);
     let r, modeloUsado;
     for (const [modelo, limite] of intentos) {
       modeloUsado = modelo;
