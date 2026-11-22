@@ -74,12 +74,12 @@ export default {
       .map((m) => ({ role: m.rol === "inaki" ? "model" : "user", parts: [{ text: m.texto.slice(0, 300) }] }));
 
     const t0 = Date.now();
-    // Primero el modelo principal; si está saturado (429/503) o tarda, el de respaldo. La app corta a los 8 s.
     // Cadena de modelos: cada uno tiene su propio límite por minuto en el plan gratuito. Si uno está lleno (429)
     // o saturado (503) se brinca al siguiente (un 429 tarda ~0.2 s). Todo cabe en < 7 s (la app espera 8 s).
     const modelos = String(env.MODELOS || env.MODELO || "").split(",").map((m) => m.trim()).filter(Boolean);
     const presupuesto = 6800;
     let r, modeloUsado;
+    const bitacora = []; // qué contestó cada modelo (se ve en Cloudflare → Workers → argos-inaki → Logs)
     for (let i = 0; i < modelos.length; i++) {
       const queda = presupuesto - (Date.now() - t0);
       if (queda < 1200) break;
@@ -87,13 +87,15 @@ export default {
       const limite = i === 0 ? Math.min(4000, queda) : queda; // el primero no se come todo el tiempo
       try {
         r = await llamarGemini(env, modeloUsado, historial, prompt, limite);
-      } catch (_) { r = null; continue; } // no respondió a tiempo
+      } catch (_) { r = null; bitacora.push(modeloUsado + ": tardó"); continue; }
+      bitacora.push(modeloUsado + ": " + r.status);
       if (r.ok || (r.status !== 429 && r.status !== 503)) break;
     }
-    if (!r) return json({ error: "Gemini no respondió a tiempo", ms: Date.now() - t0 }, 504);
+    console.log("inaki", JSON.stringify({ pregunta: pregunta.slice(0, 80), bitacora, ms: Date.now() - t0 }));
+    if (!r) return json({ error: "Gemini no respondió a tiempo", bitacora, ms: Date.now() - t0 }, 504);
     if (!r.ok) {
       // 429 = se acabó la cuota gratuita del minuto/día. La app usa su frase local.
-      return json({ error: "Gemini respondió " + r.status, detalle: (await r.text()).slice(0, 300) }, 502);
+      return json({ error: "Gemini respondió " + r.status, bitacora, detalle: (await r.text()).slice(0, 300) }, 502);
     }
     const datos = await r.json();
     const crudo = datos?.candidates?.[0]?.content?.parts?.map((p) => p.text || "").join("") || "";
