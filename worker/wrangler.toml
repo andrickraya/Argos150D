@@ -6,9 +6,10 @@ preview_urls = false
 
 [vars]
 # Modelos de Gemini en orden de preferencia, separados por coma. Se cambian aquí sin tocar el código.
-# Cada modelo tiene su propio límite por minuto en el plan gratuito: si uno se llena, se usa el siguiente.
-# (gemini-3.8-flash daba 503 "high demand" en el plan gratuito el 2026-11-19.)
-MODELOS = "gemini-3.5-flash,gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-flash-latest"
+# Cada modelo tiene su propio límite en el plan gratuito: si uno se llena, se usa el siguiente.
+# AI Studio (2026-11-21): los "Flash" dan solo 5/min y 20/día; "Flash Lite" da 15/min y 500/día.
+# Por eso solo modelos Lite: alcanzan para la demo y contestan en < 1 s.
+MODELOS = "gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-flash-lite-latest"
 
 # La API key NO va aquí: se guarda como secreto con
 #   npx wrangler secret put GEMINI_API_KEY
