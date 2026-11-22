@@ -887,6 +887,7 @@
   const inaki = {
     activo: parametrosURL.get("lobo") !== "0",
     servidor: null,
+    rutaConModelo: parametrosURL.get("inakiruta") === "1",
     texto: "",
     textoMs: 0,
     textoDur: 12000,
@@ -982,7 +983,9 @@
     inaki.textoDur = op.dur || 12000;
     inaki.gesto = op.gesto || "ninguno";
     inaki.ultimoEvento = evento;
-    if (!inaki.servidor || op.soloLocal) { inaki.pedido++; hablarInaki(op.voz || textoLocal); return; }
+    // Los avisos de la ruta son locales (exactos y gratis): Gemini queda para las preguntas del chat,
+    // porque el plan gratuito da pocas llamadas por minuto. Con &inakiruta=1 también los reescribe Gemini.
+    if (!inaki.servidor || op.soloLocal || !inaki.rutaConModelo) { inaki.pedido++; hablarInaki(op.voz || textoLocal); return; }
     const miPedido = ++inaki.pedido;
     const ctl = typeof AbortController === "function" ? new AbortController() : null;
     const corte = setTimeout(() => ctl && ctl.abort(), 8000);

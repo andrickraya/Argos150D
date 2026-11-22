@@ -5,11 +5,10 @@ workers_dev = true
 preview_urls = false
 
 [vars]
-# Modelos de Gemini. Se cambian aquí sin tocar el código.
-# Principal: mejor calidad (~1.5 s). Respaldo: si el principal está saturado (429/503) o tarda (~0.8 s).
+# Modelos de Gemini en orden de preferencia, separados por coma. Se cambian aquí sin tocar el código.
+# Cada modelo tiene su propio límite por minuto en el plan gratuito: si uno se llena, se usa el siguiente.
 # (gemini-3.8-flash daba 503 "high demand" en el plan gratuito el 2026-11-19.)
-MODELO = "gemini-3.5-flash"
-MODELO_RESPALDO = "gemini-3.5-flash-lite"
+MODELOS = "gemini-3.5-flash,gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-flash-latest"
 
 # La API key NO va aquí: se guarda como secreto con
 #   npx wrangler secret put GEMINI_API_KEY

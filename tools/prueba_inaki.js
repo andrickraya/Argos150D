@@ -76,7 +76,7 @@ const espera = (ms) => new Promise((r) => setTimeout(r, ms));
   await p.close();
 
   // ---- C. Con servidor: la frase la pone el modelo ----
-  p = await abrir("?inaki=" + encodeURIComponent("http://localhost:8791/inaki"));
+  p = await abrir("?inakiruta=1&inaki=" + encodeURIComponent("http://localhost:8791/inaki"));
   await ruta(p, "N07", "N10"); await espera(2200);
   t = await dibujado(p);
   ok(/MODELO: EVENTO: inicio/.test(t), "C1 la app muestra la respuesta del modelo", t.replace(/🐺/g, "").replace(/\s+/g, " ").slice(0, 80));
@@ -132,14 +132,14 @@ const espera = (ms) => new Promise((r) => setTimeout(r, ms));
   await p.close();
 
   // ---- G. Chat: pregunta escrita → Worker (de mentira) → respuesta en el panel, con memoria ----
-  let pedidoChat = null;
+  let pedidoChat = null, avisosRuta = 0;
   const worker = http.createServer((q, r) => {
     const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "Content-Type", "Content-Type": "application/json" };
     if (q.method === "OPTIONS") { r.writeHead(204, cors); r.end(); return; }
     let c = ""; q.on("data", (d) => (c += d)); q.on("end", () => {
       const j = JSON.parse(c);
       r.writeHead(200, cors);
-      if (!j.pregunta) { r.end(JSON.stringify({ texto: j.sugerencia, gesto: "ninguno" })); return; } // avisos de la ruta
+      if (!j.pregunta) { avisosRuta++; r.end(JSON.stringify({ texto: j.sugerencia, gesto: "ninguno" })); return; } // avisos de la ruta
       pedidoChat = j;
       r.end(JSON.stringify({ texto: "RESP: " + j.pregunta + " | memoria " + j.historial.length, gesto: "pensar" }));
     });
@@ -161,6 +161,7 @@ const espera = (ms) => new Promise((r) => setTimeout(r, ms));
     "G2 manda la pregunta con el contexto y muestra la respuesta", log.slice(-70));
   log = await preguntar(p, "¿y de qué material es?");
   ok(/memoria 2/.test(log), "G3 la segunda pregunta lleva la memoria de la primera", log.slice(-50));
+  ok(avisosRuta === 0, "G3b los avisos de la ruta no gastan llamadas a Gemini", "avisos enviados: " + avisosRuta);
   t = await dibujado(p);
   ok(/RESP: ¿y de qué material/.test(t), "G4 la respuesta también sale en el globo de Iñaki");
   ok(p.errs.length === 0, "G5 sin errores JS", p.errs.join(" | "));

@@ -52,7 +52,7 @@ export default {
       const d = await r.json();
       return json((d.models || []).map((m) => m.name).filter((n) => /flash/.test(n)));
     }
-    if (req.method === "GET") return json({ ok: true, servicio: "argos-inaki", modelo: env.MODELO, key: !!env.GEMINI_API_KEY });
+    if (req.method === "GET") return json({ ok: true, servicio: "argos-inaki", modelos: env.MODELOS, key: !!env.GEMINI_API_KEY });
     if (req.method !== "POST") return json({ error: "método no permitido" }, 405);
     if (!env.GEMINI_API_KEY) return json({ error: "falta GEMINI_API_KEY" }, 500);
 
@@ -75,13 +75,18 @@ export default {
 
     const t0 = Date.now();
     // Primero el modelo principal; si está saturado (429/503) o tarda, el de respaldo. La app corta a los 8 s.
-    // Suma < 7 s para que la app (que espera 8 s) siempre reciba respuesta
-    const intentos = [[env.MODELO, 4000], [env.MODELO_RESPALDO, 2800]].filter(([m]) => m);
+    // Cadena de modelos: cada uno tiene su propio límite por minuto en el plan gratuito. Si uno está lleno (429)
+    // o saturado (503) se brinca al siguiente (un 429 tarda ~0.2 s). Todo cabe en < 7 s (la app espera 8 s).
+    const modelos = String(env.MODELOS || env.MODELO || "").split(",").map((m) => m.trim()).filter(Boolean);
+    const presupuesto = 6800;
     let r, modeloUsado;
-    for (const [modelo, limite] of intentos) {
-      modeloUsado = modelo;
+    for (let i = 0; i < modelos.length; i++) {
+      const queda = presupuesto - (Date.now() - t0);
+      if (queda < 1200) break;
+      modeloUsado = modelos[i];
+      const limite = i === 0 ? Math.min(4000, queda) : queda; // el primero no se come todo el tiempo
       try {
-        r = await llamarGemini(env, modelo, historial, prompt, limite);
+        r = await llamarGemini(env, modeloUsado, historial, prompt, limite);
       } catch (_) { r = null; continue; } // no respondió a tiempo
       if (r.ok || (r.status !== 429 && r.status !== 503)) break;
     }
