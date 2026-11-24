@@ -399,53 +399,59 @@
           </div>
 
           <div class="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-            <article class="feature-card card-hover bg-white p-6 md:p-7">
+            <a href="practicas.html#p1" class="feature-card card-hover block bg-white p-6 md:p-7">
               <p class="text-[12px] font-medium tracking-[-0.12px] text-[#707070]">Práctica 1</p>
-              <h3 class="mt-4 text-[24px] font-semibold tracking-[-0.4px] text-[#1d1d1f]">Físicas Básicas y Gravedad</h3>
+              <h3 class="mt-4 text-[24px] font-semibold tracking-[-0.4px] text-[#1d1d1f]">Fundamentos de Unity</h3>
               <p class="mt-4 text-[17px] leading-[1.47] tracking-[-0.374px] text-[#707070]">
-                Exploramos cómo los objetos participan en la simulación física de Unity configurando un plano base y soltando objetos para analizar la masa, la gravedad y la resistencia en la caída.
+                GameObjects, jerarquías y prefabs: construimos un parque de diversiones con una rueda de la fortuna animada sin escribir código.
               </p>
-            </article>
+              <span class="mt-5 inline-block text-[14px] font-semibold text-[#DC0235]">Ver práctica completa →</span>
+            </a>
 
-            <article class="feature-card card-hover bg-white p-6 md:p-7">
+            <a href="practicas.html#p2" class="feature-card card-hover block bg-white p-6 md:p-7">
               <p class="text-[12px] font-medium tracking-[-0.12px] text-[#707070]">Práctica 2</p>
-              <h3 class="mt-4 text-[24px] font-semibold tracking-[-0.4px] text-[#1d1d1f]">Colisiones Avanzadas</h3>
-              <p class="mt-4 text-[17px] leading-[1.47] tracking-[-0.374px] text-[#707070]">
-                Programamos la detección de colisiones mediante el evento OnCollisionEnter y evaluamos el comportamiento físico comparando los métodos de detección Discrete y Continuous.
-              </p>
-            </article>
-
-            <article class="feature-card card-hover bg-white p-6 md:p-7">
-              <p class="text-[12px] font-medium tracking-[-0.12px] text-[#707070]">Práctica 3</p>
               <h3 class="mt-4 text-[24px] font-semibold tracking-[-0.4px] text-[#1d1d1f]">Objetos y Scripts</h3>
               <p class="mt-4 text-[17px] leading-[1.47] tracking-[-0.374px] text-[#707070]">
-                Introducción a la programación orientada a objetos en C#. Desarrollamos un cañón virtual creando instancias de balas físicas con Rigidbody, las cuales se autodestruyen mediante código tras unos segundos para optimizar la memoria.
+                Primer código en C#: un cañón que instancia balas físicas con Rigidbody que se autodestruyen, más una interfaz con contador de munición.
               </p>
-            </article>
+              <span class="mt-5 inline-block text-[14px] font-semibold text-[#DC0235]">Ver práctica completa →</span>
+            </a>
 
-            <article class="feature-card card-hover bg-white p-6 md:p-7">
+            <a href="practicas.html#p3" class="feature-card card-hover block bg-white p-6 md:p-7">
+              <p class="text-[12px] font-medium tracking-[-0.12px] text-[#707070]">Práctica 3</p>
+              <h3 class="mt-4 text-[24px] font-semibold tracking-[-0.4px] text-[#1d1d1f]">Físicas y Colisiones</h3>
+              <p class="mt-4 text-[17px] leading-[1.47] tracking-[-0.374px] text-[#707070]">
+                Masa, gravedad y resistencia en una escena de caída, y una pista con obstáculos donde detectamos choques con OnCollisionEnter (Discrete vs Continuous).
+              </p>
+              <span class="mt-5 inline-block text-[14px] font-semibold text-[#DC0235]">Ver práctica completa →</span>
+            </a>
+
+            <a href="practicas.html#p4" class="feature-card card-hover block bg-white p-6 md:p-7">
               <p class="text-[12px] font-medium tracking-[-0.12px] text-[#707070]">Práctica 4</p>
-              <h3 class="mt-4 text-[24px] font-semibold tracking-[-0.4px] text-[#1d1d1f]">Interfaz de Usuario</h3>
+              <h3 class="mt-4 text-[24px] font-semibold tracking-[-0.4px] text-[#1d1d1f]">Conexión de Escenas</h3>
               <p class="mt-4 text-[17px] leading-[1.47] tracking-[-0.374px] text-[#707070]">
-                Creamos una interfaz gráfica sobre la pantalla mediante un Canvas, utilizando elementos TextMeshPro para crear un contador de munición y botones interactivos que accionan el disparo.
+                Navegación entre tres escenas con SceneManager y los eventos On Click() de los botones de la interfaz.
               </p>
-            </article>
+              <span class="mt-5 inline-block text-[14px] font-semibold text-[#DC0235]">Ver práctica completa →</span>
+            </a>
 
-            <article class="feature-card card-hover bg-white p-6 md:p-7">
+            <a href="practicas.html#p5" class="feature-card card-hover block bg-white p-6 md:p-7">
               <p class="text-[12px] font-medium tracking-[-0.12px] text-[#707070]">Práctica 5</p>
-              <h3 class="mt-4 text-[24px] font-semibold tracking-[-0.4px] text-[#1d1d1f]">Conexión y Navegación de Escenas</h3>
+              <h3 class="mt-4 text-[24px] font-semibold tracking-[-0.4px] text-[#1d1d1f]">Colisiones y Triggers</h3>
               <p class="mt-4 text-[17px] leading-[1.47] tracking-[-0.374px] text-[#707070]">
-                Estructuramos el flujo del proyecto conectando diferentes niveles. Utilizamos el SceneManager y asignamos funciones de cambio de escena a los eventos OnClick de los botones en la interfaz.
+                Una nave controlada con botones atraviesa un agujero negro y, mediante un trigger, hace aparecer planetas y asteroides.
               </p>
-            </article>
+              <span class="mt-5 inline-block text-[14px] font-semibold text-[#DC0235]">Ver práctica completa →</span>
+            </a>
 
-            <article class="feature-card card-hover bg-white p-6 md:p-7">
+            <a href="practicas.html#p6" class="feature-card card-hover block bg-white p-6 md:p-7">
               <p class="text-[12px] font-medium tracking-[-0.12px] text-[#707070]">Práctica 6</p>
               <h3 class="mt-4 text-[24px] font-semibold tracking-[-0.4px] text-[#1d1d1f]">Conectividad IoT (MQTT)</h3>
               <p class="mt-4 text-[17px] leading-[1.47] tracking-[-0.374px] text-[#707070]">
-                Integramos comunicación en tiempo real usando el protocolo MQTT en Unity. Desarrollamos interacciones de Realidad Mixta para cambiar el color de figuras y enviamos/recibimos comandos desde una placa ESP32 para controlar un carro omnidireccional.
+                Figuras en realidad mixta que cambian de color al tocarlas y un carro omnidireccional controlado en tiempo real por MQTT.
               </p>
-            </article>
+              <span class="mt-5 inline-block text-[14px] font-semibold text-[#DC0235]">Ver práctica completa →</span>
+            </a>
           </div>
         </div>
       </section>
