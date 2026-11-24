@@ -17,7 +17,7 @@ const PRACTICAS = [
     resumen:
       'Primer contacto con el editor: creamos figuras 3D, las organizamos en jerarquías padre-hijo y construimos un parque de diversiones con una rueda de la fortuna animada.',
     etiquetas: ['Unity Hub', 'Transform', 'Jerarquías', 'Prefabs', 'Animator'],
-    video: { src: 'assets/videos/practica-rueda.webm', tipo: 'video/webm' },
+    video: { src: 'assets/videos/practica1-parque.mp4', tipo: 'video/mp4' },
     objetivo:
       'Comprender cómo se estructura lógicamente un proyecto en Unity antes de escribir una sola línea de código: ventanas principales, GameObjects, componentes y prefabs.',
     conceptos: [
