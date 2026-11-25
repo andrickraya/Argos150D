@@ -399,7 +399,7 @@ public class MoverPulsador : MonoBehaviour
     resumen:
       'Comunicación en tiempo real entre Unity (Meta Quest 3S) y otros dispositivos por MQTT: seis figuras que cambian de color al tocarlas y un carro omnidireccional controlado a distancia.',
     etiquetas: ['MQTT', 'MQTTnet', 'Mosquitto', 'MQTT Explorer', 'Realidad Mixta', 'Three.js'],
-    video: null,
+    video: { src: 'assets/videos/practica6-webapp.mp4', tipo: 'video/mp4' },
     objetivo:
       'Integrar comunicación en tiempo real por el protocolo MQTT en una experiencia de realidad mixta en Unity.',
     conceptos: [
@@ -541,12 +541,14 @@ public class MQTTBasico : MonoBehaviour
       }
     ],
     resultados: [
-      'Unity publica y recibe mensajes en tiempo real; MQTT Explorer muestra cada evento en el topic <code>clase/te/quest3/texto</code>.',
-      'La escena final (<code>Practica_MR_MQTT_Completa</code>) reúne el texto flotante, las 6 figuras, el carro omnidireccional y el <code>MQTT_Manager</code>.',
-      'Usamos tres topics: <code>clase/te/quest3/texto</code>, <code>clase/te/quest3/figuras</code> y <code>clase/te/quest3/carro</code>.',
-      'Esta práctica es la base de la conectividad de ARGOS: mandar eventos del visor a otros dispositivos y analizarlos como datos.'
+      'La Web App se conecta al broker público (<code>wss://test.mosquitto.org:8081/mqtt</code>) y publica cada interacción: al tocar una figura cambia de color y el texto flotante muestra qué figura se tocó y su nuevo color.',
+      'El panel del carro envía los comandos de movimiento, giro, faros y direccionales por el topic <code>clase/te/quest3/carro</code>, y el espejo 3D refleja la posición del carro.',
+      'Cada evento queda registrado con id, hora, topic, categoría, detalle y posición (X, Z) del carro, y se exporta como dataset CSV/JSON para analizarlo.',
+      'En Unity armamos la escena <code>Practica_MR_MQTT_Completa</code> (texto flotante, 6 figuras, carro y <code>MQTT_Manager</code>); la conexión directa con el visor Quest quedó en pruebas.',
+      'Esta práctica es la base de la conectividad de ARGOS: mandar eventos a otros dispositivos y analizarlos como datos.'
     ],
     imagenes: [
+      { src: 'assets/img/practicas/p6-2.jpg', pie: 'Dataset exportado desde la Web App: cada mensaje MQTT con su hora, topic, figura o comando y la posición del carro.' },
       { src: 'assets/img/practicas/p6-1.jpg', pie: 'Escena en Unity: texto flotante, las 6 figuras interactivas y el carro omnidireccional.' }
     ]
   }
