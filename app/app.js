@@ -143,13 +143,15 @@
   // 2026-11-12: lo mismo con los puntos que Andrick recolocó en el editor de caminos (app/editor.html).
   // 2026-11-18: sus ajustes de la Explanada ya están en campus_data.js; el pin de Puerta 3 movido por error se descarta.
   // 2026-11-25: Escultura de Lobos (N03) y N70–N76 recolocados en el editor; la Explanada ya no da vuelta en U (N81–N84).
+  // 2026-11-25 (2): Explanada (N72–N77) y pasillo N85–N89 recorridos a la izquierda; también N60 y N100.
   try {
-    if (localStorage.getItem("argos_limpieza_pines") !== "2026-11-25") {
+    if (localStorage.getItem("argos_limpieza_pines") !== "2026-11-25b") {
       const guardados = JSON.parse(localStorage.getItem(CLAVE_PINES) || "{}") || {};
-      ["N01", "N02", "N03", "N04", "N05", "N07", "N61", "N70", "N80", "N81", "N82", "N83", "N11", "N12", "N13", "N14", "N15", "N20", "N29", "N30", "N31", "N37", "N38", "N40", "N71", "N72", "N73", "N74", "N75", "N76", "N84"]
+      ["N01", "N02", "N03", "N04", "N05", "N07", "N61", "N70", "N80", "N81", "N82", "N83", "N11", "N12", "N13", "N14", "N15", "N20", "N29", "N30", "N31", "N37", "N38", "N40", "N71", "N72", "N73", "N74", "N75", "N76", "N84",
+        "N60", "N77", "N85", "N87", "N88", "N89", "N100"]
         .forEach((id) => { delete guardados[id]; });
       localStorage.setItem(CLAVE_PINES, JSON.stringify(guardados));
-      localStorage.setItem("argos_limpieza_pines", "2026-11-25");
+      localStorage.setItem("argos_limpieza_pines", "2026-11-25b");
     }
   } catch (_) {}
   function leerPines() {
