@@ -2640,10 +2640,13 @@
 
   // iPhone/iPad (iOS 13+): el giroscopio y el podómetro requieren permiso pedido dentro de un toque
   // y re-registrar los listeners DESPUÉS de que requestPermission() devuelva "granted".
-  let permisosSensoresPedidos = false;
+  // Si el permiso falla (toque que iOS no cuenta como gesto, diálogo cerrado), se vuelve a pedir en el siguiente toque.
+  let permisosSensoresPedidos = false, pidiendoSensores = false, intentosSensores = 0;
   async function solicitarPermisosSensores() {
-    if (permisosSensoresPedidos) return;
-    permisosSensoresPedidos = true;
+    if (permisosSensoresPedidos || pidiendoSensores) return;
+    pidiendoSensores = true;
+    intentosSensores++;
+    let concedido = true;
     try {
       if (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === "function") {
         const resO = await DeviceOrientationEvent.requestPermission();
@@ -2652,14 +2655,27 @@
           window.removeEventListener("deviceorientation", listenerOrientacionRel, true);
           window.addEventListener("deviceorientationabsolute", listenerOrientacionAbs, true);
           window.addEventListener("deviceorientation", listenerOrientacionRel, true);
-        }
+        } else concedido = false;
       }
       if (window.DeviceMotionEvent && typeof DeviceMotionEvent.requestPermission === "function") {
-        await DeviceMotionEvent.requestPermission();
+        if ((await DeviceMotionEvent.requestPermission()) !== "granted") concedido = false;
       }
     } catch (err) {
+      concedido = false;
       console.warn("ARGOS sensores:", err);
     }
+    pidiendoSensores = false;
+    if (!concedido) {
+      locationModeBadge.textContent = intentosSensores < 3
+        ? "🧭 Toca la pantalla otra vez para activar el giro"
+        : "🧭 Sin permiso de movimiento: cierra la pestaña de Safari y abre el link de nuevo";
+      const vc = document.getElementById("arVideo");
+      if (vc && (!vc.srcObject || vc.paused)) activarCamara(vc);
+      return; // se reintenta en el siguiente toque
+    }
+    permisosSensoresPedidos = true;
+    document.removeEventListener("click", solicitarPermisosSensores, true);
+    document.removeEventListener("touchend", solicitarPermisosSensores, true);
     // Si a los 3 s no llegó Norte real, avisar que las flechas son aproximadas
     setTimeout(() => {
       if (!estado.brujulaReal) locationModeBadge.textContent = "⚠️ Sin brújula: modo aproximado";
@@ -2668,8 +2684,8 @@
     const v = document.getElementById("arVideo");
     if (v && (!v.srcObject || v.paused)) activarCamara(v);
   }
-  document.addEventListener("click", solicitarPermisosSensores, { once: true, capture: true });
-  document.addEventListener("touchend", solicitarPermisosSensores, { once: true, capture: true });
+  document.addEventListener("click", solicitarPermisosSensores, true);
+  document.addEventListener("touchend", solicitarPermisosSensores, true);
 
   // Texto de un QR → id de nodo. Acepta el link de la app ("…/app/?qr=N07"), "ARGOS:N07" o "N07" a secas.
   function idDeTextoQR(texto) {
