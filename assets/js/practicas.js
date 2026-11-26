@@ -139,7 +139,8 @@ public class ControlCañon : MonoBehaviour
     resumen:
       'Dos sesiones de física. Primero analizamos masa, gravedad y resistencia en una escena de caída; después construimos una pista con obstáculos y detectamos colisiones con C#.',
     etiquetas: ['Rigidbody', 'Gravedad', 'Colliders', 'OnCollisionEnter', 'Discrete vs Continuous'],
-    video: null,
+    video: { src: 'assets/videos/practica3-caida1.webm', tipo: 'video/webm' },
+    videosExtra: [{ src: 'assets/videos/practica3-caida2.webm', tipo: 'video/webm' }],
     objetivo:
       'Comprender cómo participa un objeto en la simulación física de Unity (sesión 1) y configurar superficies físicas para detectar contactos entre objetos (sesión 2).',
     conceptos: [
@@ -600,9 +601,9 @@ public class MQTTBasico : MonoBehaviour
     const next = PRACTICAS[i + 1];
 
     const media = [];
-    if (p.video) {
-      media.push(`<video class="w-full rounded-2xl bg-black" controls playsinline preload="metadata"><source src="${p.video.src}" type="${p.video.tipo}"></video>`);
-    }
+    [p.video, ...(p.videosExtra || [])].filter(Boolean).forEach((v) => {
+      media.push(`<video class="w-full rounded-2xl bg-black" controls playsinline preload="metadata"><source src="${v.src}" type="${v.tipo}"></video>`);
+    });
 
     const galeria = p.imagenes.length
       ? `<div class="grid gap-4 ${p.imagenes.length > 1 ? 'sm:grid-cols-2' : ''}">${p.imagenes.map((im) => `
@@ -653,7 +654,7 @@ public class MQTTBasico : MonoBehaviour
       <h2 id="practicaTitulo" class="mt-3 text-3xl font-black tracking-tight text-slate-900 sm:text-4xl">${p.titulo}</h2>
       <div class="mt-4 flex flex-wrap gap-2">${p.etiquetas.map((t) => `<span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">${esc(t)}</span>`).join('')}</div>
       <p class="mt-6 text-lg leading-8 text-slate-600">${p.resumen}</p>
-      ${media.length ? `<div class="mt-8">${media.join('')}</div>` : ''}
+      ${media.length ? `<div class="mt-8 grid gap-4">${media.join('')}</div>` : ''}
       ${seccion('Objetivo', `<p class="leading-7 text-slate-700">${p.objetivo}</p>`)}
       ${seccion('Conceptos clave', conceptos)}
       ${seccion('Qué hicimos, paso a paso', pasos)}
