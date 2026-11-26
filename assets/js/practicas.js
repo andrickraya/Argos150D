@@ -190,7 +190,7 @@ public class DetectorColision : MonoBehaviour
     resumen:
       'Estructuramos el flujo del proyecto conectando tres escenas (Inicio, Actividad 1 y Actividad 2) con SceneManager y los eventos On Click() de los botones.',
     etiquetas: ['SceneManager', 'Build Settings', 'UI Button', 'On Click()'],
-    video: null,
+    video: { src: 'assets/videos/practica4-cambiodeescensas.mp4', tipo: 'video/mp4' },
     objetivo:
       'Conectar varias escenas de Unity para que el usuario pueda navegar entre ellas desde la interfaz.',
     conceptos: [
