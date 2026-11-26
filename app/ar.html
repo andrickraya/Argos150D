@@ -606,6 +606,8 @@
         align-items: center;
         gap: 5px;
       }
+      body:not(.dev) .dev-only { display: none !important; }
+      .brand-logo { cursor: pointer; }
     </style>
   </head>
   <body class="mode-ar">
@@ -631,7 +633,7 @@
 
       <div class="header-actions">
         <button id="btnOpenQrModal" class="icon-btn" commandfor="dialogQrScanner" command="show-modal" title="Elegir nodo o escanear QR" type="button">QR</button>
-        <button id="btnOpenPrintModal" class="icon-btn" commandfor="dialogQrCards" command="show-modal" title="Códigos QR" type="button">🖨️</button>
+        <button id="btnOpenPrintModal" class="icon-btn dev-only" commandfor="dialogQrCards" command="show-modal" title="Códigos QR" type="button">🖨️</button>
         <button id="btnOpenHelpModal" class="icon-btn" commandfor="dialogHowItWorks" command="show-modal" title="Ayuda" type="button">?</button>
       </div>
     </header>
@@ -707,7 +709,7 @@
           <button id="btnWalkSim" class="action-btn btn-sim" type="button">
             <span id="btnWalkSimText">▶️ Caminar</span>
           </button>
-          <button id="btnNextNode" class="action-btn btn-primary" type="button">
+          <button id="btnNextNode" class="action-btn btn-primary dev-only" type="button">
             <span>Siguiente</span>
           </button>
         </div>
@@ -738,10 +740,10 @@
           <button type="button" class="preset-pill" data-preset="N01,N07">Puerta 3 → Salón C</button>
           <button type="button" class="preset-pill" data-preset="N07,N10">Salón C → El Cubo</button>
           <button type="button" class="preset-pill" data-preset="N07,N64">Salón C → Camellia</button>
-          <button type="button" id="btnToggleGps" class="preset-pill">🛰️ Activar GPS Real</button>
-          <button type="button" id="btnDemo" class="preset-pill">🎬 Demo (avanza sola)</button>
-          <button type="button" id="btnAjustar" class="preset-pill">↔️ Ajustar camino aquí</button>
-          <button type="button" class="preset-pill" commandfor="dialogPines" command="show-modal">📍 Poner pines con GPS</button>
+          <button type="button" id="btnToggleGps" class="preset-pill dev-only">🛰️ Activar GPS Real</button>
+          <button type="button" id="btnDemo" class="preset-pill dev-only">🎬 Demo (avanza sola)</button>
+          <button type="button" id="btnAjustar" class="preset-pill dev-only">↔️ Ajustar camino aquí</button>
+          <button type="button" class="preset-pill dev-only" commandfor="dialogPines" command="show-modal">📍 Poner pines con GPS</button>
         </div>
 
         <div class="itinerary-block">
@@ -4281,6 +4283,28 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
   //      Se promedian ~20 s de lecturas GPS (pesadas por precisión) y se guardan en el celular.
   //      "Enviar resultados" genera el CSV con el formato de proyecto/tools/lugares_propios.csv.
   // ============================================================================
+  // Modo desarrollador: las herramientas de campo (pines, ajustar, demo, GPS manual,
+  // imprimir QR, "Siguiente") quedan ocultas. Se muestran tocando el logo "A"
+  // (o con ?dev=1). Se recuerda en localStorage "argos_dev".
+  function configurarModoDesarrollador() {
+    const logo = document.querySelector(".brand-logo");
+    const param = new URLSearchParams(location.search).get("dev");
+    if (param === "1") localStorage.setItem("argos_dev", "1");
+    if (param === "0") localStorage.removeItem("argos_dev");
+    const aplicar = (on) => document.body.classList.toggle("dev", on);
+    aplicar(localStorage.getItem("argos_dev") === "1");
+    if (!logo) return;
+    logo.setAttribute("role", "button");
+    logo.title = "Modo desarrollador";
+    logo.addEventListener("click", () => {
+      const on = !document.body.classList.contains("dev");
+      if (on) localStorage.setItem("argos_dev", "1");
+      else localStorage.removeItem("argos_dev");
+      aplicar(on);
+      avisarImportante(on ? "🛠️ Modo desarrollador activado" : "Modo desarrollador desactivado");
+    });
+  }
+
   function configurarPines() {
     const dlg = document.getElementById("dialogPines");
     if (!dlg) return;
@@ -4638,6 +4662,7 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
   inicializarControles();
   configurarFallbacksWebModernos();
   configurarPines();
+  configurarModoDesarrollador();
   recalcularRutaCompleta();
   if (qrInicial && nodosPorId.has(qrInicial)) {
     avisarImportante(`📍 QR: ${qrInicial} ${nodosPorId.get(qrInicial).name}`);

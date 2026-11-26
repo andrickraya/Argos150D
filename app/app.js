@@ -3177,6 +3177,28 @@
   //      Se promedian ~20 s de lecturas GPS (pesadas por precisión) y se guardan en el celular.
   //      "Enviar resultados" genera el CSV con el formato de proyecto/tools/lugares_propios.csv.
   // ============================================================================
+  // Modo desarrollador: las herramientas de campo (pines, ajustar, demo, GPS manual,
+  // imprimir QR, "Siguiente") quedan ocultas. Se muestran tocando el logo "A"
+  // (o con ?dev=1). Se recuerda en localStorage "argos_dev".
+  function configurarModoDesarrollador() {
+    const logo = document.querySelector(".brand-logo");
+    const param = new URLSearchParams(location.search).get("dev");
+    if (param === "1") localStorage.setItem("argos_dev", "1");
+    if (param === "0") localStorage.removeItem("argos_dev");
+    const aplicar = (on) => document.body.classList.toggle("dev", on);
+    aplicar(localStorage.getItem("argos_dev") === "1");
+    if (!logo) return;
+    logo.setAttribute("role", "button");
+    logo.title = "Modo desarrollador";
+    logo.addEventListener("click", () => {
+      const on = !document.body.classList.contains("dev");
+      if (on) localStorage.setItem("argos_dev", "1");
+      else localStorage.removeItem("argos_dev");
+      aplicar(on);
+      avisarImportante(on ? "🛠️ Modo desarrollador activado" : "Modo desarrollador desactivado");
+    });
+  }
+
   function configurarPines() {
     const dlg = document.getElementById("dialogPines");
     if (!dlg) return;
@@ -3534,6 +3556,7 @@
   inicializarControles();
   configurarFallbacksWebModernos();
   configurarPines();
+  configurarModoDesarrollador();
   recalcularRutaCompleta();
   if (qrInicial && nodosPorId.has(qrInicial)) {
     avisarImportante(`📍 QR: ${qrInicial} ${nodosPorId.get(qrInicial).name}`);
