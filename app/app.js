@@ -31,7 +31,7 @@
   if (!datos) {
     console.error("ARGOS: no se encontraron datos del campus (window.ARGOS_CAMPUS_DATA).");
     const aviso = document.getElementById("locationModeBadge");
-    if (aviso) aviso.textContent = "⚠️ Error: no cargaron los datos del campus";
+    if (aviso) aviso.textContent = "Error: no cargaron los datos del campus";
     return;
   }
 
@@ -76,7 +76,7 @@
     const id = "N" + String(num).padStart(2, "0");
     lista.push({ id, name: nombre, category: categoria, lat, lon, acc });
     guardarLugaresNuevos(lista);
-    try { sessionStorage.setItem("argos_aviso", `✅ ${id} ${nombre} agregado: ya puedes elegirlo como destino`); } catch (_) {}
+    try { sessionStorage.setItem("argos_aviso", `${id} ${nombre} agregado: ya puedes elegirlo como destino`); } catch (_) {}
     location.reload();
   }
 
@@ -98,14 +98,16 @@
     if (i >= 0) for (let k = i + 1; k < ruta.length; k++) if (!esCruce(ruta[k])) return ruta[k].name;
     return ruta.length ? ruta[ruta.length - 1].name : "tu destino";
   }
-  const etiquetaNodo = (n, inicial) => esCruce(n) ? `${inicial ? "Camino" : "el camino"} a ${nombreHacia(n)}` : `${n.id} · ${n.name}`;
+  const modoDev = () => document.body.classList.contains("dev");
+  const conCodigo = (n) => (modoDev() ? `${n.id} · ${n.name}` : n.name);
+  const etiquetaNodo = (n, inicial) => esCruce(n) ? `${inicial ? "Camino" : "el camino"} a ${nombreHacia(n)}` : conCodigo(n);
   // El selector de origen sólo lista lugares; si quedas parado en un cruce se muestra una opción temporal.
   function fijarSelectOrigen(id) {
     let o = selectOrigen.querySelector("option[data-cruce]");
     if (esCruce(nodosPorId.get(id))) {
       if (!o) { o = document.createElement("option"); o.dataset.cruce = "1"; selectOrigen.insertBefore(o, selectOrigen.firstChild); }
       o.value = id;
-      o.textContent = "📍 Donde estás (sobre el camino)";
+      o.textContent = "Donde estás (sobre el camino)";
     } else if (o) o.remove();
     selectOrigen.value = id;
   }
@@ -290,7 +292,7 @@
     usuarioZ: -9.85,
     ruta: [],
     distanciaTotal: 0,
-    mostrarEtiquetas: true,
+    mostrarEtiquetas: false, // mapa limpio: sólo se nombran los lugares de la ruta (el botón Aa de desarrollador muestra todos)
     modoVista: "ar",
     caminandoSim: false,
     navegando: false,    // true = "Caminar" activo: tus pasos reales te mueven en la ruta
@@ -302,6 +304,21 @@
     ultimoRumboGyro: null,    // Último ángulo del giroscopio para integrar giros suaves sin saltos magnéticos
     brjSensorActual: null,
     menuColapsado: true  // Inicia colapsado para que las flechas 3D se vean completas en el celular
+  };
+
+  // Íconos de línea (sin emojis). Se insertan como innerHTML; trazo = currentColor.
+  const ICONOS = {
+    recto: '<svg viewBox="0 0 24 24"><path d="M12 20V5M6 11l6-6 6 6"/></svg>',
+    derecha: '<svg viewBox="0 0 24 24"><path d="M6 20v-7a4 4 0 0 1 4-4h9M14 4l5 5-5 5"/></svg>',
+    izquierda: '<svg viewBox="0 0 24 24"><path d="M18 20v-7a4 4 0 0 0-4-4H5M10 4 5 9l5 5"/></svg>',
+    vuelta: '<svg viewBox="0 0 24 24"><path d="M8 20V9a4 4 0 0 1 8 0v6M12 11l4 4 4-4"/></svg>',
+    llegada: '<svg viewBox="0 0 24 24"><path d="M12 21s-6-5.6-6-11a6 6 0 0 1 12 0c0 5.4-6 11-6 11z"/><circle cx="12" cy="10" r="2.2"/></svg>',
+    chat: '<svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 0 1-11.6 7.1L4 20l1-4.2A8 8 0 1 1 20 12z"/></svg>',
+    vozOn: '<svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></svg>',
+    vozOff: '<svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M17 9.5l5 5M22 9.5l-5 5"/></svg>',
+    mic: '<svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>',
+    enviar: '<svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>',
+    cerrar: '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg>'
   };
 
   // Referencias DOM
@@ -342,6 +359,28 @@
   const arSignDist = document.getElementById("arSignDist");
   const arTurnHint = document.getElementById("arTurnHint");
   const arTurnHintText = document.getElementById("arTurnHintText");
+  // Tarjetas nuevas (diseño limpio): pueden faltar en páginas viejas, por eso se usan con "?."
+  const navDistNum = document.getElementById("navDistNum");
+  const navDistUnidad = document.getElementById("navDistUnidad");
+  const navLlegada = document.getElementById("navLlegada");
+  const navMin = document.getElementById("navMin");
+  const navMetros = document.getElementById("navMetros");
+  const topDestino = document.getElementById("topDestino");
+  const inakiControles = document.getElementById("inakiControles");
+  // Cambia el ícono del giro sólo cuando cambia (esto corre en cada cuadro)
+  let iconoGiroActual = "";
+  function ponerIconoGiro(clave) {
+    if (!arSignTurnIcon || clave === iconoGiroActual) return;
+    iconoGiroActual = clave;
+    arSignTurnIcon.innerHTML = ICONOS[clave] || ICONOS.recto;
+    arSignTurnIcon.dataset.giro = clave;
+  }
+  function ponerDistanciaGrande(metros) {
+    if (!navDistNum) return;
+    const txt = metros === null ? "" : String(metros);
+    if (navDistNum.textContent !== txt) navDistNum.textContent = txt;
+    if (navDistUnidad) navDistUnidad.hidden = metros === null;
+  }
 
   const kpiNodesCount = document.getElementById("kpiNodesCount");
   const kpiDistanceMeters = document.getElementById("kpiDistanceMeters");
@@ -362,9 +401,9 @@
     estado.menuColapsado = colapsado;
     bottomSheet.classList.toggle("is-collapsed", colapsado);
     btnToggleSheet.setAttribute("aria-expanded", String(!colapsado));
-    sheetToggleLabel.textContent = colapsado
-      ? "🔼 Cambiar Origen / Destino"
-      : "🔽 Bajar Menú (Ver Piso AR)";
+    sheetToggleLabel.textContent = colapsado ? "Cambiar ruta" : "Listo";
+    const btnCambiar = document.getElementById("btnCambiarRuta");
+    if (btnCambiar) btnCambiar.textContent = colapsado ? "Cambiar" : "Listo";
   }
 
   btnToggleSheet.addEventListener("click", () => {
@@ -609,7 +648,7 @@
     if (estado.indiceActual >= estado.ruta.length - 1) {
       colaAvanceMetros = 0;
       if (estado.caminandoSim) detenerSimulacionCaminata();
-      if (estado.navegando) detenerNavegacion("🏁 Llegaste a tu destino");
+      if (estado.navegando) detenerNavegacion("Llegaste a tu destino");
     }
   }
 
@@ -803,8 +842,8 @@
       grados,
       nodoGiro: nB,
       nodoSiguiente: nC,
-      icono: derecha ? "➡️" : "⬅️",
-      textoCorto: derecha ? `➡️ Gira a la derecha (${grados}°)` : `⬅️ Gira a la izquierda (${grados}°)`
+      icono: derecha ? "derecha" : "izquierda",
+      textoCorto: derecha ? "Gira a la derecha" : "Gira a la izquierda"
     };
   }
 
@@ -825,57 +864,60 @@
     }
     if (arHeadingText) {
       arHeadingText.textContent = absDesfase > 18
-        ? (desfase < 0 ? `➡️ Gira ${absDesfase}° a la derecha` : `⬅️ Gira ${absDesfase}° a la izquierda`)
-        : `🧭 De frente (${Math.round(rumboTramo)}° ${cardinal})`;
+        ? (desfase < 0 ? `Gira ${absDesfase}° a la derecha` : `Gira ${absDesfase}° a la izquierda`)
+        : `De frente (${Math.round(rumboTramo)}° ${cardinal})`;
     }
 
     if (enDestino) {
-      if (arSignTurnIcon) arSignTurnIcon.textContent = "🏁";
-      if (arSignTitle) arSignTitle.textContent = `¡Llegaste a ${actual.name}!`;
+      ponerIconoGiro("llegada");
+      ponerDistanciaGrande(null);
+      if (arSignTitle) arSignTitle.textContent = `Llegaste a ${actual.name}`;
       if (arSignDist) arSignDist.textContent = `Destino alcanzado · 0 m restantes`;
       return;
     }
 
     if (absDesfase > 135) {
-      if (arSignTurnIcon) arSignTurnIcon.textContent = "🔄";
-      if (arSignTitle) arSignTitle.textContent = `Da media vuelta (${absDesfase}°)`;
+      ponerIconoGiro("vuelta");
+      if (arSignTitle) arSignTitle.textContent = "Da media vuelta";
       if (arSignDist) arSignDist.textContent = `${esCruce(siguiente) ? etiquetaNodo(siguiente, true) : `El nodo ${siguiente.id} (${siguiente.name})`} está detrás de ti a ${mTramo} m`;
-      hudInstruction.textContent = `🔄 Da media vuelta hacia ${nombreHacia(siguiente)}`;
+      hudInstruction.textContent = `Da media vuelta hacia ${nombreHacia(siguiente)}`;
     } else if (desfase < -18) {
-      if (arSignTurnIcon) arSignTurnIcon.textContent = "➡️";
-      if (arSignTitle) arSignTitle.textContent = `Gira a la derecha (${absDesfase}°)`;
+      ponerIconoGiro("derecha");
+      if (arSignTitle) arSignTitle.textContent = "Gira a la derecha";
       if (arSignDist) arSignDist.textContent = `Apunta hacia ${etiquetaNodo(siguiente)} (${mTramo} m)`;
-      hudInstruction.textContent = `➡️ Gira a la derecha (${absDesfase}°) hacia ${nombreHacia(siguiente)}`;
+      hudInstruction.textContent = `Gira a la derecha (${absDesfase}°) hacia ${nombreHacia(siguiente)}`;
     } else if (desfase > 18) {
-      if (arSignTurnIcon) arSignTurnIcon.textContent = "⬅️";
-      if (arSignTitle) arSignTitle.textContent = `Gira a la izquierda (${absDesfase}°)`;
+      ponerIconoGiro("izquierda");
+      if (arSignTitle) arSignTitle.textContent = "Gira a la izquierda";
       if (arSignDist) arSignDist.textContent = `Apunta hacia ${etiquetaNodo(siguiente)} (${mTramo} m)`;
-      hudInstruction.textContent = `⬅️ Gira a la izquierda (${absDesfase}°) hacia ${nombreHacia(siguiente)}`;
+      hudInstruction.textContent = `Gira a la izquierda (${absDesfase}°) hacia ${nombreHacia(siguiente)}`;
     } else {
       // El usuario ya está alineado mirando al nodo quieto frente a él
       if (proximoGiro && distRestanteTramo <= 8) {
-        if (arSignTurnIcon) arSignTurnIcon.textContent = proximoGiro.icono;
-        if (arSignTitle) arSignTitle.textContent = `En ${mTramo} m: ${proximoGiro.textoCorto}`;
+        ponerIconoGiro(proximoGiro.icono);
+        if (arSignTitle) arSignTitle.textContent = proximoGiro.textoCorto;
         if (arSignDist) arSignDist.textContent = `${esCruce(siguiente) ? "En el cruce" : `Al llegar a ${siguiente.name}`}, dobla hacia ${nombreHacia(proximoGiro.nodoSiguiente)}`;
         hudInstruction.textContent = `${proximoGiro.textoCorto} en ${esCruce(siguiente) ? "el cruce" : siguiente.name}`;
       } else {
-        if (arSignTurnIcon) arSignTurnIcon.textContent = "⬆️";
-        if (arSignTitle) arSignTitle.textContent = `Camina de frente hacia ${nombreHacia(siguiente)}`;
+        ponerIconoGiro("recto");
+        if (arSignTitle) arSignTitle.textContent = `Sigue hacia ${nombreHacia(siguiente)}`;
         if (arSignDist) {
           arSignDist.textContent = proximoGiro
             ? `${mTramo} m de frente · ${esCruce(siguiente) ? "En el cruce" : "En " + siguiente.id}: ${proximoGiro.textoCorto}`
             : `${mTramo} m de frente (${cardinal}) · El nodo está fijo frente a ti`;
         }
-        hudInstruction.textContent = `⬆️ Camina ${mTramo} m de frente hacia ${nombreHacia(siguiente)}`;
+        hudInstruction.textContent = `Camina ${mTramo} m de frente hacia ${nombreHacia(siguiente)}`;
       }
     }
 
     // Escaleras (nodos con escaleras: true en campus_data.js): se avisa al acercarse y al pasar por ellas
     const metrosDesdeActual = tramoVista.distTramo - distRestanteTramo;
     let avisoEscaleras = "";
-    if (siguiente.escaleras && distRestanteTramo <= 15) avisoEscaleras = `🪜 Escaleras en ${mTramo} m`;
-    else if (actual.escaleras && metrosDesdeActual <= 10) avisoEscaleras = "🪜 Aquí hay escaleras, con cuidado";
+    if (siguiente.escaleras && distRestanteTramo <= 15) avisoEscaleras = `Escaleras en ${mTramo} m`;
+    else if (actual.escaleras && metrosDesdeActual <= 10) avisoEscaleras = "Aquí hay escaleras, con cuidado";
+    ponerDistanciaGrande(mTramo);
     if (avisoEscaleras && arSignDist) arSignDist.textContent = `${avisoEscaleras} · ${arSignDist.textContent}`;
+    if (avisoEscaleras && arSignTitle) arSignTitle.textContent = avisoEscaleras;
   }
 
   // ============================================================================
@@ -961,12 +1003,17 @@
     } catch (_) {}
   }
   (function crearBotonVozInaki() {
-    if (!inaki.activo || !("speechSynthesis" in window) || !btnAlignArrows || !btnAlignArrows.parentNode) return;
+    const contenedor = inakiControles || (btnAlignArrows && btnAlignArrows.parentNode);
+    if (!inaki.activo || !("speechSynthesis" in window) || !contenedor) return;
     const btn = document.createElement("button");
     btn.id = "btnVozInaki";
     btn.type = "button";
-    btn.className = btnAlignArrows.className;
-    const pintar = () => { btn.textContent = inaki.voz ? "🔊 Iñaki" : "🔇 Iñaki"; };
+    btn.className = "round-btn";
+    const pintar = () => {
+      btn.innerHTML = inaki.voz ? ICONOS.vozOn : ICONOS.vozOff;
+      btn.dataset.on = inaki.voz ? "1" : "0";
+      btn.setAttribute("aria-label", inaki.voz ? "Silenciar a Iñaki" : "Activar la voz de Iñaki");
+    };
     pintar();
     btn.addEventListener("click", () => {
       inaki.voz = !inaki.voz;
@@ -975,7 +1022,7 @@
       if (inaki.voz) hablarInaki(inaki.texto || "Hola, soy Iñaki. Ya te puedo hablar.", true);
       else if ("speechSynthesis" in window) window.speechSynthesis.cancel();
     });
-    btnAlignArrows.insertAdjacentElement("afterend", btn);
+    contenedor.appendChild(btn);
   })();
 
   // op (opcional): { soloLocal: no preguntar al servidor, voz: texto largo para la voz, dur: ms del globo, gesto }
@@ -1113,8 +1160,8 @@
   function pintarChatInaki(quien, texto) {
     if (!chatInaki.log) return;
     const d = document.createElement("div");
-    d.style.cssText = "margin:4px 0;" + (quien === "tu" ? "text-align:right;color:#cbd5e1" : "color:#fff");
-    d.textContent = (quien === "tu" ? "Tú: " : "🐺 Iñaki: ") + texto;
+    d.className = quien === "tu" ? "chat-msg chat-msg-tu" : "chat-msg";
+    d.textContent = texto;
     chatInaki.log.appendChild(d);
     chatInaki.log.scrollTop = chatInaki.log.scrollHeight;
   }
@@ -1153,28 +1200,28 @@
       });
   }
   (function crearChatInaki() {
-    if (!inaki.activo || !btnAlignArrows || !btnAlignArrows.parentNode) return;
+    const contenedor = inakiControles || (btnAlignArrows && btnAlignArrows.parentNode);
+    if (!inaki.activo || !contenedor) return;
     const btn = document.createElement("button");
     btn.id = "btnChatInaki";
     btn.type = "button";
-    btn.className = btnAlignArrows.className;
-    btn.textContent = "💬 Pregúntale";
+    btn.className = "round-btn round-btn-main";
+    btn.innerHTML = ICONOS.chat;
+    btn.setAttribute("aria-label", "Pregúntale a Iñaki");
     const panel = document.createElement("div");
     panel.id = "panelChatInaki";
-    panel.style.cssText = "position:fixed;left:12px;right:12px;bottom:12px;max-width:520px;margin:0 auto;z-index:9999;" +
-      "background:rgba(15,23,42,0.94);color:#fff;border:1px solid rgba(255,255,255,0.4);border-radius:14px;padding:10px;" +
-      "font:15px/1.35 system-ui,-apple-system,sans-serif;display:none";
-    const estiloBtn = "padding:0 12px;border:0;border-radius:10px;font-size:18px;background:#334155;color:#fff;min-height:44px";
+    panel.className = "chat-panel";
+    panel.style.display = "none";
+    const estiloBtn = "";
     panel.innerHTML =
-      '<div id="chatInakiModo" style="font-size:12px;color:#94a3b8;margin-bottom:4px"></div>' +
-      '<div id="chatInakiLog" style="max-height:38vh;overflow-y:auto"></div>' +
-      '<div id="chatInakiEstado" style="font-size:13px;color:#94a3b8;min-height:16px"></div>' +
-      '<form id="chatInakiForm" style="display:flex;gap:6px;margin-top:4px">' +
-      '<input id="chatInakiTexto" type="text" maxlength="300" autocomplete="off" placeholder="Pregúntale a Iñaki…" ' +
-      'style="flex:1;min-width:0;padding:10px;border:0;border-radius:10px;font-size:16px;color:#0f172a">' +
-      `<button type="button" id="chatInakiMic" title="Dictar" style="${estiloBtn}">🎤</button>` +
-      `<button type="submit" id="chatInakiEnviar" title="Enviar" style="${estiloBtn};background:#2563eb">➤</button>` +
-      `<button type="button" id="chatInakiCerrar" title="Cerrar" style="${estiloBtn}">✕</button>` +
+      '<div class="chat-top"><span class="chat-titulo">Iñaki</span><span id="chatInakiModo" class="chat-modo"></span>' +
+      `<button type="button" id="chatInakiCerrar" class="chat-icono" aria-label="Cerrar">${ICONOS.cerrar}</button></div>` +
+      '<div id="chatInakiLog" class="chat-log"></div>' +
+      '<div id="chatInakiEstado" class="chat-estado"></div>' +
+      '<form id="chatInakiForm" class="chat-form">' +
+      '<input id="chatInakiTexto" type="text" maxlength="300" autocomplete="off" placeholder="Pregúntale a Iñaki" class="chat-input">' +
+      `<button type="button" id="chatInakiMic" class="chat-icono" aria-label="Dictar">${ICONOS.mic}</button>` +
+      `<button type="submit" id="chatInakiEnviar" class="chat-icono chat-enviar" aria-label="Enviar">${ICONOS.enviar}</button>` + estiloBtn +
       "</form>";
     document.body.appendChild(panel);
     chatInaki.log = panel.querySelector("#chatInakiLog");
@@ -1186,8 +1233,8 @@
       if (abrir) {
         // Para saber de un vistazo si las preguntas van a Gemini o solo a lo guardado
         panel.querySelector("#chatInakiModo").textContent = inaki.servidor
-          ? "🟢 Conectado a Gemini"
-          : "⚪ Sin servidor: solo respuestas guardadas (abre la app con &inaki=…)";
+          ? "Conectado a Gemini"
+          : "Sin servidor: respuestas guardadas";
         if (!chatInaki.log.childElementCount) pintarChatInaki("inaki", "¡Hola! Pregúntame del campus: los Lobos, la Explanada, El Cubo, Camelia o el laboratorio PB03.");
         entrada.focus();
       }
@@ -1215,14 +1262,14 @@
         rec.start();
       } catch (_) { chatInaki.estado.textContent = "El dictado no está disponible; escribe tu pregunta."; }
     });
-    const vecino = document.getElementById("btnVozInaki") || btnAlignArrows;
-    vecino.insertAdjacentElement("afterend", btn);
+    if (inakiControles) inakiControles.insertBefore(btn, inakiControles.firstChild);
+    else (document.getElementById("btnVozInaki") || btnAlignArrows).insertAdjacentElement("afterend", btn);
   })();
 
   function dibujarGloboInaki(cx, yBase, w) {
     if (!inaki.texto || performance.now() - inaki.textoMs > inaki.textoDur) return;
     arCtx.save();
-    arCtx.font = "600 15px system-ui, -apple-system, sans-serif";
+    arCtx.font = "500 15px Outfit, system-ui, sans-serif";
     const anchoMax = Math.min(w - 32, 300);
     const lineas = [];
     let linea = "";
@@ -1236,13 +1283,14 @@
     const x = limitar(cx - ancho / 2, 16, w - 16 - ancho);
     const y = Math.max(96, yBase - alto - 10);
     arCtx.beginPath();
-    if (arCtx.roundRect) arCtx.roundRect(x, y, ancho, alto, 12); else arCtx.rect(x, y, ancho, alto);
-    arCtx.fillStyle = "rgba(15, 23, 42, 0.86)";
-    arCtx.fill();
-    arCtx.strokeStyle = "rgba(255, 255, 255, 0.55)";
-    arCtx.lineWidth = 1.5;
-    arCtx.stroke();
+    if (arCtx.roundRect) arCtx.roundRect(x, y, ancho, alto, 16); else arCtx.rect(x, y, ancho, alto);
+    arCtx.shadowColor = "rgba(15, 23, 42, 0.18)";
+    arCtx.shadowBlur = 16;
+    arCtx.shadowOffsetY = 4;
     arCtx.fillStyle = "#ffffff";
+    arCtx.fill();
+    arCtx.shadowColor = "transparent";
+    arCtx.fillStyle = "#15181c";
     arCtx.textAlign = "left";
     arCtx.textBaseline = "top";
     lineas.forEach((l, i) => arCtx.fillText(l, x + 12, y + 9 + i * 19));
@@ -1430,20 +1478,11 @@
     const cam = crearCamara(w, h, (estado.desfaseMiradaGrados * Math.PI) / 180);
     const miraArriba = -estado.arribaDispositivo[2] > 0.05; // la cámara apunta arriba del horizonte
 
+    // La píldora del centro sólo pide inclinar el celular; los giros ya los dicen
+    // la tarjeta inferior y el indicador lateral del canvas.
     if (arTurnHint && arTurnHintText) {
-      const absD = Math.round(Math.abs(estado.desfaseMiradaGrados));
-      if (miraArriba) {
-        arTurnHint.hidden = false;
-        arTurnHintText.textContent = "📱 Inclina un poco el celular hacia el piso para ver el camino";
-      } else if (!llegoAlFinal && absD > 18) {
-        arTurnHint.hidden = false;
-        arTurnHintText.textContent =
-          estado.desfaseMiradaGrados < 0
-            ? `➡️ Gira a la derecha (${absD}°) hacia ${nombreHacia(tramoVista.siguiente)}`
-            : `⬅️ Gira a la izquierda (${absD}°) hacia ${nombreHacia(tramoVista.siguiente)}`;
-      } else {
-        arTurnHint.hidden = true;
-      }
+      arTurnHint.hidden = !miraArriba;
+      if (miraArriba) arTurnHintText.textContent = "Inclina el celular hacia el piso";
     }
 
     const { siguiente, distRestanteTramo } = tramoVista;
@@ -1568,25 +1607,22 @@
       arCtx.stroke();
 
       const textoPin = `${etiquetaNodo(siguiente, true)} (${Math.round(distRestanteTramo)} m)`;
-      arCtx.font = "800 12px Inter, -apple-system, sans-serif";
+      arCtx.font = "600 13px Outfit, system-ui, sans-serif";
       const tw = arCtx.measureText(textoPin).width;
       const bx = limitar(pPinAlto.sx - tw / 2 - 10, 6, w - tw - 26);
       const by = pPinAlto.sy - tamRombo - 30;
-      arCtx.fillStyle = "rgba(15, 23, 42, 0.88)";
+      arCtx.fillStyle = "#ffffff";
       arCtx.beginPath();
       if (arCtx.roundRect) {
-        arCtx.roundRect(bx, by, tw + 20, 24, 12);
+        arCtx.roundRect(bx, by, tw + 20, 26, 13);
       } else {
         arCtx.rect(bx, by, tw + 20, 24);
       }
       arCtx.fill();
-      arCtx.strokeStyle = "#DC0235";
-      arCtx.lineWidth = 1.5;
-      arCtx.stroke();
 
-      arCtx.fillStyle = "#ffffff";
+      arCtx.fillStyle = "#15181c";
       arCtx.textAlign = "center";
-      arCtx.fillText(textoPin, bx + (tw + 20) / 2, by + 16);
+      arCtx.fillText(textoPin, bx + (tw + 20) / 2, by + 17.5);
     }
 
     // 3b. Ajuste fino: el punto del camino que se está moviendo, en amarillo
@@ -1597,39 +1633,36 @@
       const haciaDerecha = estado.desfaseMiradaGrados < 0;
       const absGrados = Math.round(Math.abs(estado.desfaseMiradaGrados));
       const etiquetaGiro = haciaDerecha
-        ? `Gira a la derecha (${absGrados}°) ➡️`
-        : `⬅️ Gira a la izquierda (${absGrados}°)`;
+        ? "Gira a la derecha  →"
+        : "←  Gira a la izquierda";
       const subEtiqueta = `${etiquetaNodo(siguiente, true)} (${Math.round(distRestanteTramo)} m)`;
 
-      arCtx.font = "800 14px Inter, -apple-system, sans-serif";
+      arCtx.font = "600 15px Outfit, system-ui, sans-serif";
       const w1 = arCtx.measureText(etiquetaGiro).width;
-      arCtx.font = "600 12px Inter, -apple-system, sans-serif";
+      arCtx.font = "500 12px Outfit, system-ui, sans-serif";
       const w2 = arCtx.measureText(subEtiqueta).width;
       const boxW = Math.max(w1, w2) + 28;
       const boxH = 50;
       const boxX = haciaDerecha ? Math.max(12, w - boxW - 14) : 14;
       const boxY = Math.round(h * 0.44);
 
-      arCtx.fillStyle = "rgba(15, 23, 42, 0.92)";
+      arCtx.fillStyle = "#ffffff";
       arCtx.beginPath();
       if (arCtx.roundRect) {
-        arCtx.roundRect(boxX, boxY, boxW, boxH, 14);
+        arCtx.roundRect(boxX, boxY, boxW, boxH, 18);
       } else {
         arCtx.rect(boxX, boxY, boxW, boxH);
       }
       arCtx.fill();
-      arCtx.strokeStyle = "#f59e0b";
-      arCtx.lineWidth = 2.5;
-      arCtx.stroke();
 
-      arCtx.fillStyle = "#fbbf24";
-      arCtx.font = "800 14px Inter, -apple-system, sans-serif";
+      arCtx.fillStyle = "#15181c";
+      arCtx.font = "600 15px Outfit, system-ui, sans-serif";
       arCtx.textAlign = "center";
       arCtx.fillText(etiquetaGiro, boxX + boxW / 2, boxY + 22);
 
-      arCtx.fillStyle = "#ffffff";
-      arCtx.font = "600 12px Inter, -apple-system, sans-serif";
-      arCtx.fillText(subEtiqueta, boxX + boxW / 2, boxY + 40);
+      arCtx.fillStyle = "#8b9197";
+      arCtx.font = "500 12px Outfit, system-ui, sans-serif";
+      arCtx.fillText(subEtiqueta, boxX + boxW / 2, boxY + 39);
     }
   }
 
@@ -1812,8 +1845,8 @@
       ctx.stroke();
 
       if ((estado.mostrarEtiquetas || enRuta) && !cruce) {
-        const texto = `${nodo.id} · ${nodo.name}`;
-        ctx.font = enRuta ? "700 12px Inter, sans-serif" : "600 11px Inter, sans-serif";
+        const texto = conCodigo(nodo);
+        ctx.font = enRuta ? "700 12px Outfit, system-ui, sans-serif" : "600 11px Outfit, system-ui, sans-serif";
         const tw = ctx.measureText(texto).width;
         ctx.fillStyle = "rgba(255, 255, 255, 0.92)";
         ctx.fillRect(cx - tw / 2 - 6, cy - radio - 24, tw + 12, 18);
@@ -1854,7 +1887,7 @@
     ctx.strokeStyle = "#ffffff";
     ctx.stroke();
 
-    ctx.font = "800 11px Inter, sans-serif";
+    ctx.font = "800 11px Outfit, system-ui, sans-serif";
     ctx.fillStyle = "#8A0021";
     ctx.textAlign = "center";
     ctx.fillText("TÚ", posU.cx, posU.cy + 24);
@@ -1866,10 +1899,10 @@
     const h = minimapCanvas.height;
     miniCtx.clearRect(0, 0, w, h);
 
-    miniCtx.fillStyle = "#0f172a";
+    miniCtx.fillStyle = "#eef1ef";
     miniCtx.fillRect(0, 0, w, h);
 
-    miniCtx.strokeStyle = "rgba(148, 163, 184, 0.18)";
+    miniCtx.strokeStyle = "rgba(15, 23, 42, 0.06)";
     miniCtx.lineWidth = 1;
     [28, 56, 82].forEach((r) => {
       miniCtx.beginPath();
@@ -1889,10 +1922,10 @@
         const p = aMini(x, z);
         return { x: p.mx, y: p.my };
       },
-      true
+      false
     );
 
-    miniCtx.strokeStyle = "rgba(148, 163, 184, 0.35)";
+    miniCtx.strokeStyle = "rgba(15, 23, 42, 0.14)";
     miniCtx.lineWidth = 2.5;
     datos.edges.forEach(([u, v]) => {
       const na = nodosPorId.get(u);
@@ -1924,7 +1957,7 @@
       if (p.mx < -10 || p.mx > w + 10 || p.my < -10 || p.my > h + 10) return;
       miniCtx.beginPath();
       miniCtx.arc(p.mx, p.my, n.id === estado.destinoId ? 5.5 : 3.5, 0, Math.PI * 2);
-      miniCtx.fillStyle = n.id === estado.destinoId ? "#ef4444" : "#cbd5e1";
+      miniCtx.fillStyle = n.id === estado.destinoId ? "#DC0235" : "rgba(15, 23, 42, 0.25)";
       miniCtx.fill();
     });
 
@@ -1953,9 +1986,9 @@
     miniCtx.stroke();
 
     // Indicador de Norte fijo arriba (el minimapa nunca gira)
-    miniCtx.font = "800 12px Inter, sans-serif";
+    miniCtx.font = "800 12px Outfit, system-ui, sans-serif";
     miniCtx.textAlign = "center";
-    miniCtx.fillStyle = "#ef4444";
+    miniCtx.fillStyle = "rgba(15, 23, 42, 0.45)";
     miniCtx.fillText("N", w / 2, 14);
   }
 
@@ -2026,9 +2059,17 @@
 
     const nodoDestinoFinal = nodosPorId.get(estado.destinoId);
     hudStepBadge.textContent = `${esCruce(actual) ? "En camino" : actual.id + " " + actual.name} ➔ ${nodoDestinoFinal ? nodoDestinoFinal.name : estado.destinoId}`;
+    if (topDestino) topDestino.textContent = nodoDestinoFinal ? nodoDestinoFinal.name : estado.destinoId;
+    const minEnteros = Math.max(1, Math.round(distTotalRestante / 80));
+    if (navMetros) navMetros.textContent = String(Math.round(distTotalRestante));
+    if (navMin) navMin.textContent = distTotalRestante < 0.8 ? "0" : String(minEnteros);
+    if (navLlegada) {
+      const llegada = new Date(Date.now() + (distTotalRestante < 0.8 ? 0 : minEnteros) * 60000);
+      navLlegada.textContent = `${llegada.getHours()}:${String(llegada.getMinutes()).padStart(2, "0")}`;
+    }
 
     if (actual.id === siguiente.id || distTotalRestante < 0.8) {
-      hudInstruction.textContent = `🎉 ¡Llegaste a ${actual.name}!`;
+      hudInstruction.textContent = `¡Llegaste a ${actual.name}!`;
       hudSub.textContent = `Destino alcanzado · 0 m restantes`;
     } else {
       hudSub.textContent = `${Math.round(distTotalRestante)} m restantes · ~${minutos} min`;
@@ -2058,21 +2099,21 @@
       metrosAcumulados = 0;
       const li = document.createElement("li");
       li.className = `itinerary-item ${idx === estado.indiceActual ? "is-current" : ""}`;
-      let detalle = "📍 Origen";
+      let detalle = "Origen";
       if (idx === estado.ruta.length - 1) {
         const dFin = idx > 0 ? metrosDesdeAnterior : 0;
-        detalle = dFin > 0 ? `+${dFin} m · 🎯 Destino` : "🎯 Destino";
+        detalle = dFin > 0 ? `+${dFin} m · Destino` : "Destino";
       } else if (idx > 0) {
         const d = metrosDesdeAnterior;
         const rEnt = calcularRumboGrados(estado.ruta[idx - 1].x, estado.ruta[idx - 1].z, nodo.x, nodo.z);
         const rSal = calcularRumboGrados(nodo.x, nodo.z, estado.ruta[idx + 1].x, estado.ruta[idx + 1].z);
         const giro = diferenciaAngularGrados(rSal, rEnt);
-        let txtGiro = "⬆️ Sigue recto";
-        if (giro >= 20) txtGiro = `➡️ Gira a la derecha (${Math.round(giro)}°)`;
-        else if (giro <= -20) txtGiro = `⬅️ Gira a la izquierda (${Math.round(Math.abs(giro))}°)`;
+        let txtGiro = "Sigue recto";
+        if (giro >= 20) txtGiro = `Gira a la derecha (${Math.round(giro)}°)`;
+        else if (giro <= -20) txtGiro = `Gira a la izquierda (${Math.round(Math.abs(giro))}°)`;
         detalle = `+${d} m · ${txtGiro}`;
       }
-      if (nodo.escaleras) detalle += " · 🪜 Escaleras";
+      if (nodo.escaleras) detalle += " · Escaleras";
       li.innerHTML = `
         <div><span class="itinerary-code">${esCruce(nodo) ? "↪" : nodo.id}</span><span>${esCruce(nodo) ? "Cruce del camino" : nodo.name}</span></div>
         <span>${detalle}</span>
@@ -2126,8 +2167,8 @@
     reiniciarSiYaLlego();
     fijarEstadoMenu(true);
     estado.caminandoSim = true;
-    if (btnDemo) btnDemo.textContent = "⏹️ Detener demo";
-    locationModeBadge.textContent = "🎬 Demo: avanzando solo";
+    if (btnDemo) btnDemo.textContent = "Detener demo";
+    locationModeBadge.textContent = "Demo: avanzando solo";
     idIntervaloCaminata = setInterval(() => { colaAvanceMetros += 0.13; }, 100);
   }
 
@@ -2138,10 +2179,10 @@
       clearInterval(idIntervaloCaminata);
       idIntervaloCaminata = null;
     }
-    if (btnDemo) btnDemo.textContent = "🎬 Demo (avanza sola)";
+    if (btnDemo) btnDemo.textContent = "Demo (avanza sola)";
     locationModeBadge.textContent = estado.gpsActivo
-      ? "🛰️ Ubicación: GPS Activo"
-      : `📍 ${estado.origenId} (QR + Pasos)`;
+      ? "Ubicación: GPS Activo"
+      : `${estado.origenId} (QR + Pasos)`;
   }
 
   if (btnDemo) {
@@ -2162,8 +2203,8 @@
     podometro.inicioNavMs = performance.now();
     fijarEstadoMenu(true);
     btnWalkSim.classList.add("is-walking");
-    btnWalkSimText.textContent = "⏸️ Pausar";
-    locationModeBadge.textContent = "👣 Camina con el celular al frente";
+    btnWalkSimText.textContent = "Pausar";
+    locationModeBadge.textContent = "Camina con el celular al frente";
     // El GPS se enciende solo: corrige el avance y recalcula la ruta si tomas otro camino (como Google Maps).
     if (GPS_AUTOMATICO && !gpsNegado) encenderGPS(false);
   }
@@ -2171,8 +2212,8 @@
   function detenerNavegacion(mensaje) {
     estado.navegando = false;
     btnWalkSim.classList.remove("is-walking");
-    btnWalkSimText.textContent = "▶️ Caminar";
-    locationModeBadge.textContent = mensaje || `⏸️ Pausado · ${estado.pasosDetectados} pasos`;
+    btnWalkSimText.textContent = "Caminar";
+    locationModeBadge.textContent = mensaje || `Pausado · ${estado.pasosDetectados} pasos`;
   }
 
   btnWalkSim.addEventListener("click", () => {
@@ -2201,8 +2242,8 @@
     if (estado.navegando) {
       colaAvanceMetros += nuevos * PASO_METROS; // el bucle de dibujo lo avanza suave
       if (estado.navegando) {
-        const aviso = Math.abs(estado.desfaseMiradaGrados) > 100 ? " · ⚠️ vas al revés" : "";
-        locationModeBadge.textContent = `👣 ${estado.pasosDetectados} pasos${aviso}`;
+        const aviso = Math.abs(estado.desfaseMiradaGrados) > 100 ? " · vas al revés" : "";
+        locationModeBadge.textContent = `${estado.pasosDetectados} pasos${aviso}`;
       }
     }
   }
@@ -2230,7 +2271,7 @@
     if (!estado.navegando) return;
     const ahora = performance.now();
     if (ahora - podometro.inicioNavMs > 3000 && ahora - podometro.ultimaMuestraMs > 3000) {
-      locationModeBadge.textContent = "⚠️ Sin sensor de pasos: usa 'Siguiente'";
+      locationModeBadge.textContent = "Sin sensor de pasos: usa 'Siguiente'";
     }
   }, 1000);
 
@@ -2364,7 +2405,7 @@
   // 3. "🎯 Centrar flechas": apunta el celular a lo largo del camino y toca el botón UNA vez.
   // Las flechas quedan al frente en ese instante y después se quedan fijas en el mundo:
   // si giras, ya NO giran contigo (verás "Gira a la derecha/izquierda" o "Da media vuelta").
-  btnAlignArrows.textContent = "🎯 Centrar flechas";
+  btnAlignArrows.textContent = "Centrar flechas";
   btnAlignArrows.addEventListener("click", () => {
     if (estado.brujulaReal) return; // Con brújula las flechas NUNCA se mueven por un toque
     estado.rumboUsuarioGrados = obtenerTramoActivo().rumboTramo;
@@ -2372,8 +2413,8 @@
     estado.rumboManual = true;
     estado.calibrado = true;
     locationModeBadge.textContent = estado.hayGiroscopio
-      ? "🎯 Flechas centradas: ya quedan fijas aunque gires"
-      : "⚠️ Sin sensor de giro: las flechas no pueden quedarse fijas";
+      ? "Flechas centradas: ya quedan fijas aunque gires"
+      : "Sin sensor de giro: las flechas no pueden quedarse fijas";
     actualizarHUD();
     dibujarMinimapa();
   });
@@ -2438,7 +2479,7 @@
         if (!mejor || costo < mejor.costo) mejor = { id: n.id, costo };
       });
       if (!mejor) {
-        locationModeBadge.textContent = `🛰️ Estás a ${Math.round(p.d)} m de los caminos: usa QR`;
+        locationModeBadge.textContent = `Estás a ${Math.round(p.d)} m de los caminos: usa QR`;
         return false;
       }
       punto = { x: g.x, z: g.z, a: mejor.id, b: mejor.id };
@@ -2461,15 +2502,15 @@
     const redibujar = () => { dibujarMapa2D(); dibujarMinimapa(); };
     const b = datos.bounds;
     if (m.x < b.minX - 150 || m.x > b.maxX + 150 || m.z < b.minZ - 150 || m.z > b.maxZ + 150) {
-      if (!estado.navegando) locationModeBadge.textContent = "📍 Fuera de IBERO (usa QR)";
+      if (!estado.navegando) locationModeBadge.textContent = "Fuera de IBERO (usa QR)";
       return;
     }
     if (acc > GPS_PRECISION_MAX) {
-      locationModeBadge.textContent = `🛰️ GPS impreciso (±${Math.round(acc)} m)`;
+      locationModeBadge.textContent = `GPS impreciso (±${Math.round(acc)} m)`;
       redibujar();
       return;
     }
-    const precision = `🛰️ GPS ±${Math.round(acc)} m`;
+    const precision = `GPS ±${Math.round(acc)} m`;
     // El estado rutinario del GPS no tapa un aviso importante (p. ej. "ruta recalculada") durante sus 6 s
     const estadoGPS = (texto) => { if (performance.now() > avisoProtegidoHastaMs) locationModeBadge.textContent = texto; };
 
@@ -2498,7 +2539,7 @@
         gpsFueraDeRuta = 0;
         if (ubicarConGPS(estado.gps)) {
           inaki.recalculo = true;
-          avisarImportante("🔄 Tomaste otro camino: ruta recalculada");
+          avisarImportante("Tomaste otro camino: ruta recalculada");
           if (navigator.vibrate) navigator.vibrate([80, 60, 80]);
         }
       }
@@ -2527,7 +2568,7 @@
     estado.gpsWatchId = null;
     estado.gpsActivo = false;
     estado.gps = null;
-    btnToggleGps.textContent = "🛰️ Activar GPS Real";
+    btnToggleGps.textContent = "Activar GPS Real";
     dibujarMapa2D();
     dibujarMinimapa();
   }
@@ -2539,7 +2580,7 @@
     gpsFueraDeRuta = 0;
     // Si ya vas caminando una ruta, el GPS sólo la corrige; si no, primero te ubica.
     gpsUbicado = estado.navegando || estado.indiceActual > 0 || estado.progresoTramo > 0.02;
-    btnToggleGps.textContent = "🛰️ GPS Activo (Apagar)";
+    btnToggleGps.textContent = "GPS Activo (Apagar)";
     estado.gpsWatchId = navigator.geolocation.watchPosition(
       manejarLecturaGPS,
       (err) => {
@@ -2547,10 +2588,10 @@
           // Sin permiso: se sigue con QR + pasos, y "Caminar" no vuelve a pedirlo solo
           gpsNegado = true;
           apagarGPS();
-          locationModeBadge.textContent = aMano ? "📍 Permite la ubicación en Ajustes" : "📍 Sin permiso de ubicación: sigues con QR + pasos";
+          locationModeBadge.textContent = aMano ? "Permite la ubicación en Ajustes" : "Sin permiso de ubicación: sigues con QR + pasos";
           return;
         }
-        if ((aMano || !estado.navegando) && performance.now() > avisoProtegidoHastaMs) locationModeBadge.textContent = "📍 Sin señal GPS (usa QR)";
+        if ((aMano || !estado.navegando) && performance.now() > avisoProtegidoHastaMs) locationModeBadge.textContent = "Sin señal GPS (usa QR)";
       },
       { enableHighAccuracy: true, maximumAge: 1000, timeout: 30000 }
     );
@@ -2563,11 +2604,11 @@
     }
     if (estado.gpsActivo) {
       apagarGPS();
-      locationModeBadge.textContent = "📍 Modo: QR + Pasos";
+      locationModeBadge.textContent = "Modo: QR + Pasos";
       return;
     }
     gpsNegado = false;
-    locationModeBadge.textContent = "🛰️ Buscando GPS...";
+    locationModeBadge.textContent = "Buscando GPS...";
     fijarEstadoMenu(true);
     encenderGPS(true);
   });
@@ -2597,7 +2638,7 @@
     s.async = true;
     s.onerror = () => {
       jsQRCargando = false;
-      locationModeBadge.textContent = "⚠️ Lector QR no disponible: usa los botones de nodo";
+      locationModeBadge.textContent = "Lector QR no disponible: usa los botones de nodo";
     };
     document.head.appendChild(s);
   }
@@ -2620,8 +2661,8 @@
   async function activarCamara(videoEl) {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       locationModeBadge.textContent = window.isSecureContext
-        ? "⚠️ Este navegador no permite usar la cámara"
-        : "⚠️ La cámara requiere abrir la página con https://";
+        ? "Este navegador no permite usar la cámara"
+        : "La cámara requiere abrir la página con https://";
       return;
     }
     try {
@@ -2636,8 +2677,8 @@
       cargarJsQRSiHaceFalta();
     } catch (err) {
       console.warn("ARGOS cámara:", err);
-      if (err && err.name === "NotAllowedError") locationModeBadge.textContent = "📷 Permite la cámara en el navegador y recarga";
-      else if (performance.now() > avisoProtegidoHastaMs) locationModeBadge.textContent = "📷 Toca la pantalla para activar la cámara";
+      if (err && err.name === "NotAllowedError") locationModeBadge.textContent = "Permite la cámara en el navegador y recarga";
+      else if (performance.now() > avisoProtegidoHastaMs) locationModeBadge.textContent = "Toca la pantalla para activar la cámara";
     }
   }
 
@@ -2670,8 +2711,8 @@
     pidiendoSensores = false;
     if (!concedido) {
       locationModeBadge.textContent = intentosSensores < 3
-        ? "🧭 Toca la pantalla otra vez para activar el giro"
-        : "🧭 Sin permiso de movimiento: cierra la pestaña de Safari y abre el link de nuevo";
+        ? "Toca la pantalla otra vez para activar el giro"
+        : "Sin permiso de movimiento: cierra la pestaña de Safari y abre el link de nuevo";
       const vc = document.getElementById("arVideo");
       if (vc && (!vc.srcObject || vc.paused)) activarCamara(vc);
       return; // se reintenta en el siguiente toque
@@ -2681,7 +2722,7 @@
     document.removeEventListener("touchend", solicitarPermisosSensores, true);
     // Si a los 3 s no llegó Norte real, avisar que las flechas son aproximadas
     setTimeout(() => {
-      if (!estado.brujulaReal) locationModeBadge.textContent = "⚠️ Sin brújula: modo aproximado";
+      if (!estado.brujulaReal) locationModeBadge.textContent = "Sin brújula: modo aproximado";
     }, 3000);
     // Reintentar la cámara si el navegador exigía un gesto del usuario para reproducir el video
     const v = document.getElementById("arVideo");
@@ -2719,11 +2760,11 @@
     estado.origenId = idNodo;
     fijarSelectOrigen(idNodo);
     const nodo = nodosPorId.get(idNodo);
-    locationModeBadge.textContent = `📍 ${fuente}: ${esCruce(nodo) ? "sobre el camino" : nodo.id + " " + nodo.name}`;
+    locationModeBadge.textContent = `${fuente}: ${esCruce(nodo) ? "sobre el camino" : nodo.id + " " + nodo.name}`;
     if (estado.destinoId === idNodo) {
       // Estás parado en tu destino (p. ej. escaneaste su QR): llegaste. Antes aquí se cambiaba el destino solo.
-      if (estado.navegando) detenerNavegacion("🏁 Llegaste a tu destino");
-      else locationModeBadge.textContent = `🏁 Estás en ${nodo.name}: elige a dónde ir`;
+      if (estado.navegando) detenerNavegacion("Llegaste a tu destino");
+      else locationModeBadge.textContent = `Estás en ${nodo.name}: elige a dónde ir`;
     }
     recalcularRutaCompleta();
     centrarMapaEnUsuario();
@@ -2772,12 +2813,12 @@
     lugares().forEach((nodo) => {
       const optO = document.createElement("option");
       optO.value = nodo.id;
-      optO.textContent = `${nodo.id} — ${nodo.name}`;
+      optO.textContent = nodo.name;
       selectOrigen.appendChild(optO);
 
       const optD = document.createElement("option");
       optD.value = nodo.id;
-      optD.textContent = `${nodo.id} — ${nodo.name}`;
+      optD.textContent = nodo.name;
       selectDestino.appendChild(optD);
     });
 
@@ -2796,9 +2837,9 @@
       guardarDestino();
       recalcularRutaCompleta(true);
       if (estado.ruta.length === 1) {
-        locationModeBadge.textContent = `🏁 Ya estás en ${estado.ruta[0].name}`;
+        locationModeBadge.textContent = `Ya estás en ${estado.ruta[0].name}`;
       } else if (estado.ruta.length === 0) {
-        locationModeBadge.textContent = "⚠️ No hay camino registrado hasta ese lugar";
+        locationModeBadge.textContent = "No hay camino registrado hasta ese lugar";
       }
       fijarEstadoMenu(true);
     });
@@ -2857,6 +2898,8 @@
       tabMap.setAttribute("aria-selected", String(!esAR));
       viewAR.classList.toggle("is-visible", esAR);
       viewMap.classList.toggle("is-visible", !esAR);
+      document.body.classList.toggle("mode-map", !esAR);
+      document.body.classList.toggle("mode-ar", esAR);
 
       if (esAR) {
         activarCamara(document.getElementById("arVideo"));
@@ -2868,6 +2911,10 @@
     tabAR.addEventListener("click", () => cambiarVista("ar"));
     tabMap.addEventListener("click", () => cambiarVista("map"));
     document.getElementById("arMinimap").addEventListener("click", () => cambiarVista("map"));
+    const btnVolverAR = document.getElementById("btnVolverAR");
+    if (btnVolverAR) btnVolverAR.addEventListener("click", () => cambiarVista("ar"));
+    const btnCambiarRuta = document.getElementById("btnCambiarRuta");
+    if (btnCambiarRuta) btnCambiarRuta.addEventListener("click", () => fijarEstadoMenu(!estado.menuColapsado));
 
     btnCenterRoute.addEventListener("click", centrarMapaEnUsuario);
     btnToggleLabels.addEventListener("click", () => {
@@ -3024,7 +3071,7 @@
       btnAqui.type = "button";
       btnAqui.className = "preset-pill";
       btnAqui.style.fontSize = "0.7rem";
-      btnAqui.textContent = "📍 Ubicarse aquí";
+      btnAqui.textContent = "Ubicarse aquí";
       btnAqui.addEventListener("click", () => {
         fijarUbicacionPorNodo(nodo.id, "Tarjeta QR");
         document.getElementById("dialogQrCards")?.close();
@@ -3112,7 +3159,7 @@
     function pintar(mensaje) {
       const n = nodoPorAjustar();
       texto.textContent = mensaje || (n
-        ? `🟡 Párate en el centro del andador y mueve el punto amarillo (${nombreCorto(n)}, a ${Math.round(Math.hypot(n.x - estado.usuarioX, n.z - estado.usuarioZ))} m) hasta que quede centrado.`
+        ? `Párate en el centro del andador y mueve el punto amarillo (${nombreCorto(n)}, a ${Math.round(Math.hypot(n.x - estado.usuarioX, n.z - estado.usuarioZ))} m) hasta que quede centrado.`
         : "No hay un punto del camino adelante de ti (¿ya llegaste?).");
     }
     function refrescar() {
@@ -3137,26 +3184,26 @@
       pines[n.id] = { lat: ll.lat, lon: ll.lon, acc: 0, n: 1, t: new Date().toISOString(), ajuste: true };
       guardarPinesLocal(pines);
       refrescar();
-      pintar(`🟡 ${nombreCorto(n)}: lleva ${movidoMetros(n).toFixed(1)} m movido respecto al mapa. Sigue hasta que quede centrado.`);
+      pintar(`${nombreCorto(n)}: lleva ${movidoMetros(n).toFixed(1)} m movido respecto al mapa. Sigue hasta que quede centrado.`);
     }
-    boton("btnAjIzq", "⬅️ 0.5 m", () => mover(-AJUSTE_PASO_METROS));
-    boton("btnAjDer", "0.5 m ➡️", () => mover(AJUSTE_PASO_METROS));
-    boton("btnAjDeshacer", "↩️", () => {
+    boton("btnAjIzq", "← 0.5 m", () => mover(-AJUSTE_PASO_METROS));
+    boton("btnAjDer", "0.5 m →", () => mover(AJUSTE_PASO_METROS));
+    boton("btnAjDeshacer", "Deshacer", () => {
       const ultimo = ajuste.pila.pop();
       if (!ultimo) { pintar("No hay nada que deshacer."); return; }
       const pines = leerPines();
       if (ultimo.antes) pines[ultimo.id] = ultimo.antes; else delete pines[ultimo.id];
       guardarPinesLocal(pines);
       refrescar();
-      pintar(`↩️ Deshecho el último movimiento de ${ultimo.id}.`);
+      pintar(`Deshecho el último movimiento de ${ultimo.id}.`);
     });
-    boton("btnAjListo", "✔ Listo", () => {
+    boton("btnAjListo", "Listo", () => {
       const cuantos = new Set(ajuste.pila.map((m) => m.id)).size;
       ajuste.activo = false;
       ajuste.objetivoId = null;
       ajuste.pila = [];
       barra.style.display = "none";
-      if (cuantos) avisarImportante(`✅ ${cuantos} punto(s) ajustado(s). Mándalos: 📍 Poner pines › 📤 Enviar`);
+      if (cuantos) avisarImportante(`${cuantos} punto(s) ajustado(s). Mándalos: Poner pines › Enviar`);
     });
     barra.appendChild(texto);
     barra.appendChild(fila);
@@ -3195,7 +3242,7 @@
       if (on) localStorage.setItem("argos_dev", "1");
       else localStorage.removeItem("argos_dev");
       aplicar(on);
-      avisarImportante(on ? "🛠️ Modo desarrollador activado" : "Modo desarrollador desactivado");
+      avisarImportante(on ? "Modo desarrollador activado" : "Modo desarrollador desactivado");
     });
   }
 
@@ -3225,9 +3272,9 @@
       o.textContent = texto;
       selectPin.appendChild(o);
     };
-    agregarOpcionNueva("?", "➕ Lugar nuevo (restaurante, salón…): escribir nombre");
+    agregarOpcionNueva("?", "Lugar nuevo (restaurante, salón…): escribir nombre");
     "ABCDEFGHIJKLMNOPQRSTUVW".split("").forEach((letra) => {
-      if (!yaExiste("Edificio " + letra)) agregarOpcionNueva("Edificio " + letra, "➕ Edificio " + letra + " (dar de alta)");
+      if (!yaExiste("Edificio " + letra)) agregarOpcionNueva("Edificio " + letra, "Edificio " + letra + " (dar de alta)");
     });
     let lugarNuevo = null; // { nombre, categoria } mientras se ubica un lugar que aún no existe
     function prepararLugarNuevo() {
@@ -3238,7 +3285,7 @@
       if (nombre === "?") {
         nombre = (window.prompt("Nombre del lugar nuevo (ej. Cafetería Capeltic):") || "").trim().replace(/,/g, " ");
         if (!nombre) return false;
-        if (yaExiste(nombre)) { txtEstado.textContent = "⚠️ Ya existe un lugar con ese nombre: elígelo en la lista."; return false; }
+        if (yaExiste(nombre)) { txtEstado.textContent = "Ya existe un lugar con ese nombre: elígelo en la lista."; return false; }
         categoria = window.confirm("¿Es restaurante o cafetería?\n\nAceptar = Sí · Cancelar = No") ? "Cafetería" : "Referencia";
       }
       lugarNuevo = { nombre, categoria };
@@ -3262,11 +3309,11 @@
         const li = document.createElement("li");
         li.style.padding = "3px 0";
         li.textContent = p.ajuste
-          ? `↔️ ${n.id} ${n.name} · ajustado a mano · se movió ${movidoMetros(n.id).toFixed(1)} m`
-          : `✅ ${n.id} ${n.name} · ±${p.acc} m · se movió ${Math.round(movidoMetros(n.id))} m`;
+          ? `${n.id} ${n.name} · ajustado a mano · se movió ${movidoMetros(n.id).toFixed(1)} m`
+          : `${n.id} ${n.name} · ±${p.acc} m · se movió ${Math.round(movidoMetros(n.id))} m`;
         lista.appendChild(li);
       });
-      btnEnviar.textContent = `📤 Enviar resultados (${cuantos}/${lugares().length})`;
+      btnEnviar.textContent = `Enviar resultados (${cuantos}/${lugares().length})`;
     }
 
     let idWatch = null;
@@ -3281,21 +3328,21 @@
       idWatch = null;
       clearTimeout(temporizador);
       clearInterval(reloj);
-      btnGuardar.textContent = "📍 Guardar mi posición aquí";
+      btnGuardar.textContent = "Guardar mi posición aquí";
     }
 
     function mostrarProgreso() {
       const seg = Math.round((Date.now() - t0) / 1000);
       const mejor = muestras.length ? Math.round(Math.min(...muestras.map((m) => m.acc))) : null;
       txtEstado.textContent = muestras.length
-        ? `⏳ Midiendo ${lugarNuevo ? lugarNuevo.nombre : idMidiendo}… ${seg}/${SEGUNDOS} s · ${muestras.length} lecturas · mejor ±${mejor} m. No te muevas.`
-        : `⏳ Buscando señal GPS… ${seg} s`;
+        ? `Midiendo ${lugarNuevo ? lugarNuevo.nombre : idMidiendo}… ${seg}/${SEGUNDOS} s · ${muestras.length} lecturas · mejor ±${mejor} m. No te muevas.`
+        : `Buscando señal GPS… ${seg} s`;
     }
 
     function terminarCaptura() {
       detenerCaptura();
       if (!muestras.length) {
-        txtEstado.textContent = "❌ No llegó ninguna lectura buena. Sal a un lugar sin techo y vuelve a intentar.";
+        txtEstado.textContent = "No llegó ninguna lectura buena. Sal a un lugar sin techo y vuelve a intentar.";
         return;
       }
       // Solo las lecturas cercanas a la mejor precisión, promediadas con peso 1/precisión²
@@ -3325,7 +3372,7 @@
       reconstruirGrafo();
       recalcularRutaCompleta();
       const n = nodosPorId.get(idMidiendo);
-      txtEstado.textContent = `✅ ${n.id} ${n.name} guardado (±${Math.round(mejor)} m). Se movió ${Math.round(movidoMetros(n.id))} m respecto al mapa anterior.`;
+      txtEstado.textContent = `${n.id} ${n.name} guardado (±${Math.round(mejor)} m). Se movió ${Math.round(movidoMetros(n.id))} m respecto al mapa anterior.`;
       if (navigator.vibrate) navigator.vibrate(150);
       pintarLista();
     }
@@ -3337,7 +3384,7 @@
     btnMapaPin.className = "action-btn btn-primary";
     btnMapaPin.style.width = "100%";
     btnMapaPin.style.marginTop = "6px";
-    btnMapaPin.textContent = "🗺️ O elegir punto tocando el Mapa 2D";
+    btnMapaPin.textContent = "O elegir punto tocando el Mapa 2D";
     btnGuardar.insertAdjacentElement("afterend", btnMapaPin);
 
     btnMapaPin.addEventListener("click", () => {
@@ -3346,7 +3393,7 @@
       if (dlg.open) dlg.close();
       document.getElementById("tabMap")?.click();
       const n = nodosPorId.get(nodoPorUbicarEnMapa);
-      locationModeBadge.textContent = `📌 Toca el Mapa 2D donde va ${lugarNuevo ? lugarNuevo.nombre : n.id}`;
+      locationModeBadge.textContent = `Toca el Mapa 2D donde va ${lugarNuevo ? lugarNuevo.nombre : n.id}`;
     });
 
     campusCanvas.addEventListener("click", (e) => {
@@ -3377,22 +3424,22 @@
       reconstruirGrafo();
       recalcularRutaCompleta();
       const n = nodosPorId.get(idMovido);
-      locationModeBadge.textContent = `✅ ${n.id} movido en Mapa 2D`;
-      txtEstado.textContent = `✅ ${n.id} ${n.name} actualizado desde el Mapa 2D.`;
+      locationModeBadge.textContent = `${n.id} movido en Mapa 2D`;
+      txtEstado.textContent = `${n.id} ${n.name} actualizado desde el Mapa 2D.`;
       pintarLista();
     });
 
     btnGuardar.addEventListener("click", () => {
       if (idWatch !== null) { terminarCaptura(); return; } // tocar otra vez = terminar antes
       if (!("geolocation" in navigator)) {
-        txtEstado.textContent = "❌ Este navegador no da ubicación GPS.";
+        txtEstado.textContent = "Este navegador no da ubicación GPS.";
         return;
       }
       if (!prepararLugarNuevo()) return;
       muestras = [];
       idMidiendo = selectPin.value;
       t0 = Date.now();
-      btnGuardar.textContent = "⏹️ Terminar ya";
+      btnGuardar.textContent = "Terminar ya";
       mostrarProgreso();
       reloj = setInterval(mostrarProgreso, 1000);
       idWatch = navigator.geolocation.watchPosition(
@@ -3404,8 +3451,8 @@
         },
         (err) => {
           txtEstado.textContent = err && err.code === 1
-            ? "❌ Permite la ubicación: Ajustes › Privacidad › Localización › Safari → Mientras se usa."
-            : "⚠️ Sin señal GPS todavía… o usa '🗺️ O elegir punto tocando el Mapa 2D'.";
+            ? "Permite la ubicación: Ajustes › Privacidad › Localización › Safari → Mientras se usa."
+            : "Sin señal GPS todavía… o usa 'O elegir punto tocando el Mapa 2D'.";
         },
         { enableHighAccuracy: true, maximumAge: 0, timeout: 30000 }
       );
@@ -3450,7 +3497,7 @@
       }
       try {
         await navigator.clipboard.writeText(texto);
-        txtEstado.textContent = "📋 Copiado. Pégalo en WhatsApp/Notas y mándamelo.";
+        txtEstado.textContent = "Copiado. Pégalo en WhatsApp/Notas y mándamelo.";
       } catch (_) {
         window.prompt("Copia este texto y mándamelo:", texto);
       }
@@ -3467,7 +3514,7 @@
       aplicarPines();
       reconstruirGrafo();
       recalcularRutaCompleta();
-      txtEstado.textContent = "🗑️ Pines borrados: se usan las posiciones del mapa original.";
+      txtEstado.textContent = "Pines borrados: se usan las posiciones del mapa original.";
       pintarLista();
     });
 
@@ -3559,7 +3606,7 @@
   configurarModoDesarrollador();
   recalcularRutaCompleta();
   if (qrInicial && nodosPorId.has(qrInicial)) {
-    avisarImportante(`📍 QR: ${qrInicial} ${nodosPorId.get(qrInicial).name}`);
+    avisarImportante(`QR: ${qrInicial} ${nodosPorId.get(qrInicial).name}`);
   }
   activarCamara(document.getElementById("arVideo"));
   requestAnimationFrame(renderizarBucleAR);

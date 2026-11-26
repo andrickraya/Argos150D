@@ -115,7 +115,7 @@ const espera = (ms) => new Promise((r) => setTimeout(r, ms));
   // ---- F. Narración verificada (app/inaki_contenido.js) al llegar a la Escultura de Lobos ----
   p = await abrir("");
   // La prueba E dejó la voz guardada encendida en localStorage: solo se enciende si está apagada
-  await p.evaluate(() => { const bv = document.getElementById("btnVozInaki"); if (/🔇/.test(bv.textContent)) bv.click(); });
+  await p.evaluate(() => { const bv = document.getElementById("btnVozInaki"); if (bv.dataset.on !== "1") bv.click(); });
   await ruta(p, "N01", "N07"); await espera(1500);
   for (let i = 0; i < 25; i++) {
     await p.evaluate(() => document.getElementById("btnNextNode").click()); await espera(900);

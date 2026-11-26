@@ -6,6 +6,7 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
+    <meta name="theme-color" content="#ffffff" />
     <!-- three.js para Iñaki 3D (assets/models/inaki.glb); misma versión que assets/js/campus3d.js -->
     <script type="importmap">
       { "imports": {
@@ -13,19 +14,33 @@
           "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
       } }
     </script>
+    <!-- Tipografía: Outfit (geométrica, limpia). Si no carga, se usa la del sistema. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <title>ARGOS — Navegación AR Campus IBERO</title>
     <style>
+      /* =====================================================================
+         DISEÑO LIMPIO: dos tarjetas blancas (destino arriba, navegación abajo)
+         sobre la cámara. Todo lo demás se esconde o vive en el modo desarrollador.
+         ===================================================================== */
       :root {
-        --bg-app: #0f172a;
-        --surface: rgba(255, 255, 255, 0.94);
-        --surface-solid: #ffffff;
-        --text-primary: #1c1c1e;
-        --text-secondary: #64748b;
-        --border: rgba(15, 23, 42, 0.12);
+        --ink: #15181c;
+        --muted: #8b9197;
+        --line: #eceef0;
+        --card: #ffffff;
+        --soft: #f4f5f6;
         --accent: #DC0235;
-        --accent-soft: rgba(220, 2, 53, 0.12);
-        --green: #DC0235;
-        --red-ibero: #DC0235;
+        --accent-soft: #fdeef1;
+        --radius: 22px;
+        --shadow: 0 10px 30px rgba(15, 23, 42, 0.14);
+        --font: "Outfit", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        /* alias de los nombres viejos (por si algún estilo en línea los usa) */
+        --text-primary: var(--ink);
+        --text-secondary: var(--muted);
+        --border: var(--line);
+        --green: var(--accent);
+        --red-ibero: var(--accent);
       }
 
       * {
@@ -40,153 +55,112 @@
         height: 100%;
         height: 100dvh;
         overflow: hidden;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-        background: var(--bg-app);
-        color: var(--text-primary);
+        font-family: var(--font);
+        background: #0d0f12;
+        color: var(--ink);
         user-select: none;
+        -webkit-font-smoothing: antialiased;
       }
+      button, select, input { font-family: inherit; color: inherit; }
+      button { cursor: pointer; border: none; background: none; }
+      [hidden] { display: none !important; }
+      svg { width: 100%; height: 100%; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
-      /* BARRA SUPERIOR */
+      /* Modo desarrollador (tocar el logo "A") */
+      body:not(.dev) .dev-only { display: none !important; }
+
+      /* Lo que existe para el código pero ya no se muestra */
+      .view-switcher, .instruction-box, .ar-floating-sign, #arHeadingText,
+      .sheet-toggle-text, .minimap-label { display: none !important; }
+
+      /* ---------- TARJETA SUPERIOR ---------- */
       .app-header {
         position: fixed;
-        top: max(10px, env(safe-area-inset-top));
-        left: 10px;
-        right: 10px;
+        top: max(12px, env(safe-area-inset-top));
+        left: 12px;
+        right: 12px;
         z-index: 100;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 6px;
-        pointer-events: none;
+        max-width: 540px;
+        margin: 0 auto;
       }
-      .app-header > * { pointer-events: auto; }
-
-      .brand-pill {
+      .top-card {
         display: flex;
         align-items: center;
-        gap: 6px;
-        padding: 5px 10px 5px 5px;
-        background: var(--surface);
-        border-radius: 999px;
-        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
-        max-width: 155px;
+        gap: 12px;
+        padding: 10px 10px 10px 10px;
+        background: var(--card);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
       }
       .brand-logo {
-        width: 28px;
-        height: 28px;
-        border-radius: 50%;
-        background: linear-gradient(135deg, var(--accent), var(--red-ibero));
+        width: 46px;
+        height: 46px;
+        border-radius: 14px;
+        background: var(--accent);
         color: #fff;
-        font-weight: 800;
-        font-size: 0.85rem;
+        font-weight: 600;
+        font-size: 1.25rem;
         display: flex;
         align-items: center;
         justify-content: center;
         flex-shrink: 0;
+        cursor: pointer;
       }
-      .brand-text {
-        display: flex;
-        flex-direction: column;
-        min-width: 0;
-      }
-      .brand-name {
-        font-weight: 800;
-        font-size: 0.78rem;
-        line-height: 1.1;
-      }
-      .brand-tag {
-        font-size: 0.62rem;
-        color: var(--text-secondary);
+      .top-text { display: flex; flex-direction: column; min-width: 0; flex: 1; line-height: 1.2; }
+      .top-label { font-size: 0.78rem; color: var(--muted); }
+      .top-destino {
+        font-size: 1.05rem;
         font-weight: 600;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
       }
+      .brand-tag {
+        font-size: 0.72rem;
+        color: var(--muted);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        margin-top: 1px;
+      }
+      .pill-btn {
+        flex-shrink: 0;
+        padding: 11px 18px;
+        border-radius: 14px;
+        background: var(--accent-soft);
+        color: var(--accent);
+        font-size: 0.9rem;
+        font-weight: 600;
+        transition: transform 0.15s ease;
+      }
+      .pill-btn:active, .primary-btn:active, .round-btn:active { transform: scale(0.96); }
 
-      .view-switcher {
-        display: flex;
-        align-items: center;
-        background: var(--surface);
-        border-radius: 999px;
-        padding: 3px;
-        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
-      }
-      .switch-btn {
-        display: flex;
-        align-items: center;
-        gap: 4px;
-        padding: 6px 11px;
-        border: none;
-        background: transparent;
-        color: var(--text-secondary);
-        font-weight: 700;
-        font-size: 0.75rem;
-        border-radius: 999px;
-        cursor: pointer;
-      }
-      .switch-btn.is-active {
-        background: var(--accent);
-        color: #ffffff;
-      }
-      .live-dot {
-        width: 6px;
-        height: 6px;
-        border-radius: 50%;
-        background: #ffffff;
-      }
-
-      .header-actions {
-        display: flex;
-        gap: 5px;
-      }
-      .icon-btn, .fab-btn {
-        width: 36px;
+      /* Herramientas de desarrollador debajo de la tarjeta */
+      .header-actions { display: flex; gap: 6px; margin-top: 8px; justify-content: flex-end; }
+      body:not(.dev) .header-actions { display: none; }
+      .icon-btn {
         height: 36px;
-        border-radius: 50%;
-        border: none;
-        background: var(--surface);
-        color: var(--text-primary);
-        font-weight: 800;
-        font-size: 0.78rem;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
-        cursor: pointer;
+        padding: 0 14px;
+        border-radius: 12px;
+        background: var(--card);
+        font-size: 0.8rem;
+        font-weight: 600;
+        box-shadow: var(--shadow);
       }
 
-      /* CONTENEDOR DE VISTAS */
-      .main-viewport { z-index: 1;
-        position: fixed;
-        inset: 0;
-        width: 100%;
-        height: 100%;
-      }
+      /* ---------- VISTAS ---------- */
+      .main-viewport { position: fixed; inset: 0; z-index: 1; }
       .view-panel {
         position: absolute;
         inset: 0;
         opacity: 0;
         pointer-events: none;
-        transition: opacity 0.2s ease;
+        transition: opacity 0.25s ease;
       }
-      .view-panel.is-visible {
-        opacity: 1;
-        pointer-events: auto;
-      }
+      .view-panel.is-visible { opacity: 1; pointer-events: auto; }
 
-      /* VISTA CÁMARA AR */
-      #viewAR {
-        background: radial-gradient(circle at 50% 60%, #1e293b 0%, #090d16 100%);
-        overflow: hidden;
-      }
-      #arVideo {
-        position: absolute;
-        inset: 0;
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-        z-index: 1;
-      }
+      #viewAR { background: #0d0f12; overflow: hidden; }
+      #arVideo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; }
       .ar-floor-canvas {
         position: absolute;
         inset: 0;
@@ -197,128 +171,82 @@
         touch-action: pan-y;
       }
 
-      /* Cartel de dirección arriba a la izquierda en AR */
-      .ar-floating-sign {
-        position: fixed;
-        top: 58px;
-        left: 10px;
-        right: 122px;
-        z-index: 20;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        padding: 8px 12px;
-        border-radius: 16px;
-        background: rgba(15, 23, 42, 0.86);
-        border: 1.5px solid rgba(56, 189, 248, 0.65);
-        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
-        color: #fff;
-      }
-      .ar-sign-icon {
-        width: 34px;
-        height: 34px;
-        border-radius: 10px;
-        background: linear-gradient(135deg, #DC0235, #E8344F);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 1.1rem;
-        flex-shrink: 0;
-      }
-      .ar-sign-body { min-width: 0; flex: 1; }
-      .ar-sign-title {
-        font-size: 0.82rem;
-        font-weight: 800;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-      }
-      .ar-sign-sub {
-        font-size: 0.68rem;
-        color: #ffd6dc;
-        font-weight: 600;
-      }
-
+      /* "Centrar flechas" sólo aparece en celulares sin brújula (lo decide app.js) */
       .ar-sensor-bar {
         position: fixed;
-        top: 116px;
-        left: 10px;
+        top: calc(max(12px, env(safe-area-inset-top)) + 82px);
+        right: 12px;
         z-index: 20;
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        background: rgba(15, 23, 42, 0.8);
-        color: #fff;
-        padding: 4px 10px;
-        border-radius: 999px;
-        font-size: 0.7rem;
-        font-weight: 700;
       }
       .chip-sm {
-        padding: 3px 8px;
-        border-radius: 999px;
-        border: 1px solid #DC0235;
-        background: rgba(56, 189, 248, 0.2);
-        color: #fff;
-        font-size: 0.66rem;
-        font-weight: 700;
-        cursor: pointer;
+        padding: 9px 14px;
+        border-radius: 12px;
+        background: var(--card);
+        color: var(--ink);
+        font-size: 0.8rem;
+        font-weight: 500;
+        box-shadow: var(--shadow);
       }
 
+      /* Indicación al centro: discreta, sólo cuando hay que girar o inclinar */
       .ar-turn-hint {
         position: fixed;
-        top: 46%;
+        top: 42%;
         left: 50%;
         transform: translate(-50%, -50%);
         z-index: 25;
-        padding: 10px 16px;
+        padding: 10px 18px;
         border-radius: 999px;
-        background: rgba(220, 2, 53, 0.95);
+        background: rgba(21, 24, 28, 0.72);
         color: #fff;
-        font-size: 0.8rem;
-        font-weight: 700;
-        box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+        font-size: 0.9rem;
+        font-weight: 500;
         white-space: nowrap;
+        pointer-events: none;
       }
 
-      /* Minimapa circular en vivo arriba a la derecha */
-      .ar-minimap-card {
+      /* Iñaki: botones redondos a la derecha */
+      .inaki-controles {
         position: fixed;
-        top: 58px;
-        right: 10px;
-        z-index: 20;
-        width: 102px;
-        height: 102px;
+        right: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        z-index: 40;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        align-items: center;
+      }
+      body.mode-map .inaki-controles { display: none; }
+      body:has(.nav-bottom-sheet:not(.is-collapsed)) .inaki-controles,
+      body:has(.chat-panel[style*="block"]) .inaki-controles { opacity: 0; pointer-events: none; }
+      .inaki-controles { transition: opacity 0.2s ease; }
+      /* En modo desarrollador la fila de herramientas ocupa ese lugar */
+      body.dev .ar-sensor-bar { top: calc(max(12px, env(safe-area-inset-top)) + 128px); }
+      .round-btn {
+        width: 46px;
+        height: 46px;
         border-radius: 50%;
-        border: 2.5px solid #DC0235;
-        background: #0f172a;
-        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
-        overflow: hidden;
+        background: var(--card);
+        color: var(--ink);
+        box-shadow: var(--shadow);
         display: flex;
         align-items: center;
         justify-content: center;
-        cursor: pointer;
+        padding: 12px;
+        transition: transform 0.15s ease;
       }
-      #minimapCanvas { width: 100%; height: 100%; }
-      .minimap-label {
-        position: absolute;
-        bottom: 5px;
-        font-size: 0.54rem;
-        font-weight: 800;
-        color: #0f172a;
-        background: #DC0235;
-        padding: 1px 6px;
-        border-radius: 6px;
-      }
+      .round-btn-main { width: 56px; height: 56px; padding: 15px; background: var(--accent); color: #fff; }
+      .round-btn[data-on="0"] { color: var(--muted); }
 
-      /* VISTA MAPA 2D */
+      /* ---------- VISTA MAPA 2D ---------- */
       .map-pan-container {
         width: 100%;
         height: 100%;
         overflow: auto;
         scroll-axis-lock: none;
         overscroll-behavior: contain;
-        background: #f4f3ee;
+        background: #f2f3f1;
         cursor: grab;
       }
       @supports not (scroll-axis-lock: none) {
@@ -328,242 +256,259 @@
       #campusCanvas { display: block; width: 1200px; height: 1000px; }
       .map-floating-controls {
         position: fixed;
-        right: 14px;
-        bottom: 145px;
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-        z-index: 30;
-      }
-
-      /* TARJETA INFERIOR COMPACTA / DESPLEGABLE */
-      .nav-bottom-sheet {
-        position: fixed;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        z-index: 100;
-        background: var(--surface);
-        backdrop-filter: blur(20px);
-        -webkit-backdrop-filter: blur(20px);
-        border-top: 1px solid var(--border);
-        border-radius: 22px 22px 0 0;
-        box-shadow: 0 -6px 28px rgba(0, 0, 0, 0.28);
-        max-width: 540px;
-        margin: 0 auto;
-        padding-bottom: env(safe-area-inset-bottom);
-      }
-
-      .sheet-toggle-bar {
-        width: 100%;
-        border: none;
-        background: transparent;
-        padding: 7px 14px 3px;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 4px;
-        cursor: pointer;
-      }
-      .sheet-handle-pill {
-        width: 40px;
-        height: 4px;
-        border-radius: 999px;
-        background: rgba(15, 23, 42, 0.25);
-      }
-      .sheet-toggle-text {
-        font-size: 0.73rem;
-        font-weight: 800;
-        color: #ffffff;
-        background: var(--accent);
-        padding: 4px 14px;
-        border-radius: 999px;
-        box-shadow: 0 2px 8px rgba(220, 2, 53, 0.3);
-      }
-
-      .sheet-summary {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 6px 14px 10px;
-        gap: 8px;
-      }
-      .instruction-box {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        min-width: 0;
-        flex: 1;
-      }
-      .compass-mini { width: 36px; height: 36px; flex-shrink: 0; }
-      .compass-svg { width: 100%; height: 100%; transition: transform 0.25s ease; }
-      .instruction-text { min-width: 0; flex: 1; }
-      .step-pill {
-        font-size: 0.64rem;
-        font-weight: 800;
-        color: var(--accent);
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-      }
-      .instruction-title {
-        font-size: 0.92rem;
-        font-weight: 800;
-        color: var(--text-primary);
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-      }
-      .instruction-sub {
-        font-size: 0.72rem;
-        color: var(--text-secondary);
-        font-weight: 600;
-      }
-
-      .sheet-actions {
-        display: flex;
-        align-items: center;
-        gap: 5px;
-        flex-shrink: 0;
-      }
-      .action-btn {
-        padding: 9px 12px;
-        border-radius: 999px;
-        border: none;
-        font-size: 0.78rem;
-        font-weight: 800;
-        cursor: pointer;
-        color: #fff;
-      }
-      .btn-primary { background: var(--accent); }
-      .btn-sim { background: var(--green); }
-      .btn-sim.is-walking { background: var(--red-ibero); }
-
-      /* Cuando está colapsado, oculta por completo los selectores para dejar libre el 85% de la pantalla */
-      .nav-bottom-sheet.is-collapsed .sheet-details {
-        display: none !important;
-      }
-
-      .sheet-details {
-        padding: 4px 14px 14px;
+        right: 12px;
+        top: calc(max(12px, env(safe-area-inset-top)) + 82px);
         display: flex;
         flex-direction: column;
         gap: 10px;
-        max-height: 48dvh;
-        overflow-y: auto;
-        border-top: 1px solid var(--border);
+        z-index: 30;
       }
-      .route-selectors { display: flex; flex-direction: column; gap: 6px; }
+      .fab-btn {
+        width: 46px;
+        height: 46px;
+        border-radius: 50%;
+        background: var(--card);
+        color: var(--ink);
+        box-shadow: var(--shadow);
+        padding: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.75rem;
+        font-weight: 600;
+      }
+
+      /* ---------- TARJETA INFERIOR ---------- */
+      .nav-bottom-sheet {
+        position: fixed;
+        left: 12px;
+        right: 12px;
+        bottom: max(12px, env(safe-area-inset-bottom));
+        z-index: 100;
+        max-width: 540px;
+        margin: 0 auto;
+        background: var(--card);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+        padding: 4px 12px 12px;
+      }
+      .sheet-toggle-bar {
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        padding: 6px 0 8px;
+      }
+      .sheet-handle-pill { width: 36px; height: 4px; border-radius: 999px; background: #d9dcdf; }
+
+      .sheet-summary { display: flex; gap: 12px; align-items: stretch; }
+      .ar-minimap-card {
+        width: 104px;
+        height: 104px;
+        flex-shrink: 0;
+        border-radius: 16px;
+        overflow: hidden;
+        background: #eef1ef;
+        cursor: pointer;
+      }
+      #minimapCanvas { width: 100%; height: 100%; display: block; }
+
+      .nav-info { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: space-between; }
+      .nav-turn { display: flex; align-items: center; gap: 10px; min-width: 0; }
+      .turn-icon { width: 34px; height: 34px; flex-shrink: 0; color: var(--ink); }
+      .turn-icon svg { stroke-width: 2.2; }
+      .turn-icon[data-giro="llegada"] { color: var(--accent); }
+      .nav-turn-text { min-width: 0; flex: 1; }
+      .nav-dist { font-size: 1.75rem; font-weight: 600; line-height: 1; letter-spacing: -0.01em; }
+      .nav-dist small { font-size: 1rem; font-weight: 500; color: var(--muted); margin-left: 2px; }
+      .ar-sign-title {
+        font-size: 0.88rem;
+        color: var(--muted);
+        margin-top: 3px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .nav-stats {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        border-top: 1px solid var(--line);
+        padding-top: 8px;
+      }
+      .nav-stats div { display: flex; flex-direction: column; line-height: 1.15; }
+      .nav-stats div + div { border-left: 1px solid var(--line); padding-left: 10px; }
+      .nav-stats b { font-size: 0.98rem; font-weight: 600; }
+      .nav-stats span { font-size: 0.74rem; color: var(--muted); }
+
+      .sheet-actions { display: flex; gap: 8px; margin-top: 12px; }
+      .primary-btn, .action-btn {
+        flex: 1;
+        height: 50px;
+        border-radius: 16px;
+        background: var(--accent);
+        color: #fff;
+        font-size: 1rem;
+        font-weight: 600;
+        transition: transform 0.15s ease, background 0.2s ease;
+      }
+      .btn-sim.is-walking { background: var(--ink); }
+      .secondary-btn { flex: 0 0 auto; padding: 0 18px; background: var(--soft); color: var(--ink); }
+
+      /* Detalles (al tocar "Cambiar"): elegir origen y destino */
+      .nav-bottom-sheet.is-collapsed .sheet-details { display: none !important; }
+      .sheet-details {
+        margin-top: 12px;
+        padding-top: 12px;
+        border-top: 1px solid var(--line);
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        max-height: 46dvh;
+        overflow-y: auto;
+      }
+      .route-selectors { display: flex; flex-direction: column; gap: 8px; }
       .selector-row {
         display: flex;
         align-items: center;
-        gap: 8px;
-        background: #f8fafc;
-        border: 1px solid var(--border);
-        border-radius: 12px;
-        padding: 6px 10px;
+        gap: 10px;
+        background: var(--soft);
+        border-radius: 14px;
+        padding: 9px 12px;
       }
       .selector-icon { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
-      .icon-origin { background: var(--green); }
-      .icon-dest { background: var(--red-ibero); }
+      .icon-origin { border: 2.5px solid var(--ink); }
+      .icon-dest { background: var(--accent); }
       .selector-field { display: flex; flex-direction: column; flex: 1; min-width: 0; }
-      .selector-field label { font-size: 0.64rem; color: var(--text-secondary); font-weight: 700; }
+      .selector-field label { font-size: 0.74rem; color: var(--muted); }
       .clean-select {
         border: none;
         background: transparent;
-        font-size: 0.82rem;
-        font-weight: 700;
-        color: var(--text-primary);
+        font-size: 0.95rem;
+        font-weight: 500;
+        color: var(--ink);
         outline: none;
         width: 100%;
+        padding: 2px 0;
       }
       .btn-scan-mini, .btn-swap-mini {
-        padding: 5px 9px;
-        border-radius: 8px;
-        border: 1px solid var(--border);
-        background: #fff;
-        font-size: 0.72rem;
-        font-weight: 800;
-        color: var(--accent);
-        cursor: pointer;
+        flex-shrink: 0;
+        padding: 8px 12px;
+        border-radius: 10px;
+        background: var(--card);
+        font-size: 0.8rem;
+        font-weight: 600;
       }
-      .presets-scroll {
-        display: flex;
-        gap: 6px;
-        overflow-x: auto;
-        padding-bottom: 2px;
-        flex-shrink: 0; /* con rutas largas la lista de paradas aplastaba esta fila y no se podía tocar */
-      }
+      .presets-scroll { display: flex; gap: 8px; overflow-x: auto; flex-shrink: 0; scrollbar-width: none; }
+      .presets-scroll::-webkit-scrollbar { display: none; }
       .preset-pill {
         white-space: nowrap;
-        padding: 6px 11px;
-        border-radius: 999px;
-        border: 1px solid var(--border);
-        background: #fff;
-        font-size: 0.73rem;
-        font-weight: 700;
-        color: var(--text-primary);
-        cursor: pointer;
+        padding: 9px 14px;
+        border-radius: 12px;
+        background: var(--soft);
+        font-size: 0.84rem;
+        font-weight: 500;
       }
-      .itinerary-header {
-        display: flex;
-        justify-content: space-between;
-        font-size: 0.73rem;
-        color: var(--text-secondary);
-        font-weight: 700;
-        margin-bottom: 6px;
-      }
-      .itinerary-list { list-style: none; display: flex; flex-direction: column; gap: 5px; }
+      .preset-pill.dev-only { background: #fff4d6; }
+
+      /* Lista de paradas: herramienta de desarrollador */
+      body:not(.dev) .itinerary-block { display: none; }
+      .itinerary-header { display: flex; justify-content: space-between; font-size: 0.78rem; color: var(--muted); margin-bottom: 6px; }
+      .itinerary-list { list-style: none; display: flex; flex-direction: column; gap: 4px; }
       .itinerary-item {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        padding: 6px 10px;
-        border-radius: 8px;
-        background: #f1f5f9;
-        font-size: 0.78rem;
+        padding: 8px 10px;
+        border-radius: 10px;
+        background: var(--soft);
+        font-size: 0.82rem;
         cursor: pointer;
       }
-      .itinerary-item.is-current {
-        background: var(--accent-soft);
-        color: var(--accent);
-        font-weight: 800;
-      }
-      .itinerary-code { font-family: monospace; font-weight: 800; margin-right: 6px; }
+      .itinerary-item.is-current { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+      .itinerary-code { font-weight: 600; margin-right: 6px; color: var(--muted); }
 
-      /* MODALES */
+      /* ---------- CHAT DE IÑAKI ---------- */
+      .chat-panel {
+        position: fixed;
+        left: 12px;
+        right: 12px;
+        bottom: max(12px, env(safe-area-inset-bottom));
+        max-width: 540px;
+        margin: 0 auto;
+        z-index: 9999;
+        background: var(--card);
+        color: var(--ink);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+        padding: 12px;
+        font-family: var(--font);
+        font-size: 0.95rem;
+        line-height: 1.4;
+      }
+      .chat-top { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+      .chat-titulo { font-weight: 600; font-size: 1rem; }
+      .chat-modo { flex: 1; font-size: 0.75rem; color: var(--muted); }
+      .chat-log { max-height: 38vh; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; user-select: text; }
+      .chat-msg { align-self: flex-start; max-width: 88%; padding: 8px 12px; border-radius: 16px 16px 16px 4px; background: var(--soft); color: var(--ink); }
+      .chat-msg-tu { align-self: flex-end; border-radius: 16px 16px 4px 16px; background: var(--accent); color: #fff; }
+      .chat-estado { font-size: 0.8rem; color: var(--muted); min-height: 18px; margin-top: 4px; }
+      .chat-form { display: flex; gap: 8px; margin-top: 6px; }
+      .chat-input {
+        flex: 1;
+        min-width: 0;
+        height: 46px;
+        padding: 0 14px;
+        border: none;
+        border-radius: 14px;
+        background: var(--soft);
+        font-size: 16px;
+        outline: none;
+      }
+      .chat-icono {
+        width: 46px;
+        height: 46px;
+        flex-shrink: 0;
+        border-radius: 14px;
+        background: var(--soft);
+        color: var(--ink);
+        padding: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .chat-top .chat-icono { width: 34px; height: 34px; padding: 8px; border-radius: 50%; }
+      .chat-enviar { background: var(--accent); color: #fff; }
+
+      /* ---------- DIÁLOGOS ---------- */
       .clean-dialog {
         border: none;
-        border-radius: 22px;
+        border-radius: var(--radius);
         padding: 0;
         background: transparent;
         max-width: 500px;
         width: calc(100vw - 24px);
         margin: auto;
-        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+        box-shadow: var(--shadow);
       }
-      .clean-dialog::backdrop {
-        background: rgba(0, 0, 0, 0.55);
-        backdrop-filter: blur(6px);
-      }
-      .dialog-card { background: #fff; border-radius: 22px; padding: 18px; color: var(--text-primary); }
-      .dialog-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
-      .dialog-top h3 { font-size: 1.05rem; font-weight: 800; }
+      .clean-dialog::backdrop { background: rgba(13, 15, 18, 0.5); }
+      .dialog-card { background: var(--card); border-radius: var(--radius); padding: 18px; color: var(--ink); }
+      .dialog-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+      .dialog-top h3 { font-size: 1.1rem; font-weight: 600; }
       .dialog-close-btn {
-        width: 30px;
-        height: 30px;
+        width: 34px;
+        height: 34px;
         border-radius: 50%;
-        border: none;
-        background: #f1f5f9;
-        font-weight: 800;
-        cursor: pointer;
+        background: var(--soft);
+        padding: 9px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
       }
-      .dialog-desc { font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 10px; line-height: 1.4; }
+      .dialog-desc { font-size: 0.86rem; color: var(--muted); margin-bottom: 10px; line-height: 1.45; }
       .scanner-feed-box {
         width: 100%;
-        height: 180px;
+        height: 200px;
         background: #000;
-        border-radius: 14px;
+        border-radius: 16px;
         position: relative;
         overflow: hidden;
         display: flex;
@@ -573,21 +518,14 @@
       #qrScannerVideo { width: 100%; height: 100%; object-fit: cover; }
       .scanner-status {
         position: absolute;
-        bottom: 8px;
-        font-size: 0.7rem;
+        bottom: 10px;
+        font-size: 0.78rem;
         color: #fff;
-        background: rgba(0, 0, 0, 0.65);
-        padding: 3px 10px;
+        background: rgba(0, 0, 0, 0.55);
+        padding: 4px 12px;
         border-radius: 999px;
       }
-      .simulated-chips-grid {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 6px;
-        max-height: 150px;
-        overflow-y: auto;
-        margin-top: 8px;
-      }
+      .simulated-chips-grid { display: flex; flex-wrap: wrap; gap: 6px; max-height: 160px; overflow-y: auto; margin-top: 10px; }
       .cards-grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
@@ -596,45 +534,40 @@
         overflow-y: auto;
       }
       .qr-card-item {
-        border: 1px solid var(--border);
-        border-radius: 12px;
+        border: 1px solid var(--line);
+        border-radius: 14px;
         padding: 8px;
         text-align: center;
-        background: #f8fafc;
+        background: var(--soft);
         display: flex;
         flex-direction: column;
         align-items: center;
         gap: 5px;
       }
-      body:not(.dev) .dev-only { display: none !important; }
-      .brand-logo { cursor: pointer; }
     </style>
   </head>
   <body class="mode-ar">
-    <!-- BARRA SUPERIOR FLOTANTE -->
+    <!-- TARJETA SUPERIOR: a dónde vas + estado -->
     <header class="app-header">
-      <div class="brand-pill">
-        <span class="brand-logo">A</span>
-        <div class="brand-text">
-          <span class="brand-name">ARGOS IBERO</span>
-          <span id="locationModeBadge" class="brand-tag">📍 Salón C (QR)</span>
+      <div class="top-card brand-pill">
+        <span class="brand-logo" aria-label="ARGOS">A</span>
+        <div class="top-text brand-text">
+          <span class="top-label">Vas a</span>
+          <span id="topDestino" class="top-destino">Cafetería El Cubo</span>
+          <span id="locationModeBadge" class="brand-tag">Listo</span>
         </div>
+        <button id="btnCambiarRuta" class="pill-btn" type="button">Cambiar</button>
       </div>
 
       <nav class="view-switcher" role="tablist" aria-label="Modo de visualización">
-        <button id="tabAR" class="switch-btn is-active" type="button" role="tab" aria-selected="true">
-          <span class="live-dot"></span>
-          <span>🥽 Cámara AR</span>
-        </button>
-        <button id="tabMap" class="switch-btn" type="button" role="tab" aria-selected="false">
-          <span>🗺️ Mapa 2D</span>
-        </button>
+        <button id="tabAR" class="switch-btn is-active" type="button" role="tab" aria-selected="true">Cámara</button>
+        <button id="tabMap" class="switch-btn" type="button" role="tab" aria-selected="false">Mapa</button>
       </nav>
 
       <div class="header-actions">
-        <button id="btnOpenQrModal" class="icon-btn" commandfor="dialogQrScanner" command="show-modal" title="Elegir nodo o escanear QR" type="button">QR</button>
-        <button id="btnOpenPrintModal" class="icon-btn dev-only" commandfor="dialogQrCards" command="show-modal" title="Códigos QR" type="button">🖨️</button>
-        <button id="btnOpenHelpModal" class="icon-btn" commandfor="dialogHowItWorks" command="show-modal" title="Ayuda" type="button">?</button>
+        <button id="btnOpenQrModal" class="icon-btn dev-only" commandfor="dialogQrScanner" command="show-modal" title="Elegir nodo o escanear QR" type="button">QR</button>
+        <button id="btnOpenPrintModal" class="icon-btn dev-only" commandfor="dialogQrCards" command="show-modal" title="Códigos QR" type="button">Imprimir QR</button>
+        <button id="btnOpenHelpModal" class="icon-btn dev-only" commandfor="dialogHowItWorks" command="show-modal" title="Ayuda" type="button">Ayuda</button>
       </div>
     </header>
 
@@ -645,26 +578,18 @@
         <video id="arVideo" playsinline autoplay muted></video>
         <canvas id="arFloorCanvas" class="ar-floor-canvas"></canvas>
 
+        <!-- Texto largo de la indicación: lo sigue escribiendo app.js, pero ya no se muestra -->
         <div id="arFloatingSign" class="ar-floating-sign">
-          <div class="ar-sign-icon" id="arSignTurnIcon">⬆️</div>
-          <div class="ar-sign-body">
-            <div id="arSignTitle" class="ar-sign-title">Sigue hacia Paso Noreste</div>
-            <div id="arSignDist" class="ar-sign-sub">87 m al Este · Sigue las flechas en el piso</div>
-          </div>
+          <div id="arSignDist" class="ar-sign-sub"></div>
         </div>
 
         <div id="arTurnHint" class="ar-turn-hint" hidden>
-          <span id="arTurnHintText">⬅️ Gira a la izquierda para ver el pasillo</span>
+          <span id="arTurnHintText">Gira a la izquierda</span>
         </div>
 
         <div class="ar-sensor-bar">
-          <span id="arHeadingText">🧭 Rumbo: 106° Este</span>
-          <button id="btnAlignArrows" class="chip-sm" type="button">🎯 Centrar flechas</button>
-        </div>
-
-        <div id="arMinimap" class="ar-minimap-card" title="Toca para abrir el Mapa 2D">
-          <canvas id="minimapCanvas" width="180" height="180"></canvas>
-          <span class="minimap-label">Minimapa en vivo</span>
+          <span id="arHeadingText"></span>
+          <button id="btnAlignArrows" class="chip-sm" type="button">Centrar flechas</button>
         </div>
       </section>
 
@@ -676,43 +601,64 @@
           </div>
         </div>
         <div class="map-floating-controls">
-          <button id="btnCenterRoute" class="fab-btn" title="Centrar en mi ubicación" type="button">🎯</button>
-          <button id="btnToggleLabels" class="fab-btn" title="Mostrar/ocultar nombres" type="button">🏷️</button>
+          <button id="btnVolverAR" class="fab-btn" title="Volver a la cámara" aria-label="Volver a la cámara" type="button">
+            <svg viewBox="0 0 24 24"><path d="M4 8.5A2.5 2.5 0 0 1 6.5 6h1.8l1.4-2h4.6l1.4 2h1.8A2.5 2.5 0 0 1 20 8.5v8a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 16.5z"/><circle cx="12" cy="12.5" r="3.5"/></svg>
+          </button>
+          <button id="btnCenterRoute" class="fab-btn" title="Centrar en mi ubicación" aria-label="Centrar en mi ubicación" type="button">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.5"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+          </button>
+          <button id="btnToggleLabels" class="fab-btn dev-only" title="Mostrar/ocultar nombres" type="button">Aa</button>
         </div>
       </section>
     </main>
 
-    <!-- TARJETA INFERIOR (INICIA COMPACTA ABAJO PARA DEJAR LIBRES LAS FLECHAS 3D) -->
+    <!-- Iñaki (los botones los crea app.js aquí) -->
+    <div id="inakiControles" class="inaki-controles"></div>
+
+    <!-- TARJETA INFERIOR: minimapa + siguiente giro + llegada -->
     <aside class="nav-bottom-sheet is-collapsed" id="bottomSheet">
-      <button id="btnToggleSheet" class="sheet-toggle-bar" type="button" aria-expanded="false">
+      <button id="btnToggleSheet" class="sheet-toggle-bar" type="button" aria-expanded="false" aria-label="Cambiar ruta">
         <span class="sheet-handle-pill"></span>
-        <span id="sheetToggleLabel" class="sheet-toggle-text">🔼 Cambiar Origen / Destino</span>
+        <span id="sheetToggleLabel" class="sheet-toggle-text">Cambiar ruta</span>
       </button>
 
       <div class="sheet-summary">
-        <div class="instruction-box">
-          <div class="compass-mini">
-            <svg id="hudCompass" class="compass-svg" viewBox="0 0 48 48" fill="none">
-              <circle cx="24" cy="24" r="22" stroke="rgba(220,2,53,0.25)" stroke-width="2.5"/>
-              <polygon points="24,5 31,26 24,21 17,26" fill="#DC0235"/>
-              <polygon points="24,43 31,26 24,21 17,26" fill="#cbd5e1"/>
-            </svg>
+        <div id="arMinimap" class="ar-minimap-card" title="Abrir el mapa">
+          <canvas id="minimapCanvas" width="208" height="208"></canvas>
+          <span class="minimap-label"></span>
+        </div>
+
+        <div class="nav-info">
+          <div class="nav-turn">
+            <div id="arSignTurnIcon" class="turn-icon"></div>
+            <div class="nav-turn-text">
+              <div class="nav-dist"><span id="navDistNum"></span><small id="navDistUnidad">m</small></div>
+              <div id="arSignTitle" class="ar-sign-title">Sigue las flechas</div>
+            </div>
           </div>
-          <div class="instruction-text">
-            <div id="hudStepBadge" class="step-pill">N07 Salón C ➔ N10 Cafetería El Cubo</div>
-            <h1 id="hudInstruction" class="instruction-title">Camina 87 m hacia Paso Noreste</h1>
-            <p id="hudSub" class="instruction-sub">138 m restantes · ~1.7 min</p>
+          <div class="nav-stats">
+            <div><b id="navLlegada">--:--</b><span>llegada</span></div>
+            <div><b id="navMin">0</b><span>min</span></div>
+            <div><b id="navMetros">0</b><span>m</span></div>
           </div>
         </div>
 
-        <div class="sheet-actions">
-          <button id="btnWalkSim" class="action-btn btn-sim" type="button">
-            <span id="btnWalkSimText">▶️ Caminar</span>
-          </button>
-          <button id="btnNextNode" class="action-btn btn-primary dev-only" type="button">
-            <span>Siguiente</span>
-          </button>
+        <!-- Versión anterior del resumen: app.js la sigue llenando; oculta -->
+        <div class="instruction-box">
+          <svg id="hudCompass" class="compass-svg" viewBox="0 0 48 48"></svg>
+          <div id="hudStepBadge"></div>
+          <h1 id="hudInstruction"></h1>
+          <p id="hudSub"></p>
         </div>
+      </div>
+
+      <div class="sheet-actions">
+        <button id="btnWalkSim" class="primary-btn action-btn btn-sim" type="button">
+          <span id="btnWalkSimText">Caminar</span>
+        </button>
+        <button id="btnNextNode" class="primary-btn secondary-btn dev-only" type="button">
+          <span>Siguiente</span>
+        </button>
       </div>
 
       <div class="sheet-details" id="sheetDetails">
@@ -720,19 +666,19 @@
           <div class="selector-row">
             <span class="selector-icon icon-origin"></span>
             <div class="selector-field">
-              <label for="selectOrigen">📍 Estoy en (Origen / QR actual):</label>
+              <label for="selectOrigen">Estoy en</label>
               <select id="selectOrigen" class="clean-select"></select>
             </div>
-            <button id="btnScanOrigin" class="btn-scan-mini" commandfor="dialogQrScanner" command="show-modal" type="button">📷 QR</button>
+            <button id="btnScanOrigin" class="btn-scan-mini" commandfor="dialogQrScanner" command="show-modal" type="button">QR</button>
           </div>
 
           <div class="selector-row">
             <span class="selector-icon icon-dest"></span>
             <div class="selector-field">
-              <label for="selectDestino">🎯 Quiero ir a (Destino):</label>
+              <label for="selectDestino">Quiero ir a</label>
               <select id="selectDestino" class="clean-select"></select>
             </div>
-            <button id="btnInvert" class="btn-swap-mini" type="button">⇄</button>
+            <button id="btnInvert" class="btn-swap-mini" type="button" aria-label="Invertir">⇅</button>
           </div>
         </div>
 
@@ -740,10 +686,10 @@
           <button type="button" class="preset-pill" data-preset="N01,N07">Puerta 3 → Salón C</button>
           <button type="button" class="preset-pill" data-preset="N07,N10">Salón C → El Cubo</button>
           <button type="button" class="preset-pill" data-preset="N07,N64">Salón C → Camellia</button>
-          <button type="button" id="btnToggleGps" class="preset-pill dev-only">🛰️ Activar GPS Real</button>
-          <button type="button" id="btnDemo" class="preset-pill dev-only">🎬 Demo (avanza sola)</button>
-          <button type="button" id="btnAjustar" class="preset-pill dev-only">↔️ Ajustar camino aquí</button>
-          <button type="button" class="preset-pill dev-only" commandfor="dialogPines" command="show-modal">📍 Poner pines con GPS</button>
+          <button type="button" id="btnToggleGps" class="preset-pill dev-only">Activar GPS Real</button>
+          <button type="button" id="btnDemo" class="preset-pill dev-only">Demo (avanza sola)</button>
+          <button type="button" id="btnAjustar" class="preset-pill dev-only">Ajustar camino aquí</button>
+          <button type="button" class="preset-pill dev-only" commandfor="dialogPines" command="show-modal">Poner pines con GPS</button>
         </div>
 
         <div class="itinerary-block">
@@ -760,26 +706,26 @@
     <dialog id="dialogQrScanner" class="clean-dialog" closedby="any" aria-labelledby="qrScannerDialogTitle">
       <div class="dialog-card">
         <div class="dialog-top">
-          <h3 id="qrScannerDialogTitle">📍 ¿En qué nodo del campus estás?</h3>
-          <button class="dialog-close-btn" commandfor="dialogQrScanner" command="close" type="button">✕</button>
+          <h3 id="qrScannerDialogTitle">¿Dónde estás?</h3>
+          <button class="dialog-close-btn" commandfor="dialogQrScanner" command="close" type="button" aria-label="Cerrar"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
         </div>
-        <p class="dialog-desc">Apunta a un QR o <strong>toca cualquiera de los lugares de abajo</strong> para fijar tu ubicación ahí:</p>
+        <p class="dialog-desc">Apunta a un código QR del campus o toca el lugar donde estás.</p>
         <div class="scanner-feed-box">
           <video id="qrScannerVideo" playsinline autoplay muted></video>
-          <span class="scanner-status">Cámara lista para escanear QR...</span>
+          <span class="scanner-status">Buscando código QR</span>
         </div>
         <div id="simulatedQrChips" class="simulated-chips-grid"></div>
       </div>
     </dialog>
 
-    <!-- MODAL 2: 20 TARJETAS QR -->
+    <!-- MODAL 2: TARJETAS QR -->
     <dialog id="dialogQrCards" class="clean-dialog" closedby="any" aria-labelledby="qrCardsDialogTitle">
       <div class="dialog-card">
         <div class="dialog-top">
-          <h3 id="qrCardsDialogTitle">🏷️ Códigos QR del Campus IBERO</h3>
-          <button class="dialog-close-btn" commandfor="dialogQrCards" command="close" type="button">✕</button>
+          <h3 id="qrCardsDialogTitle">Códigos QR del campus</h3>
+          <button class="dialog-close-btn" commandfor="dialogQrCards" command="close" type="button" aria-label="Cerrar"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
         </div>
-        <p class="dialog-desc">Para pegar en el campus usa las hojas grandes: <a href="qr.html" target="_blank" rel="noopener" style="font-weight:800;color:var(--accent);">🖨️ Abrir hojas QR para imprimir</a></p>
+        <p class="dialog-desc">Para pegar en el campus usa las hojas grandes: <a href="qr.html" target="_blank" rel="noopener" style="font-weight:600;color:var(--accent);">abrir hojas para imprimir</a></p>
         <div id="qrCardsGrid" class="cards-grid"></div>
       </div>
     </dialog>
@@ -788,18 +734,18 @@
     <dialog id="dialogPines" class="clean-dialog" closedby="any" aria-labelledby="pinesTitle">
       <div class="dialog-card">
         <div class="dialog-top">
-          <h3 id="pinesTitle">📍 Poner pines con GPS</h3>
-          <button class="dialog-close-btn" commandfor="dialogPines" command="close" type="button">✕</button>
+          <h3 id="pinesTitle">Poner pines con GPS</h3>
+          <button class="dialog-close-btn" commandfor="dialogPines" command="close" type="button" aria-label="Cerrar"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
         </div>
         <p class="dialog-desc">Párate <strong>exactamente</strong> en el lugar, elige cuál es y toca Guardar. Quédate quieto unos 20 segundos, de preferencia sin techo encima.</p>
-        <label for="selectPin" style="font-size:0.75rem;font-weight:700;">Estoy parado en:</label>
-        <select id="selectPin" class="clean-select" style="width:100%;margin:4px 0 10px;"></select>
-        <button id="btnGuardarPin" class="action-btn btn-sim" type="button" style="width:100%;">📍 Guardar mi posición aquí</button>
+        <label for="selectPin" style="font-size:0.78rem;color:var(--muted);">Estoy parado en</label>
+        <select id="selectPin" class="clean-select" style="width:100%;margin:4px 0 10px;background:var(--soft);border-radius:12px;padding:10px;"></select>
+        <button id="btnGuardarPin" class="primary-btn action-btn btn-sim" type="button" style="width:100%;">Guardar mi posición aquí</button>
         <p id="pinEstado" class="dialog-desc" style="margin-top:8px;min-height:2.4em;">Aún no has guardado pines.</p>
-        <ul id="listaPines" style="list-style:none;padding:0;margin:0 0 10px;font-size:0.78rem;max-height:30vh;overflow:auto;"></ul>
+        <ul id="listaPines" style="list-style:none;padding:0;margin:0 0 10px;font-size:0.8rem;max-height:30vh;overflow:auto;"></ul>
         <div style="display:flex;gap:8px;">
-          <button id="btnEnviarPines" class="action-btn btn-primary" type="button" style="flex:1;">📤 Enviar resultados</button>
-          <button id="btnBorrarPines" class="preset-pill" type="button">🗑️ Borrar</button>
+          <button id="btnEnviarPines" class="primary-btn action-btn btn-primary" type="button" style="flex:1;">Enviar resultados</button>
+          <button id="btnBorrarPines" class="preset-pill" type="button">Borrar</button>
         </div>
       </div>
     </dialog>
@@ -808,14 +754,14 @@
     <dialog id="dialogHowItWorks" class="clean-dialog" closedby="any" aria-labelledby="howItWorksTitle">
       <div class="dialog-card">
         <div class="dialog-top">
-          <h3 id="howItWorksTitle">💡 ¿Cómo funciona ARGOS?</h3>
-          <button class="dialog-close-btn" commandfor="dialogHowItWorks" command="close" type="button">✕</button>
+          <h3 id="howItWorksTitle">Cómo funciona</h3>
+          <button class="dialog-close-btn" commandfor="dialogHowItWorks" command="close" type="button" aria-label="Cerrar"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
         </div>
-        <div style="font-size:0.84rem;line-height:1.5;display:flex;flex-direction:column;gap:8px;">
-          <p><strong>1. Flechas 3D en Realidad Aumentada:</strong> En la vista <em>🥽 Cámara AR</em> ves la alfombra azul y las 7 flechas 3D animadas sobre el piso frente a ti.</p>
-          <p><strong>2. Botón verde "▶️ Caminar":</strong> Tócalo y camina con el celular al frente: la app cuenta <strong>tus pasos reales</strong> y te avanza en la ruta. Para presentar sin caminar usa <em>🎬 Demo</em> en el menú.</p>
-          <p><strong>3. Puntos QR:</strong> Apunta la cámara a una hoja QR pegada en el campus y la app te ubica ahí. Sin hoja a la mano, toca el botón <em>QR</em> arriba a la derecha y elige el lugar.</p>
-          <p><strong>4. GPS:</strong> En el menú, <em>🛰️ Activar GPS Real</em> te coloca en el pasillo más cercano y va corrigiendo tu avance. Funciona mejor al aire libre; bajo techo usa los QR.</p>
+        <div style="font-size:0.9rem;line-height:1.5;display:flex;flex-direction:column;gap:8px;">
+          <p><strong>1. Flechas en el piso.</strong> Sigue las flechas que ves con la cámara.</p>
+          <p><strong>2. Caminar.</strong> Toca Caminar y lleva el celular al frente: la app cuenta tus pasos y avanza en la ruta.</p>
+          <p><strong>3. Códigos QR.</strong> Apunta la cámara a un QR del campus y la app sabe dónde estás.</p>
+          <p><strong>4. GPS.</strong> Al aire libre corrige tu avance; bajo techo usa los QR.</p>
         </div>
       </div>
     </dialog>
@@ -1137,7 +1083,7 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
   if (!datos) {
     console.error("ARGOS: no se encontraron datos del campus (window.ARGOS_CAMPUS_DATA).");
     const aviso = document.getElementById("locationModeBadge");
-    if (aviso) aviso.textContent = "⚠️ Error: no cargaron los datos del campus";
+    if (aviso) aviso.textContent = "Error: no cargaron los datos del campus";
     return;
   }
 
@@ -1182,7 +1128,7 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
     const id = "N" + String(num).padStart(2, "0");
     lista.push({ id, name: nombre, category: categoria, lat, lon, acc });
     guardarLugaresNuevos(lista);
-    try { sessionStorage.setItem("argos_aviso", `✅ ${id} ${nombre} agregado: ya puedes elegirlo como destino`); } catch (_) {}
+    try { sessionStorage.setItem("argos_aviso", `${id} ${nombre} agregado: ya puedes elegirlo como destino`); } catch (_) {}
     location.reload();
   }
 
@@ -1204,14 +1150,16 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
     if (i >= 0) for (let k = i + 1; k < ruta.length; k++) if (!esCruce(ruta[k])) return ruta[k].name;
     return ruta.length ? ruta[ruta.length - 1].name : "tu destino";
   }
-  const etiquetaNodo = (n, inicial) => esCruce(n) ? `${inicial ? "Camino" : "el camino"} a ${nombreHacia(n)}` : `${n.id} · ${n.name}`;
+  const modoDev = () => document.body.classList.contains("dev");
+  const conCodigo = (n) => (modoDev() ? `${n.id} · ${n.name}` : n.name);
+  const etiquetaNodo = (n, inicial) => esCruce(n) ? `${inicial ? "Camino" : "el camino"} a ${nombreHacia(n)}` : conCodigo(n);
   // El selector de origen sólo lista lugares; si quedas parado en un cruce se muestra una opción temporal.
   function fijarSelectOrigen(id) {
     let o = selectOrigen.querySelector("option[data-cruce]");
     if (esCruce(nodosPorId.get(id))) {
       if (!o) { o = document.createElement("option"); o.dataset.cruce = "1"; selectOrigen.insertBefore(o, selectOrigen.firstChild); }
       o.value = id;
-      o.textContent = "📍 Donde estás (sobre el camino)";
+      o.textContent = "Donde estás (sobre el camino)";
     } else if (o) o.remove();
     selectOrigen.value = id;
   }
@@ -1396,7 +1344,7 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
     usuarioZ: -9.85,
     ruta: [],
     distanciaTotal: 0,
-    mostrarEtiquetas: true,
+    mostrarEtiquetas: false, // mapa limpio: sólo se nombran los lugares de la ruta (el botón Aa de desarrollador muestra todos)
     modoVista: "ar",
     caminandoSim: false,
     navegando: false,    // true = "Caminar" activo: tus pasos reales te mueven en la ruta
@@ -1408,6 +1356,21 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
     ultimoRumboGyro: null,    // Último ángulo del giroscopio para integrar giros suaves sin saltos magnéticos
     brjSensorActual: null,
     menuColapsado: true  // Inicia colapsado para que las flechas 3D se vean completas en el celular
+  };
+
+  // Íconos de línea (sin emojis). Se insertan como innerHTML; trazo = currentColor.
+  const ICONOS = {
+    recto: '<svg viewBox="0 0 24 24"><path d="M12 20V5M6 11l6-6 6 6"/></svg>',
+    derecha: '<svg viewBox="0 0 24 24"><path d="M6 20v-7a4 4 0 0 1 4-4h9M14 4l5 5-5 5"/></svg>',
+    izquierda: '<svg viewBox="0 0 24 24"><path d="M18 20v-7a4 4 0 0 0-4-4H5M10 4 5 9l5 5"/></svg>',
+    vuelta: '<svg viewBox="0 0 24 24"><path d="M8 20V9a4 4 0 0 1 8 0v6M12 11l4 4 4-4"/></svg>',
+    llegada: '<svg viewBox="0 0 24 24"><path d="M12 21s-6-5.6-6-11a6 6 0 0 1 12 0c0 5.4-6 11-6 11z"/><circle cx="12" cy="10" r="2.2"/></svg>',
+    chat: '<svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 0 1-11.6 7.1L4 20l1-4.2A8 8 0 1 1 20 12z"/></svg>',
+    vozOn: '<svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></svg>',
+    vozOff: '<svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M17 9.5l5 5M22 9.5l-5 5"/></svg>',
+    mic: '<svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>',
+    enviar: '<svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>',
+    cerrar: '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg>'
   };
 
   // Referencias DOM
@@ -1448,6 +1411,28 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
   const arSignDist = document.getElementById("arSignDist");
   const arTurnHint = document.getElementById("arTurnHint");
   const arTurnHintText = document.getElementById("arTurnHintText");
+  // Tarjetas nuevas (diseño limpio): pueden faltar en páginas viejas, por eso se usan con "?."
+  const navDistNum = document.getElementById("navDistNum");
+  const navDistUnidad = document.getElementById("navDistUnidad");
+  const navLlegada = document.getElementById("navLlegada");
+  const navMin = document.getElementById("navMin");
+  const navMetros = document.getElementById("navMetros");
+  const topDestino = document.getElementById("topDestino");
+  const inakiControles = document.getElementById("inakiControles");
+  // Cambia el ícono del giro sólo cuando cambia (esto corre en cada cuadro)
+  let iconoGiroActual = "";
+  function ponerIconoGiro(clave) {
+    if (!arSignTurnIcon || clave === iconoGiroActual) return;
+    iconoGiroActual = clave;
+    arSignTurnIcon.innerHTML = ICONOS[clave] || ICONOS.recto;
+    arSignTurnIcon.dataset.giro = clave;
+  }
+  function ponerDistanciaGrande(metros) {
+    if (!navDistNum) return;
+    const txt = metros === null ? "" : String(metros);
+    if (navDistNum.textContent !== txt) navDistNum.textContent = txt;
+    if (navDistUnidad) navDistUnidad.hidden = metros === null;
+  }
 
   const kpiNodesCount = document.getElementById("kpiNodesCount");
   const kpiDistanceMeters = document.getElementById("kpiDistanceMeters");
@@ -1468,9 +1453,9 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
     estado.menuColapsado = colapsado;
     bottomSheet.classList.toggle("is-collapsed", colapsado);
     btnToggleSheet.setAttribute("aria-expanded", String(!colapsado));
-    sheetToggleLabel.textContent = colapsado
-      ? "🔼 Cambiar Origen / Destino"
-      : "🔽 Bajar Menú (Ver Piso AR)";
+    sheetToggleLabel.textContent = colapsado ? "Cambiar ruta" : "Listo";
+    const btnCambiar = document.getElementById("btnCambiarRuta");
+    if (btnCambiar) btnCambiar.textContent = colapsado ? "Cambiar" : "Listo";
   }
 
   btnToggleSheet.addEventListener("click", () => {
@@ -1715,7 +1700,7 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
     if (estado.indiceActual >= estado.ruta.length - 1) {
       colaAvanceMetros = 0;
       if (estado.caminandoSim) detenerSimulacionCaminata();
-      if (estado.navegando) detenerNavegacion("🏁 Llegaste a tu destino");
+      if (estado.navegando) detenerNavegacion("Llegaste a tu destino");
     }
   }
 
@@ -1909,8 +1894,8 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
       grados,
       nodoGiro: nB,
       nodoSiguiente: nC,
-      icono: derecha ? "➡️" : "⬅️",
-      textoCorto: derecha ? `➡️ Gira a la derecha (${grados}°)` : `⬅️ Gira a la izquierda (${grados}°)`
+      icono: derecha ? "derecha" : "izquierda",
+      textoCorto: derecha ? "Gira a la derecha" : "Gira a la izquierda"
     };
   }
 
@@ -1931,57 +1916,60 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
     }
     if (arHeadingText) {
       arHeadingText.textContent = absDesfase > 18
-        ? (desfase < 0 ? `➡️ Gira ${absDesfase}° a la derecha` : `⬅️ Gira ${absDesfase}° a la izquierda`)
-        : `🧭 De frente (${Math.round(rumboTramo)}° ${cardinal})`;
+        ? (desfase < 0 ? `Gira ${absDesfase}° a la derecha` : `Gira ${absDesfase}° a la izquierda`)
+        : `De frente (${Math.round(rumboTramo)}° ${cardinal})`;
     }
 
     if (enDestino) {
-      if (arSignTurnIcon) arSignTurnIcon.textContent = "🏁";
-      if (arSignTitle) arSignTitle.textContent = `¡Llegaste a ${actual.name}!`;
+      ponerIconoGiro("llegada");
+      ponerDistanciaGrande(null);
+      if (arSignTitle) arSignTitle.textContent = `Llegaste a ${actual.name}`;
       if (arSignDist) arSignDist.textContent = `Destino alcanzado · 0 m restantes`;
       return;
     }
 
     if (absDesfase > 135) {
-      if (arSignTurnIcon) arSignTurnIcon.textContent = "🔄";
-      if (arSignTitle) arSignTitle.textContent = `Da media vuelta (${absDesfase}°)`;
+      ponerIconoGiro("vuelta");
+      if (arSignTitle) arSignTitle.textContent = "Da media vuelta";
       if (arSignDist) arSignDist.textContent = `${esCruce(siguiente) ? etiquetaNodo(siguiente, true) : `El nodo ${siguiente.id} (${siguiente.name})`} está detrás de ti a ${mTramo} m`;
-      hudInstruction.textContent = `🔄 Da media vuelta hacia ${nombreHacia(siguiente)}`;
+      hudInstruction.textContent = `Da media vuelta hacia ${nombreHacia(siguiente)}`;
     } else if (desfase < -18) {
-      if (arSignTurnIcon) arSignTurnIcon.textContent = "➡️";
-      if (arSignTitle) arSignTitle.textContent = `Gira a la derecha (${absDesfase}°)`;
+      ponerIconoGiro("derecha");
+      if (arSignTitle) arSignTitle.textContent = "Gira a la derecha";
       if (arSignDist) arSignDist.textContent = `Apunta hacia ${etiquetaNodo(siguiente)} (${mTramo} m)`;
-      hudInstruction.textContent = `➡️ Gira a la derecha (${absDesfase}°) hacia ${nombreHacia(siguiente)}`;
+      hudInstruction.textContent = `Gira a la derecha (${absDesfase}°) hacia ${nombreHacia(siguiente)}`;
     } else if (desfase > 18) {
-      if (arSignTurnIcon) arSignTurnIcon.textContent = "⬅️";
-      if (arSignTitle) arSignTitle.textContent = `Gira a la izquierda (${absDesfase}°)`;
+      ponerIconoGiro("izquierda");
+      if (arSignTitle) arSignTitle.textContent = "Gira a la izquierda";
       if (arSignDist) arSignDist.textContent = `Apunta hacia ${etiquetaNodo(siguiente)} (${mTramo} m)`;
-      hudInstruction.textContent = `⬅️ Gira a la izquierda (${absDesfase}°) hacia ${nombreHacia(siguiente)}`;
+      hudInstruction.textContent = `Gira a la izquierda (${absDesfase}°) hacia ${nombreHacia(siguiente)}`;
     } else {
       // El usuario ya está alineado mirando al nodo quieto frente a él
       if (proximoGiro && distRestanteTramo <= 8) {
-        if (arSignTurnIcon) arSignTurnIcon.textContent = proximoGiro.icono;
-        if (arSignTitle) arSignTitle.textContent = `En ${mTramo} m: ${proximoGiro.textoCorto}`;
+        ponerIconoGiro(proximoGiro.icono);
+        if (arSignTitle) arSignTitle.textContent = proximoGiro.textoCorto;
         if (arSignDist) arSignDist.textContent = `${esCruce(siguiente) ? "En el cruce" : `Al llegar a ${siguiente.name}`}, dobla hacia ${nombreHacia(proximoGiro.nodoSiguiente)}`;
         hudInstruction.textContent = `${proximoGiro.textoCorto} en ${esCruce(siguiente) ? "el cruce" : siguiente.name}`;
       } else {
-        if (arSignTurnIcon) arSignTurnIcon.textContent = "⬆️";
-        if (arSignTitle) arSignTitle.textContent = `Camina de frente hacia ${nombreHacia(siguiente)}`;
+        ponerIconoGiro("recto");
+        if (arSignTitle) arSignTitle.textContent = `Sigue hacia ${nombreHacia(siguiente)}`;
         if (arSignDist) {
           arSignDist.textContent = proximoGiro
             ? `${mTramo} m de frente · ${esCruce(siguiente) ? "En el cruce" : "En " + siguiente.id}: ${proximoGiro.textoCorto}`
             : `${mTramo} m de frente (${cardinal}) · El nodo está fijo frente a ti`;
         }
-        hudInstruction.textContent = `⬆️ Camina ${mTramo} m de frente hacia ${nombreHacia(siguiente)}`;
+        hudInstruction.textContent = `Camina ${mTramo} m de frente hacia ${nombreHacia(siguiente)}`;
       }
     }
 
     // Escaleras (nodos con escaleras: true en campus_data.js): se avisa al acercarse y al pasar por ellas
     const metrosDesdeActual = tramoVista.distTramo - distRestanteTramo;
     let avisoEscaleras = "";
-    if (siguiente.escaleras && distRestanteTramo <= 15) avisoEscaleras = `🪜 Escaleras en ${mTramo} m`;
-    else if (actual.escaleras && metrosDesdeActual <= 10) avisoEscaleras = "🪜 Aquí hay escaleras, con cuidado";
+    if (siguiente.escaleras && distRestanteTramo <= 15) avisoEscaleras = `Escaleras en ${mTramo} m`;
+    else if (actual.escaleras && metrosDesdeActual <= 10) avisoEscaleras = "Aquí hay escaleras, con cuidado";
+    ponerDistanciaGrande(mTramo);
     if (avisoEscaleras && arSignDist) arSignDist.textContent = `${avisoEscaleras} · ${arSignDist.textContent}`;
+    if (avisoEscaleras && arSignTitle) arSignTitle.textContent = avisoEscaleras;
   }
 
   // ============================================================================
@@ -2067,12 +2055,17 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
     } catch (_) {}
   }
   (function crearBotonVozInaki() {
-    if (!inaki.activo || !("speechSynthesis" in window) || !btnAlignArrows || !btnAlignArrows.parentNode) return;
+    const contenedor = inakiControles || (btnAlignArrows && btnAlignArrows.parentNode);
+    if (!inaki.activo || !("speechSynthesis" in window) || !contenedor) return;
     const btn = document.createElement("button");
     btn.id = "btnVozInaki";
     btn.type = "button";
-    btn.className = btnAlignArrows.className;
-    const pintar = () => { btn.textContent = inaki.voz ? "🔊 Iñaki" : "🔇 Iñaki"; };
+    btn.className = "round-btn";
+    const pintar = () => {
+      btn.innerHTML = inaki.voz ? ICONOS.vozOn : ICONOS.vozOff;
+      btn.dataset.on = inaki.voz ? "1" : "0";
+      btn.setAttribute("aria-label", inaki.voz ? "Silenciar a Iñaki" : "Activar la voz de Iñaki");
+    };
     pintar();
     btn.addEventListener("click", () => {
       inaki.voz = !inaki.voz;
@@ -2081,7 +2074,7 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
       if (inaki.voz) hablarInaki(inaki.texto || "Hola, soy Iñaki. Ya te puedo hablar.", true);
       else if ("speechSynthesis" in window) window.speechSynthesis.cancel();
     });
-    btnAlignArrows.insertAdjacentElement("afterend", btn);
+    contenedor.appendChild(btn);
   })();
 
   // op (opcional): { soloLocal: no preguntar al servidor, voz: texto largo para la voz, dur: ms del globo, gesto }
@@ -2219,8 +2212,8 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
   function pintarChatInaki(quien, texto) {
     if (!chatInaki.log) return;
     const d = document.createElement("div");
-    d.style.cssText = "margin:4px 0;" + (quien === "tu" ? "text-align:right;color:#cbd5e1" : "color:#fff");
-    d.textContent = (quien === "tu" ? "Tú: " : "🐺 Iñaki: ") + texto;
+    d.className = quien === "tu" ? "chat-msg chat-msg-tu" : "chat-msg";
+    d.textContent = texto;
     chatInaki.log.appendChild(d);
     chatInaki.log.scrollTop = chatInaki.log.scrollHeight;
   }
@@ -2259,28 +2252,28 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
       });
   }
   (function crearChatInaki() {
-    if (!inaki.activo || !btnAlignArrows || !btnAlignArrows.parentNode) return;
+    const contenedor = inakiControles || (btnAlignArrows && btnAlignArrows.parentNode);
+    if (!inaki.activo || !contenedor) return;
     const btn = document.createElement("button");
     btn.id = "btnChatInaki";
     btn.type = "button";
-    btn.className = btnAlignArrows.className;
-    btn.textContent = "💬 Pregúntale";
+    btn.className = "round-btn round-btn-main";
+    btn.innerHTML = ICONOS.chat;
+    btn.setAttribute("aria-label", "Pregúntale a Iñaki");
     const panel = document.createElement("div");
     panel.id = "panelChatInaki";
-    panel.style.cssText = "position:fixed;left:12px;right:12px;bottom:12px;max-width:520px;margin:0 auto;z-index:9999;" +
-      "background:rgba(15,23,42,0.94);color:#fff;border:1px solid rgba(255,255,255,0.4);border-radius:14px;padding:10px;" +
-      "font:15px/1.35 system-ui,-apple-system,sans-serif;display:none";
-    const estiloBtn = "padding:0 12px;border:0;border-radius:10px;font-size:18px;background:#334155;color:#fff;min-height:44px";
+    panel.className = "chat-panel";
+    panel.style.display = "none";
+    const estiloBtn = "";
     panel.innerHTML =
-      '<div id="chatInakiModo" style="font-size:12px;color:#94a3b8;margin-bottom:4px"></div>' +
-      '<div id="chatInakiLog" style="max-height:38vh;overflow-y:auto"></div>' +
-      '<div id="chatInakiEstado" style="font-size:13px;color:#94a3b8;min-height:16px"></div>' +
-      '<form id="chatInakiForm" style="display:flex;gap:6px;margin-top:4px">' +
-      '<input id="chatInakiTexto" type="text" maxlength="300" autocomplete="off" placeholder="Pregúntale a Iñaki…" ' +
-      'style="flex:1;min-width:0;padding:10px;border:0;border-radius:10px;font-size:16px;color:#0f172a">' +
-      `<button type="button" id="chatInakiMic" title="Dictar" style="${estiloBtn}">🎤</button>` +
-      `<button type="submit" id="chatInakiEnviar" title="Enviar" style="${estiloBtn};background:#2563eb">➤</button>` +
-      `<button type="button" id="chatInakiCerrar" title="Cerrar" style="${estiloBtn}">✕</button>` +
+      '<div class="chat-top"><span class="chat-titulo">Iñaki</span><span id="chatInakiModo" class="chat-modo"></span>' +
+      `<button type="button" id="chatInakiCerrar" class="chat-icono" aria-label="Cerrar">${ICONOS.cerrar}</button></div>` +
+      '<div id="chatInakiLog" class="chat-log"></div>' +
+      '<div id="chatInakiEstado" class="chat-estado"></div>' +
+      '<form id="chatInakiForm" class="chat-form">' +
+      '<input id="chatInakiTexto" type="text" maxlength="300" autocomplete="off" placeholder="Pregúntale a Iñaki" class="chat-input">' +
+      `<button type="button" id="chatInakiMic" class="chat-icono" aria-label="Dictar">${ICONOS.mic}</button>` +
+      `<button type="submit" id="chatInakiEnviar" class="chat-icono chat-enviar" aria-label="Enviar">${ICONOS.enviar}</button>` + estiloBtn +
       "</form>";
     document.body.appendChild(panel);
     chatInaki.log = panel.querySelector("#chatInakiLog");
@@ -2292,8 +2285,8 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
       if (abrir) {
         // Para saber de un vistazo si las preguntas van a Gemini o solo a lo guardado
         panel.querySelector("#chatInakiModo").textContent = inaki.servidor
-          ? "🟢 Conectado a Gemini"
-          : "⚪ Sin servidor: solo respuestas guardadas (abre la app con &inaki=…)";
+          ? "Conectado a Gemini"
+          : "Sin servidor: respuestas guardadas";
         if (!chatInaki.log.childElementCount) pintarChatInaki("inaki", "¡Hola! Pregúntame del campus: los Lobos, la Explanada, El Cubo, Camelia o el laboratorio PB03.");
         entrada.focus();
       }
@@ -2321,14 +2314,14 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
         rec.start();
       } catch (_) { chatInaki.estado.textContent = "El dictado no está disponible; escribe tu pregunta."; }
     });
-    const vecino = document.getElementById("btnVozInaki") || btnAlignArrows;
-    vecino.insertAdjacentElement("afterend", btn);
+    if (inakiControles) inakiControles.insertBefore(btn, inakiControles.firstChild);
+    else (document.getElementById("btnVozInaki") || btnAlignArrows).insertAdjacentElement("afterend", btn);
   })();
 
   function dibujarGloboInaki(cx, yBase, w) {
     if (!inaki.texto || performance.now() - inaki.textoMs > inaki.textoDur) return;
     arCtx.save();
-    arCtx.font = "600 15px system-ui, -apple-system, sans-serif";
+    arCtx.font = "500 15px Outfit, system-ui, sans-serif";
     const anchoMax = Math.min(w - 32, 300);
     const lineas = [];
     let linea = "";
@@ -2342,13 +2335,14 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
     const x = limitar(cx - ancho / 2, 16, w - 16 - ancho);
     const y = Math.max(96, yBase - alto - 10);
     arCtx.beginPath();
-    if (arCtx.roundRect) arCtx.roundRect(x, y, ancho, alto, 12); else arCtx.rect(x, y, ancho, alto);
-    arCtx.fillStyle = "rgba(15, 23, 42, 0.86)";
-    arCtx.fill();
-    arCtx.strokeStyle = "rgba(255, 255, 255, 0.55)";
-    arCtx.lineWidth = 1.5;
-    arCtx.stroke();
+    if (arCtx.roundRect) arCtx.roundRect(x, y, ancho, alto, 16); else arCtx.rect(x, y, ancho, alto);
+    arCtx.shadowColor = "rgba(15, 23, 42, 0.18)";
+    arCtx.shadowBlur = 16;
+    arCtx.shadowOffsetY = 4;
     arCtx.fillStyle = "#ffffff";
+    arCtx.fill();
+    arCtx.shadowColor = "transparent";
+    arCtx.fillStyle = "#15181c";
     arCtx.textAlign = "left";
     arCtx.textBaseline = "top";
     lineas.forEach((l, i) => arCtx.fillText(l, x + 12, y + 9 + i * 19));
@@ -2536,20 +2530,11 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
     const cam = crearCamara(w, h, (estado.desfaseMiradaGrados * Math.PI) / 180);
     const miraArriba = -estado.arribaDispositivo[2] > 0.05; // la cámara apunta arriba del horizonte
 
+    // La píldora del centro sólo pide inclinar el celular; los giros ya los dicen
+    // la tarjeta inferior y el indicador lateral del canvas.
     if (arTurnHint && arTurnHintText) {
-      const absD = Math.round(Math.abs(estado.desfaseMiradaGrados));
-      if (miraArriba) {
-        arTurnHint.hidden = false;
-        arTurnHintText.textContent = "📱 Inclina un poco el celular hacia el piso para ver el camino";
-      } else if (!llegoAlFinal && absD > 18) {
-        arTurnHint.hidden = false;
-        arTurnHintText.textContent =
-          estado.desfaseMiradaGrados < 0
-            ? `➡️ Gira a la derecha (${absD}°) hacia ${nombreHacia(tramoVista.siguiente)}`
-            : `⬅️ Gira a la izquierda (${absD}°) hacia ${nombreHacia(tramoVista.siguiente)}`;
-      } else {
-        arTurnHint.hidden = true;
-      }
+      arTurnHint.hidden = !miraArriba;
+      if (miraArriba) arTurnHintText.textContent = "Inclina el celular hacia el piso";
     }
 
     const { siguiente, distRestanteTramo } = tramoVista;
@@ -2674,25 +2659,22 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
       arCtx.stroke();
 
       const textoPin = `${etiquetaNodo(siguiente, true)} (${Math.round(distRestanteTramo)} m)`;
-      arCtx.font = "800 12px Inter, -apple-system, sans-serif";
+      arCtx.font = "600 13px Outfit, system-ui, sans-serif";
       const tw = arCtx.measureText(textoPin).width;
       const bx = limitar(pPinAlto.sx - tw / 2 - 10, 6, w - tw - 26);
       const by = pPinAlto.sy - tamRombo - 30;
-      arCtx.fillStyle = "rgba(15, 23, 42, 0.88)";
+      arCtx.fillStyle = "#ffffff";
       arCtx.beginPath();
       if (arCtx.roundRect) {
-        arCtx.roundRect(bx, by, tw + 20, 24, 12);
+        arCtx.roundRect(bx, by, tw + 20, 26, 13);
       } else {
         arCtx.rect(bx, by, tw + 20, 24);
       }
       arCtx.fill();
-      arCtx.strokeStyle = "#DC0235";
-      arCtx.lineWidth = 1.5;
-      arCtx.stroke();
 
-      arCtx.fillStyle = "#ffffff";
+      arCtx.fillStyle = "#15181c";
       arCtx.textAlign = "center";
-      arCtx.fillText(textoPin, bx + (tw + 20) / 2, by + 16);
+      arCtx.fillText(textoPin, bx + (tw + 20) / 2, by + 17.5);
     }
 
     // 3b. Ajuste fino: el punto del camino que se está moviendo, en amarillo
@@ -2703,39 +2685,36 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
       const haciaDerecha = estado.desfaseMiradaGrados < 0;
       const absGrados = Math.round(Math.abs(estado.desfaseMiradaGrados));
       const etiquetaGiro = haciaDerecha
-        ? `Gira a la derecha (${absGrados}°) ➡️`
-        : `⬅️ Gira a la izquierda (${absGrados}°)`;
+        ? "Gira a la derecha  →"
+        : "←  Gira a la izquierda";
       const subEtiqueta = `${etiquetaNodo(siguiente, true)} (${Math.round(distRestanteTramo)} m)`;
 
-      arCtx.font = "800 14px Inter, -apple-system, sans-serif";
+      arCtx.font = "600 15px Outfit, system-ui, sans-serif";
       const w1 = arCtx.measureText(etiquetaGiro).width;
-      arCtx.font = "600 12px Inter, -apple-system, sans-serif";
+      arCtx.font = "500 12px Outfit, system-ui, sans-serif";
       const w2 = arCtx.measureText(subEtiqueta).width;
       const boxW = Math.max(w1, w2) + 28;
       const boxH = 50;
       const boxX = haciaDerecha ? Math.max(12, w - boxW - 14) : 14;
       const boxY = Math.round(h * 0.44);
 
-      arCtx.fillStyle = "rgba(15, 23, 42, 0.92)";
+      arCtx.fillStyle = "#ffffff";
       arCtx.beginPath();
       if (arCtx.roundRect) {
-        arCtx.roundRect(boxX, boxY, boxW, boxH, 14);
+        arCtx.roundRect(boxX, boxY, boxW, boxH, 18);
       } else {
         arCtx.rect(boxX, boxY, boxW, boxH);
       }
       arCtx.fill();
-      arCtx.strokeStyle = "#f59e0b";
-      arCtx.lineWidth = 2.5;
-      arCtx.stroke();
 
-      arCtx.fillStyle = "#fbbf24";
-      arCtx.font = "800 14px Inter, -apple-system, sans-serif";
+      arCtx.fillStyle = "#15181c";
+      arCtx.font = "600 15px Outfit, system-ui, sans-serif";
       arCtx.textAlign = "center";
       arCtx.fillText(etiquetaGiro, boxX + boxW / 2, boxY + 22);
 
-      arCtx.fillStyle = "#ffffff";
-      arCtx.font = "600 12px Inter, -apple-system, sans-serif";
-      arCtx.fillText(subEtiqueta, boxX + boxW / 2, boxY + 40);
+      arCtx.fillStyle = "#8b9197";
+      arCtx.font = "500 12px Outfit, system-ui, sans-serif";
+      arCtx.fillText(subEtiqueta, boxX + boxW / 2, boxY + 39);
     }
   }
 
@@ -2918,8 +2897,8 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
       ctx.stroke();
 
       if ((estado.mostrarEtiquetas || enRuta) && !cruce) {
-        const texto = `${nodo.id} · ${nodo.name}`;
-        ctx.font = enRuta ? "700 12px Inter, sans-serif" : "600 11px Inter, sans-serif";
+        const texto = conCodigo(nodo);
+        ctx.font = enRuta ? "700 12px Outfit, system-ui, sans-serif" : "600 11px Outfit, system-ui, sans-serif";
         const tw = ctx.measureText(texto).width;
         ctx.fillStyle = "rgba(255, 255, 255, 0.92)";
         ctx.fillRect(cx - tw / 2 - 6, cy - radio - 24, tw + 12, 18);
@@ -2960,7 +2939,7 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
     ctx.strokeStyle = "#ffffff";
     ctx.stroke();
 
-    ctx.font = "800 11px Inter, sans-serif";
+    ctx.font = "800 11px Outfit, system-ui, sans-serif";
     ctx.fillStyle = "#8A0021";
     ctx.textAlign = "center";
     ctx.fillText("TÚ", posU.cx, posU.cy + 24);
@@ -2972,10 +2951,10 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
     const h = minimapCanvas.height;
     miniCtx.clearRect(0, 0, w, h);
 
-    miniCtx.fillStyle = "#0f172a";
+    miniCtx.fillStyle = "#eef1ef";
     miniCtx.fillRect(0, 0, w, h);
 
-    miniCtx.strokeStyle = "rgba(148, 163, 184, 0.18)";
+    miniCtx.strokeStyle = "rgba(15, 23, 42, 0.06)";
     miniCtx.lineWidth = 1;
     [28, 56, 82].forEach((r) => {
       miniCtx.beginPath();
@@ -2995,10 +2974,10 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
         const p = aMini(x, z);
         return { x: p.mx, y: p.my };
       },
-      true
+      false
     );
 
-    miniCtx.strokeStyle = "rgba(148, 163, 184, 0.35)";
+    miniCtx.strokeStyle = "rgba(15, 23, 42, 0.14)";
     miniCtx.lineWidth = 2.5;
     datos.edges.forEach(([u, v]) => {
       const na = nodosPorId.get(u);
@@ -3030,7 +3009,7 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
       if (p.mx < -10 || p.mx > w + 10 || p.my < -10 || p.my > h + 10) return;
       miniCtx.beginPath();
       miniCtx.arc(p.mx, p.my, n.id === estado.destinoId ? 5.5 : 3.5, 0, Math.PI * 2);
-      miniCtx.fillStyle = n.id === estado.destinoId ? "#ef4444" : "#cbd5e1";
+      miniCtx.fillStyle = n.id === estado.destinoId ? "#DC0235" : "rgba(15, 23, 42, 0.25)";
       miniCtx.fill();
     });
 
@@ -3059,9 +3038,9 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
     miniCtx.stroke();
 
     // Indicador de Norte fijo arriba (el minimapa nunca gira)
-    miniCtx.font = "800 12px Inter, sans-serif";
+    miniCtx.font = "800 12px Outfit, system-ui, sans-serif";
     miniCtx.textAlign = "center";
-    miniCtx.fillStyle = "#ef4444";
+    miniCtx.fillStyle = "rgba(15, 23, 42, 0.45)";
     miniCtx.fillText("N", w / 2, 14);
   }
 
@@ -3132,9 +3111,17 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
 
     const nodoDestinoFinal = nodosPorId.get(estado.destinoId);
     hudStepBadge.textContent = `${esCruce(actual) ? "En camino" : actual.id + " " + actual.name} ➔ ${nodoDestinoFinal ? nodoDestinoFinal.name : estado.destinoId}`;
+    if (topDestino) topDestino.textContent = nodoDestinoFinal ? nodoDestinoFinal.name : estado.destinoId;
+    const minEnteros = Math.max(1, Math.round(distTotalRestante / 80));
+    if (navMetros) navMetros.textContent = String(Math.round(distTotalRestante));
+    if (navMin) navMin.textContent = distTotalRestante < 0.8 ? "0" : String(minEnteros);
+    if (navLlegada) {
+      const llegada = new Date(Date.now() + (distTotalRestante < 0.8 ? 0 : minEnteros) * 60000);
+      navLlegada.textContent = `${llegada.getHours()}:${String(llegada.getMinutes()).padStart(2, "0")}`;
+    }
 
     if (actual.id === siguiente.id || distTotalRestante < 0.8) {
-      hudInstruction.textContent = `🎉 ¡Llegaste a ${actual.name}!`;
+      hudInstruction.textContent = `¡Llegaste a ${actual.name}!`;
       hudSub.textContent = `Destino alcanzado · 0 m restantes`;
     } else {
       hudSub.textContent = `${Math.round(distTotalRestante)} m restantes · ~${minutos} min`;
@@ -3164,21 +3151,21 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
       metrosAcumulados = 0;
       const li = document.createElement("li");
       li.className = `itinerary-item ${idx === estado.indiceActual ? "is-current" : ""}`;
-      let detalle = "📍 Origen";
+      let detalle = "Origen";
       if (idx === estado.ruta.length - 1) {
         const dFin = idx > 0 ? metrosDesdeAnterior : 0;
-        detalle = dFin > 0 ? `+${dFin} m · 🎯 Destino` : "🎯 Destino";
+        detalle = dFin > 0 ? `+${dFin} m · Destino` : "Destino";
       } else if (idx > 0) {
         const d = metrosDesdeAnterior;
         const rEnt = calcularRumboGrados(estado.ruta[idx - 1].x, estado.ruta[idx - 1].z, nodo.x, nodo.z);
         const rSal = calcularRumboGrados(nodo.x, nodo.z, estado.ruta[idx + 1].x, estado.ruta[idx + 1].z);
         const giro = diferenciaAngularGrados(rSal, rEnt);
-        let txtGiro = "⬆️ Sigue recto";
-        if (giro >= 20) txtGiro = `➡️ Gira a la derecha (${Math.round(giro)}°)`;
-        else if (giro <= -20) txtGiro = `⬅️ Gira a la izquierda (${Math.round(Math.abs(giro))}°)`;
+        let txtGiro = "Sigue recto";
+        if (giro >= 20) txtGiro = `Gira a la derecha (${Math.round(giro)}°)`;
+        else if (giro <= -20) txtGiro = `Gira a la izquierda (${Math.round(Math.abs(giro))}°)`;
         detalle = `+${d} m · ${txtGiro}`;
       }
-      if (nodo.escaleras) detalle += " · 🪜 Escaleras";
+      if (nodo.escaleras) detalle += " · Escaleras";
       li.innerHTML = `
         <div><span class="itinerary-code">${esCruce(nodo) ? "↪" : nodo.id}</span><span>${esCruce(nodo) ? "Cruce del camino" : nodo.name}</span></div>
         <span>${detalle}</span>
@@ -3232,8 +3219,8 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
     reiniciarSiYaLlego();
     fijarEstadoMenu(true);
     estado.caminandoSim = true;
-    if (btnDemo) btnDemo.textContent = "⏹️ Detener demo";
-    locationModeBadge.textContent = "🎬 Demo: avanzando solo";
+    if (btnDemo) btnDemo.textContent = "Detener demo";
+    locationModeBadge.textContent = "Demo: avanzando solo";
     idIntervaloCaminata = setInterval(() => { colaAvanceMetros += 0.13; }, 100);
   }
 
@@ -3244,10 +3231,10 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
       clearInterval(idIntervaloCaminata);
       idIntervaloCaminata = null;
     }
-    if (btnDemo) btnDemo.textContent = "🎬 Demo (avanza sola)";
+    if (btnDemo) btnDemo.textContent = "Demo (avanza sola)";
     locationModeBadge.textContent = estado.gpsActivo
-      ? "🛰️ Ubicación: GPS Activo"
-      : `📍 ${estado.origenId} (QR + Pasos)`;
+      ? "Ubicación: GPS Activo"
+      : `${estado.origenId} (QR + Pasos)`;
   }
 
   if (btnDemo) {
@@ -3268,8 +3255,8 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
     podometro.inicioNavMs = performance.now();
     fijarEstadoMenu(true);
     btnWalkSim.classList.add("is-walking");
-    btnWalkSimText.textContent = "⏸️ Pausar";
-    locationModeBadge.textContent = "👣 Camina con el celular al frente";
+    btnWalkSimText.textContent = "Pausar";
+    locationModeBadge.textContent = "Camina con el celular al frente";
     // El GPS se enciende solo: corrige el avance y recalcula la ruta si tomas otro camino (como Google Maps).
     if (GPS_AUTOMATICO && !gpsNegado) encenderGPS(false);
   }
@@ -3277,8 +3264,8 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
   function detenerNavegacion(mensaje) {
     estado.navegando = false;
     btnWalkSim.classList.remove("is-walking");
-    btnWalkSimText.textContent = "▶️ Caminar";
-    locationModeBadge.textContent = mensaje || `⏸️ Pausado · ${estado.pasosDetectados} pasos`;
+    btnWalkSimText.textContent = "Caminar";
+    locationModeBadge.textContent = mensaje || `Pausado · ${estado.pasosDetectados} pasos`;
   }
 
   btnWalkSim.addEventListener("click", () => {
@@ -3307,8 +3294,8 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
     if (estado.navegando) {
       colaAvanceMetros += nuevos * PASO_METROS; // el bucle de dibujo lo avanza suave
       if (estado.navegando) {
-        const aviso = Math.abs(estado.desfaseMiradaGrados) > 100 ? " · ⚠️ vas al revés" : "";
-        locationModeBadge.textContent = `👣 ${estado.pasosDetectados} pasos${aviso}`;
+        const aviso = Math.abs(estado.desfaseMiradaGrados) > 100 ? " · vas al revés" : "";
+        locationModeBadge.textContent = `${estado.pasosDetectados} pasos${aviso}`;
       }
     }
   }
@@ -3336,7 +3323,7 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
     if (!estado.navegando) return;
     const ahora = performance.now();
     if (ahora - podometro.inicioNavMs > 3000 && ahora - podometro.ultimaMuestraMs > 3000) {
-      locationModeBadge.textContent = "⚠️ Sin sensor de pasos: usa 'Siguiente'";
+      locationModeBadge.textContent = "Sin sensor de pasos: usa 'Siguiente'";
     }
   }, 1000);
 
@@ -3470,7 +3457,7 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
   // 3. "🎯 Centrar flechas": apunta el celular a lo largo del camino y toca el botón UNA vez.
   // Las flechas quedan al frente en ese instante y después se quedan fijas en el mundo:
   // si giras, ya NO giran contigo (verás "Gira a la derecha/izquierda" o "Da media vuelta").
-  btnAlignArrows.textContent = "🎯 Centrar flechas";
+  btnAlignArrows.textContent = "Centrar flechas";
   btnAlignArrows.addEventListener("click", () => {
     if (estado.brujulaReal) return; // Con brújula las flechas NUNCA se mueven por un toque
     estado.rumboUsuarioGrados = obtenerTramoActivo().rumboTramo;
@@ -3478,8 +3465,8 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
     estado.rumboManual = true;
     estado.calibrado = true;
     locationModeBadge.textContent = estado.hayGiroscopio
-      ? "🎯 Flechas centradas: ya quedan fijas aunque gires"
-      : "⚠️ Sin sensor de giro: las flechas no pueden quedarse fijas";
+      ? "Flechas centradas: ya quedan fijas aunque gires"
+      : "Sin sensor de giro: las flechas no pueden quedarse fijas";
     actualizarHUD();
     dibujarMinimapa();
   });
@@ -3544,7 +3531,7 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
         if (!mejor || costo < mejor.costo) mejor = { id: n.id, costo };
       });
       if (!mejor) {
-        locationModeBadge.textContent = `🛰️ Estás a ${Math.round(p.d)} m de los caminos: usa QR`;
+        locationModeBadge.textContent = `Estás a ${Math.round(p.d)} m de los caminos: usa QR`;
         return false;
       }
       punto = { x: g.x, z: g.z, a: mejor.id, b: mejor.id };
@@ -3567,15 +3554,15 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
     const redibujar = () => { dibujarMapa2D(); dibujarMinimapa(); };
     const b = datos.bounds;
     if (m.x < b.minX - 150 || m.x > b.maxX + 150 || m.z < b.minZ - 150 || m.z > b.maxZ + 150) {
-      if (!estado.navegando) locationModeBadge.textContent = "📍 Fuera de IBERO (usa QR)";
+      if (!estado.navegando) locationModeBadge.textContent = "Fuera de IBERO (usa QR)";
       return;
     }
     if (acc > GPS_PRECISION_MAX) {
-      locationModeBadge.textContent = `🛰️ GPS impreciso (±${Math.round(acc)} m)`;
+      locationModeBadge.textContent = `GPS impreciso (±${Math.round(acc)} m)`;
       redibujar();
       return;
     }
-    const precision = `🛰️ GPS ±${Math.round(acc)} m`;
+    const precision = `GPS ±${Math.round(acc)} m`;
     // El estado rutinario del GPS no tapa un aviso importante (p. ej. "ruta recalculada") durante sus 6 s
     const estadoGPS = (texto) => { if (performance.now() > avisoProtegidoHastaMs) locationModeBadge.textContent = texto; };
 
@@ -3604,7 +3591,7 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
         gpsFueraDeRuta = 0;
         if (ubicarConGPS(estado.gps)) {
           inaki.recalculo = true;
-          avisarImportante("🔄 Tomaste otro camino: ruta recalculada");
+          avisarImportante("Tomaste otro camino: ruta recalculada");
           if (navigator.vibrate) navigator.vibrate([80, 60, 80]);
         }
       }
@@ -3633,7 +3620,7 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
     estado.gpsWatchId = null;
     estado.gpsActivo = false;
     estado.gps = null;
-    btnToggleGps.textContent = "🛰️ Activar GPS Real";
+    btnToggleGps.textContent = "Activar GPS Real";
     dibujarMapa2D();
     dibujarMinimapa();
   }
@@ -3645,7 +3632,7 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
     gpsFueraDeRuta = 0;
     // Si ya vas caminando una ruta, el GPS sólo la corrige; si no, primero te ubica.
     gpsUbicado = estado.navegando || estado.indiceActual > 0 || estado.progresoTramo > 0.02;
-    btnToggleGps.textContent = "🛰️ GPS Activo (Apagar)";
+    btnToggleGps.textContent = "GPS Activo (Apagar)";
     estado.gpsWatchId = navigator.geolocation.watchPosition(
       manejarLecturaGPS,
       (err) => {
@@ -3653,10 +3640,10 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
           // Sin permiso: se sigue con QR + pasos, y "Caminar" no vuelve a pedirlo solo
           gpsNegado = true;
           apagarGPS();
-          locationModeBadge.textContent = aMano ? "📍 Permite la ubicación en Ajustes" : "📍 Sin permiso de ubicación: sigues con QR + pasos";
+          locationModeBadge.textContent = aMano ? "Permite la ubicación en Ajustes" : "Sin permiso de ubicación: sigues con QR + pasos";
           return;
         }
-        if ((aMano || !estado.navegando) && performance.now() > avisoProtegidoHastaMs) locationModeBadge.textContent = "📍 Sin señal GPS (usa QR)";
+        if ((aMano || !estado.navegando) && performance.now() > avisoProtegidoHastaMs) locationModeBadge.textContent = "Sin señal GPS (usa QR)";
       },
       { enableHighAccuracy: true, maximumAge: 1000, timeout: 30000 }
     );
@@ -3669,11 +3656,11 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
     }
     if (estado.gpsActivo) {
       apagarGPS();
-      locationModeBadge.textContent = "📍 Modo: QR + Pasos";
+      locationModeBadge.textContent = "Modo: QR + Pasos";
       return;
     }
     gpsNegado = false;
-    locationModeBadge.textContent = "🛰️ Buscando GPS...";
+    locationModeBadge.textContent = "Buscando GPS...";
     fijarEstadoMenu(true);
     encenderGPS(true);
   });
@@ -3703,7 +3690,7 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
     s.async = true;
     s.onerror = () => {
       jsQRCargando = false;
-      locationModeBadge.textContent = "⚠️ Lector QR no disponible: usa los botones de nodo";
+      locationModeBadge.textContent = "Lector QR no disponible: usa los botones de nodo";
     };
     document.head.appendChild(s);
   }
@@ -3726,8 +3713,8 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
   async function activarCamara(videoEl) {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       locationModeBadge.textContent = window.isSecureContext
-        ? "⚠️ Este navegador no permite usar la cámara"
-        : "⚠️ La cámara requiere abrir la página con https://";
+        ? "Este navegador no permite usar la cámara"
+        : "La cámara requiere abrir la página con https://";
       return;
     }
     try {
@@ -3742,8 +3729,8 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
       cargarJsQRSiHaceFalta();
     } catch (err) {
       console.warn("ARGOS cámara:", err);
-      if (err && err.name === "NotAllowedError") locationModeBadge.textContent = "📷 Permite la cámara en el navegador y recarga";
-      else if (performance.now() > avisoProtegidoHastaMs) locationModeBadge.textContent = "📷 Toca la pantalla para activar la cámara";
+      if (err && err.name === "NotAllowedError") locationModeBadge.textContent = "Permite la cámara en el navegador y recarga";
+      else if (performance.now() > avisoProtegidoHastaMs) locationModeBadge.textContent = "Toca la pantalla para activar la cámara";
     }
   }
 
@@ -3776,8 +3763,8 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
     pidiendoSensores = false;
     if (!concedido) {
       locationModeBadge.textContent = intentosSensores < 3
-        ? "🧭 Toca la pantalla otra vez para activar el giro"
-        : "🧭 Sin permiso de movimiento: cierra la pestaña de Safari y abre el link de nuevo";
+        ? "Toca la pantalla otra vez para activar el giro"
+        : "Sin permiso de movimiento: cierra la pestaña de Safari y abre el link de nuevo";
       const vc = document.getElementById("arVideo");
       if (vc && (!vc.srcObject || vc.paused)) activarCamara(vc);
       return; // se reintenta en el siguiente toque
@@ -3787,7 +3774,7 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
     document.removeEventListener("touchend", solicitarPermisosSensores, true);
     // Si a los 3 s no llegó Norte real, avisar que las flechas son aproximadas
     setTimeout(() => {
-      if (!estado.brujulaReal) locationModeBadge.textContent = "⚠️ Sin brújula: modo aproximado";
+      if (!estado.brujulaReal) locationModeBadge.textContent = "Sin brújula: modo aproximado";
     }, 3000);
     // Reintentar la cámara si el navegador exigía un gesto del usuario para reproducir el video
     const v = document.getElementById("arVideo");
@@ -3825,11 +3812,11 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
     estado.origenId = idNodo;
     fijarSelectOrigen(idNodo);
     const nodo = nodosPorId.get(idNodo);
-    locationModeBadge.textContent = `📍 ${fuente}: ${esCruce(nodo) ? "sobre el camino" : nodo.id + " " + nodo.name}`;
+    locationModeBadge.textContent = `${fuente}: ${esCruce(nodo) ? "sobre el camino" : nodo.id + " " + nodo.name}`;
     if (estado.destinoId === idNodo) {
       // Estás parado en tu destino (p. ej. escaneaste su QR): llegaste. Antes aquí se cambiaba el destino solo.
-      if (estado.navegando) detenerNavegacion("🏁 Llegaste a tu destino");
-      else locationModeBadge.textContent = `🏁 Estás en ${nodo.name}: elige a dónde ir`;
+      if (estado.navegando) detenerNavegacion("Llegaste a tu destino");
+      else locationModeBadge.textContent = `Estás en ${nodo.name}: elige a dónde ir`;
     }
     recalcularRutaCompleta();
     centrarMapaEnUsuario();
@@ -3878,12 +3865,12 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
     lugares().forEach((nodo) => {
       const optO = document.createElement("option");
       optO.value = nodo.id;
-      optO.textContent = `${nodo.id} — ${nodo.name}`;
+      optO.textContent = nodo.name;
       selectOrigen.appendChild(optO);
 
       const optD = document.createElement("option");
       optD.value = nodo.id;
-      optD.textContent = `${nodo.id} — ${nodo.name}`;
+      optD.textContent = nodo.name;
       selectDestino.appendChild(optD);
     });
 
@@ -3902,9 +3889,9 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
       guardarDestino();
       recalcularRutaCompleta(true);
       if (estado.ruta.length === 1) {
-        locationModeBadge.textContent = `🏁 Ya estás en ${estado.ruta[0].name}`;
+        locationModeBadge.textContent = `Ya estás en ${estado.ruta[0].name}`;
       } else if (estado.ruta.length === 0) {
-        locationModeBadge.textContent = "⚠️ No hay camino registrado hasta ese lugar";
+        locationModeBadge.textContent = "No hay camino registrado hasta ese lugar";
       }
       fijarEstadoMenu(true);
     });
@@ -3963,6 +3950,8 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
       tabMap.setAttribute("aria-selected", String(!esAR));
       viewAR.classList.toggle("is-visible", esAR);
       viewMap.classList.toggle("is-visible", !esAR);
+      document.body.classList.toggle("mode-map", !esAR);
+      document.body.classList.toggle("mode-ar", esAR);
 
       if (esAR) {
         activarCamara(document.getElementById("arVideo"));
@@ -3974,6 +3963,10 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
     tabAR.addEventListener("click", () => cambiarVista("ar"));
     tabMap.addEventListener("click", () => cambiarVista("map"));
     document.getElementById("arMinimap").addEventListener("click", () => cambiarVista("map"));
+    const btnVolverAR = document.getElementById("btnVolverAR");
+    if (btnVolverAR) btnVolverAR.addEventListener("click", () => cambiarVista("ar"));
+    const btnCambiarRuta = document.getElementById("btnCambiarRuta");
+    if (btnCambiarRuta) btnCambiarRuta.addEventListener("click", () => fijarEstadoMenu(!estado.menuColapsado));
 
     btnCenterRoute.addEventListener("click", centrarMapaEnUsuario);
     btnToggleLabels.addEventListener("click", () => {
@@ -4130,7 +4123,7 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
       btnAqui.type = "button";
       btnAqui.className = "preset-pill";
       btnAqui.style.fontSize = "0.7rem";
-      btnAqui.textContent = "📍 Ubicarse aquí";
+      btnAqui.textContent = "Ubicarse aquí";
       btnAqui.addEventListener("click", () => {
         fijarUbicacionPorNodo(nodo.id, "Tarjeta QR");
         document.getElementById("dialogQrCards")?.close();
@@ -4218,7 +4211,7 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
     function pintar(mensaje) {
       const n = nodoPorAjustar();
       texto.textContent = mensaje || (n
-        ? `🟡 Párate en el centro del andador y mueve el punto amarillo (${nombreCorto(n)}, a ${Math.round(Math.hypot(n.x - estado.usuarioX, n.z - estado.usuarioZ))} m) hasta que quede centrado.`
+        ? `Párate en el centro del andador y mueve el punto amarillo (${nombreCorto(n)}, a ${Math.round(Math.hypot(n.x - estado.usuarioX, n.z - estado.usuarioZ))} m) hasta que quede centrado.`
         : "No hay un punto del camino adelante de ti (¿ya llegaste?).");
     }
     function refrescar() {
@@ -4243,26 +4236,26 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
       pines[n.id] = { lat: ll.lat, lon: ll.lon, acc: 0, n: 1, t: new Date().toISOString(), ajuste: true };
       guardarPinesLocal(pines);
       refrescar();
-      pintar(`🟡 ${nombreCorto(n)}: lleva ${movidoMetros(n).toFixed(1)} m movido respecto al mapa. Sigue hasta que quede centrado.`);
+      pintar(`${nombreCorto(n)}: lleva ${movidoMetros(n).toFixed(1)} m movido respecto al mapa. Sigue hasta que quede centrado.`);
     }
-    boton("btnAjIzq", "⬅️ 0.5 m", () => mover(-AJUSTE_PASO_METROS));
-    boton("btnAjDer", "0.5 m ➡️", () => mover(AJUSTE_PASO_METROS));
-    boton("btnAjDeshacer", "↩️", () => {
+    boton("btnAjIzq", "← 0.5 m", () => mover(-AJUSTE_PASO_METROS));
+    boton("btnAjDer", "0.5 m →", () => mover(AJUSTE_PASO_METROS));
+    boton("btnAjDeshacer", "Deshacer", () => {
       const ultimo = ajuste.pila.pop();
       if (!ultimo) { pintar("No hay nada que deshacer."); return; }
       const pines = leerPines();
       if (ultimo.antes) pines[ultimo.id] = ultimo.antes; else delete pines[ultimo.id];
       guardarPinesLocal(pines);
       refrescar();
-      pintar(`↩️ Deshecho el último movimiento de ${ultimo.id}.`);
+      pintar(`Deshecho el último movimiento de ${ultimo.id}.`);
     });
-    boton("btnAjListo", "✔ Listo", () => {
+    boton("btnAjListo", "Listo", () => {
       const cuantos = new Set(ajuste.pila.map((m) => m.id)).size;
       ajuste.activo = false;
       ajuste.objetivoId = null;
       ajuste.pila = [];
       barra.style.display = "none";
-      if (cuantos) avisarImportante(`✅ ${cuantos} punto(s) ajustado(s). Mándalos: 📍 Poner pines › 📤 Enviar`);
+      if (cuantos) avisarImportante(`${cuantos} punto(s) ajustado(s). Mándalos: Poner pines › Enviar`);
     });
     barra.appendChild(texto);
     barra.appendChild(fila);
@@ -4301,7 +4294,7 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
       if (on) localStorage.setItem("argos_dev", "1");
       else localStorage.removeItem("argos_dev");
       aplicar(on);
-      avisarImportante(on ? "🛠️ Modo desarrollador activado" : "Modo desarrollador desactivado");
+      avisarImportante(on ? "Modo desarrollador activado" : "Modo desarrollador desactivado");
     });
   }
 
@@ -4331,9 +4324,9 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
       o.textContent = texto;
       selectPin.appendChild(o);
     };
-    agregarOpcionNueva("?", "➕ Lugar nuevo (restaurante, salón…): escribir nombre");
+    agregarOpcionNueva("?", "Lugar nuevo (restaurante, salón…): escribir nombre");
     "ABCDEFGHIJKLMNOPQRSTUVW".split("").forEach((letra) => {
-      if (!yaExiste("Edificio " + letra)) agregarOpcionNueva("Edificio " + letra, "➕ Edificio " + letra + " (dar de alta)");
+      if (!yaExiste("Edificio " + letra)) agregarOpcionNueva("Edificio " + letra, "Edificio " + letra + " (dar de alta)");
     });
     let lugarNuevo = null; // { nombre, categoria } mientras se ubica un lugar que aún no existe
     function prepararLugarNuevo() {
@@ -4344,7 +4337,7 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
       if (nombre === "?") {
         nombre = (window.prompt("Nombre del lugar nuevo (ej. Cafetería Capeltic):") || "").trim().replace(/,/g, " ");
         if (!nombre) return false;
-        if (yaExiste(nombre)) { txtEstado.textContent = "⚠️ Ya existe un lugar con ese nombre: elígelo en la lista."; return false; }
+        if (yaExiste(nombre)) { txtEstado.textContent = "Ya existe un lugar con ese nombre: elígelo en la lista."; return false; }
         categoria = window.confirm("¿Es restaurante o cafetería?\n\nAceptar = Sí · Cancelar = No") ? "Cafetería" : "Referencia";
       }
       lugarNuevo = { nombre, categoria };
@@ -4368,11 +4361,11 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
         const li = document.createElement("li");
         li.style.padding = "3px 0";
         li.textContent = p.ajuste
-          ? `↔️ ${n.id} ${n.name} · ajustado a mano · se movió ${movidoMetros(n.id).toFixed(1)} m`
-          : `✅ ${n.id} ${n.name} · ±${p.acc} m · se movió ${Math.round(movidoMetros(n.id))} m`;
+          ? `${n.id} ${n.name} · ajustado a mano · se movió ${movidoMetros(n.id).toFixed(1)} m`
+          : `${n.id} ${n.name} · ±${p.acc} m · se movió ${Math.round(movidoMetros(n.id))} m`;
         lista.appendChild(li);
       });
-      btnEnviar.textContent = `📤 Enviar resultados (${cuantos}/${lugares().length})`;
+      btnEnviar.textContent = `Enviar resultados (${cuantos}/${lugares().length})`;
     }
 
     let idWatch = null;
@@ -4387,21 +4380,21 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
       idWatch = null;
       clearTimeout(temporizador);
       clearInterval(reloj);
-      btnGuardar.textContent = "📍 Guardar mi posición aquí";
+      btnGuardar.textContent = "Guardar mi posición aquí";
     }
 
     function mostrarProgreso() {
       const seg = Math.round((Date.now() - t0) / 1000);
       const mejor = muestras.length ? Math.round(Math.min(...muestras.map((m) => m.acc))) : null;
       txtEstado.textContent = muestras.length
-        ? `⏳ Midiendo ${lugarNuevo ? lugarNuevo.nombre : idMidiendo}… ${seg}/${SEGUNDOS} s · ${muestras.length} lecturas · mejor ±${mejor} m. No te muevas.`
-        : `⏳ Buscando señal GPS… ${seg} s`;
+        ? `Midiendo ${lugarNuevo ? lugarNuevo.nombre : idMidiendo}… ${seg}/${SEGUNDOS} s · ${muestras.length} lecturas · mejor ±${mejor} m. No te muevas.`
+        : `Buscando señal GPS… ${seg} s`;
     }
 
     function terminarCaptura() {
       detenerCaptura();
       if (!muestras.length) {
-        txtEstado.textContent = "❌ No llegó ninguna lectura buena. Sal a un lugar sin techo y vuelve a intentar.";
+        txtEstado.textContent = "No llegó ninguna lectura buena. Sal a un lugar sin techo y vuelve a intentar.";
         return;
       }
       // Solo las lecturas cercanas a la mejor precisión, promediadas con peso 1/precisión²
@@ -4431,7 +4424,7 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
       reconstruirGrafo();
       recalcularRutaCompleta();
       const n = nodosPorId.get(idMidiendo);
-      txtEstado.textContent = `✅ ${n.id} ${n.name} guardado (±${Math.round(mejor)} m). Se movió ${Math.round(movidoMetros(n.id))} m respecto al mapa anterior.`;
+      txtEstado.textContent = `${n.id} ${n.name} guardado (±${Math.round(mejor)} m). Se movió ${Math.round(movidoMetros(n.id))} m respecto al mapa anterior.`;
       if (navigator.vibrate) navigator.vibrate(150);
       pintarLista();
     }
@@ -4443,7 +4436,7 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
     btnMapaPin.className = "action-btn btn-primary";
     btnMapaPin.style.width = "100%";
     btnMapaPin.style.marginTop = "6px";
-    btnMapaPin.textContent = "🗺️ O elegir punto tocando el Mapa 2D";
+    btnMapaPin.textContent = "O elegir punto tocando el Mapa 2D";
     btnGuardar.insertAdjacentElement("afterend", btnMapaPin);
 
     btnMapaPin.addEventListener("click", () => {
@@ -4452,7 +4445,7 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
       if (dlg.open) dlg.close();
       document.getElementById("tabMap")?.click();
       const n = nodosPorId.get(nodoPorUbicarEnMapa);
-      locationModeBadge.textContent = `📌 Toca el Mapa 2D donde va ${lugarNuevo ? lugarNuevo.nombre : n.id}`;
+      locationModeBadge.textContent = `Toca el Mapa 2D donde va ${lugarNuevo ? lugarNuevo.nombre : n.id}`;
     });
 
     campusCanvas.addEventListener("click", (e) => {
@@ -4483,22 +4476,22 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
       reconstruirGrafo();
       recalcularRutaCompleta();
       const n = nodosPorId.get(idMovido);
-      locationModeBadge.textContent = `✅ ${n.id} movido en Mapa 2D`;
-      txtEstado.textContent = `✅ ${n.id} ${n.name} actualizado desde el Mapa 2D.`;
+      locationModeBadge.textContent = `${n.id} movido en Mapa 2D`;
+      txtEstado.textContent = `${n.id} ${n.name} actualizado desde el Mapa 2D.`;
       pintarLista();
     });
 
     btnGuardar.addEventListener("click", () => {
       if (idWatch !== null) { terminarCaptura(); return; } // tocar otra vez = terminar antes
       if (!("geolocation" in navigator)) {
-        txtEstado.textContent = "❌ Este navegador no da ubicación GPS.";
+        txtEstado.textContent = "Este navegador no da ubicación GPS.";
         return;
       }
       if (!prepararLugarNuevo()) return;
       muestras = [];
       idMidiendo = selectPin.value;
       t0 = Date.now();
-      btnGuardar.textContent = "⏹️ Terminar ya";
+      btnGuardar.textContent = "Terminar ya";
       mostrarProgreso();
       reloj = setInterval(mostrarProgreso, 1000);
       idWatch = navigator.geolocation.watchPosition(
@@ -4510,8 +4503,8 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
         },
         (err) => {
           txtEstado.textContent = err && err.code === 1
-            ? "❌ Permite la ubicación: Ajustes › Privacidad › Localización › Safari → Mientras se usa."
-            : "⚠️ Sin señal GPS todavía… o usa '🗺️ O elegir punto tocando el Mapa 2D'.";
+            ? "Permite la ubicación: Ajustes › Privacidad › Localización › Safari → Mientras se usa."
+            : "Sin señal GPS todavía… o usa 'O elegir punto tocando el Mapa 2D'.";
         },
         { enableHighAccuracy: true, maximumAge: 0, timeout: 30000 }
       );
@@ -4556,7 +4549,7 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
       }
       try {
         await navigator.clipboard.writeText(texto);
-        txtEstado.textContent = "📋 Copiado. Pégalo en WhatsApp/Notas y mándamelo.";
+        txtEstado.textContent = "Copiado. Pégalo en WhatsApp/Notas y mándamelo.";
       } catch (_) {
         window.prompt("Copia este texto y mándamelo:", texto);
       }
@@ -4573,7 +4566,7 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
       aplicarPines();
       reconstruirGrafo();
       recalcularRutaCompleta();
-      txtEstado.textContent = "🗑️ Pines borrados: se usan las posiciones del mapa original.";
+      txtEstado.textContent = "Pines borrados: se usan las posiciones del mapa original.";
       pintarLista();
     });
 
@@ -4665,7 +4658,7 @@ if (typeof module !== "undefined" && module.exports) module.exports = INAKI_CONT
   configurarModoDesarrollador();
   recalcularRutaCompleta();
   if (qrInicial && nodosPorId.has(qrInicial)) {
-    avisarImportante(`📍 QR: ${qrInicial} ${nodosPorId.get(qrInicial).name}`);
+    avisarImportante(`QR: ${qrInicial} ${nodosPorId.get(qrInicial).name}`);
   }
   activarCamara(document.getElementById("arVideo"));
   requestAnimationFrame(renderizarBucleAR);
